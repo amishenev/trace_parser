@@ -5,11 +5,12 @@ from .trace import Trace
 
 class TraceSchedWakeup:
     base: Trace
-    format_id: str
+    format_id: int
     comm: str
     pid: int
     prio: int
     target_cpu: int
+    reason: int | None
 
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
@@ -24,7 +25,7 @@ class TraceSchedWakeup:
 
 class TraceSchedWakeupNew:
     base: Trace
-    format_id: str
+    format_id: int
     comm: str
     pid: int
     prio: int

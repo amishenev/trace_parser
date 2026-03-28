@@ -54,14 +54,14 @@ impl TraceReceiveVsync {
     }
 
     pub(crate) fn to_string(&self) -> PyResult<String> {
-        validate_timestamp(self.begin.mark.base.timestamp)?;
+        validate_timestamp(self.begin.base.timestamp)?;
         let payload = self.payload_to_string()?;
         let begin_values = HashMap::from([
             ("trace_mark_tgid", TemplateValue::U32(self.begin.trace_mark_tgid)),
             ("payload", TemplateValue::Str(&payload)),
         ]);
 
-        Ok(self.begin.mark.base.to_string_with_payload(
+        Ok(self.begin.base.to_string_with_payload(
             &BEGIN_TEMPLATE
                 .format(&begin_values)
                 .expect("trace mark begin template must render"),

@@ -1,4 +1,5 @@
 mod common;
+mod format_registry;
 mod frequency;
 mod payload_template;
 mod sched_process_exit;
@@ -6,6 +7,8 @@ mod sched_switch;
 mod sched_wakeup;
 mod trace;
 mod tracing_mark;
+
+pub use format_registry::{FormatRegistry, FormatSpec};
 
 use pyo3::prelude::*;
 

@@ -2,11 +2,13 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
+use regex::Captures;
 
 use crate::common::{
-    cap_parse, cap_str, parse_template_event, validate_timestamp, EventType, FastMatch,
-    TemplateEvent,
+    cap_parse, cap_str, parse_template_event, validate_timestamp, BaseTraceParts, EventType,
+    FastMatch, TemplateEvent,
 };
+use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
@@ -22,13 +24,22 @@ static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
+static FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+    FormatRegistry::new(vec![
+        FormatSpec {
+            kind: 0,
+            template: &TEMPLATE,
+        },
+    ])
+});
+
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct TraceSchedProcessExit {
     #[pyo3(get)]
     pub(crate) base: Trace,
     #[pyo3(get, set)]
-    pub(crate) format_id: String,
+    pub(crate) format_id: u8,
     #[pyo3(get, set)]
     pub(crate) comm: String,
     #[pyo3(get, set)]
@@ -46,8 +57,36 @@ impl EventType for TraceSchedProcessExit {
 impl FastMatch for TraceSchedProcessExit {}
 
 impl TemplateEvent for TraceSchedProcessExit {
-    fn template() -> &'static PayloadTemplate {
-        &TEMPLATE
+    fn formats() -> &'static FormatRegistry {
+        &FORMATS
+    }
+
+    fn parse_payload(
+        parts: BaseTraceParts,
+        captures: &Captures<'_>,
+        _format_id: u8,
+    ) -> Option<Self> {
+        Some(Self {
+            base: Trace::from_parts(parts),
+            format_id: 0,
+            comm: cap_str(captures, "comm")?,
+            pid: cap_parse(captures, "pid")?,
+            prio: cap_parse(captures, "prio")?,
+            group_dead: cap_parse::<u8>(captures, "group_dead")? == 1,
+        })
+    }
+
+    fn render_payload(&self) -> PyResult<String> {
+        let template = Self::formats().template(0).unwrap();
+        let values = HashMap::from([
+            ("comm", TemplateValue::Str(&self.comm)),
+            ("pid", TemplateValue::U32(self.pid)),
+            ("prio", TemplateValue::I32(self.prio)),
+            ("group_dead", TemplateValue::BoolInt(self.group_dead)),
+        ]);
+        Ok(template
+            .format(&values)
+            .expect("sched_process_exit template must render"))
     }
 }
 
@@ -63,28 +102,11 @@ impl TraceSchedProcessExit {
         if !Self::can_be_parsed(line) {
             return None;
         }
-        parse_template_event::<Self, _>(line, |parts, captures| {
-            Some(Self {
-                base: Trace::from_parts(parts),
-                format_id: "default".to_owned(),
-                comm: cap_str(captures, "comm")?,
-                pid: cap_parse(captures, "pid")?,
-                prio: cap_parse(captures, "prio")?,
-                group_dead: cap_parse::<u8>(captures, "group_dead")? == 1,
-            })
-        })
+        parse_template_event::<Self>(line)
     }
 
     pub(crate) fn payload_to_string(&self) -> PyResult<String> {
-        let values = HashMap::from([
-            ("comm", TemplateValue::Str(&self.comm)),
-            ("pid", TemplateValue::U32(self.pid)),
-            ("prio", TemplateValue::I32(self.prio)),
-            ("group_dead", TemplateValue::BoolInt(self.group_dead)),
-        ]);
-        Ok(Self::template()
-            .format(&values)
-            .expect("sched_process_exit template must render"))
+        self.render_payload()
     }
 
     pub(crate) fn to_string(&self) -> PyResult<String> {

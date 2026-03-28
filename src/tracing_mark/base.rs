@@ -1,11 +1,13 @@
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
+use regex::Captures;
 use std::collections::HashMap;
 
 use crate::common::{
-    cap_parse, cap_str, contains_event_name, parse_event, parse_template_event, validate_timestamp,
-    EventType, FastMatch, TemplateEvent,
+    cap_parse, cap_str, parse_template_event, validate_timestamp, BaseTraceParts, EventType,
+    FastMatch, TemplateEvent,
 };
+use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
@@ -19,6 +21,15 @@ pub(crate) static BEGIN_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
+pub(crate) static BEGIN_FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+    FormatRegistry::new(vec![
+        FormatSpec {
+            kind: 0,
+            template: &BEGIN_TEMPLATE,
+        },
+    ])
+});
+
 pub(crate) static END_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     PayloadTemplate::new(
         "E|{trace_mark_tgid}|{payload}",
@@ -28,6 +39,17 @@ pub(crate) static END_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
         ],
     )
 });
+
+pub(crate) static END_FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+    FormatRegistry::new(vec![
+        FormatSpec {
+            kind: 0,
+            template: &END_TEMPLATE,
+        },
+    ])
+});
+
+use crate::common::parse_event;
 
 pub(crate) fn contains_begin_marker(line: &str) -> bool {
     line.contains(" B|") || line.contains(": B|") || line.contains("tracing_mark_write: B|")
@@ -48,7 +70,9 @@ pub struct TracingMark {
 #[derive(Clone, Debug)]
 pub struct TraceMarkBegin {
     #[pyo3(get)]
-    pub(crate) mark: TracingMark,
+    pub(crate) base: Trace,
+    #[pyo3(get, set)]
+    pub(crate) format_id: u8,
     #[pyo3(get, set)]
     pub(crate) trace_mark_tgid: u32,
     #[pyo3(get, set)]
@@ -59,7 +83,9 @@ pub struct TraceMarkBegin {
 #[derive(Clone, Debug)]
 pub struct TraceMarkEnd {
     #[pyo3(get)]
-    pub(crate) mark: TracingMark,
+    pub(crate) base: Trace,
+    #[pyo3(get, set)]
+    pub(crate) format_id: u8,
     #[pyo3(get, set)]
     pub(crate) trace_mark_tgid: u32,
     #[pyo3(get, set)]
@@ -83,8 +109,32 @@ impl FastMatch for TraceMarkBegin {
 }
 
 impl TemplateEvent for TraceMarkBegin {
-    fn template() -> &'static PayloadTemplate {
-        &BEGIN_TEMPLATE
+    fn formats() -> &'static FormatRegistry {
+        &BEGIN_FORMATS
+    }
+
+    fn parse_payload(
+        parts: BaseTraceParts,
+        captures: &Captures<'_>,
+        _format_id: u8,
+    ) -> Option<Self> {
+        Some(Self {
+            base: Trace::from_parts(parts),
+            format_id: 0,
+            trace_mark_tgid: cap_parse(captures, "trace_mark_tgid")?,
+            payload: cap_str(captures, "payload")?,
+        })
+    }
+
+    fn render_payload(&self) -> PyResult<String> {
+        let template = Self::formats().template(0).unwrap();
+        let values = HashMap::from([
+            ("trace_mark_tgid", TemplateValue::U32(self.trace_mark_tgid)),
+            ("payload", TemplateValue::Str(&self.payload)),
+        ]);
+        Ok(template
+            .format(&values)
+            .expect("trace mark begin template must render"))
     }
 }
 
@@ -99,8 +149,32 @@ impl FastMatch for TraceMarkEnd {
 }
 
 impl TemplateEvent for TraceMarkEnd {
-    fn template() -> &'static PayloadTemplate {
-        &END_TEMPLATE
+    fn formats() -> &'static FormatRegistry {
+        &END_FORMATS
+    }
+
+    fn parse_payload(
+        parts: BaseTraceParts,
+        captures: &Captures<'_>,
+        _format_id: u8,
+    ) -> Option<Self> {
+        Some(Self {
+            base: Trace::from_parts(parts),
+            format_id: 0,
+            trace_mark_tgid: cap_parse(captures, "trace_mark_tgid")?,
+            payload: cap_str(captures, "payload")?,
+        })
+    }
+
+    fn render_payload(&self) -> PyResult<String> {
+        let template = Self::formats().template(0).unwrap();
+        let values = HashMap::from([
+            ("trace_mark_tgid", TemplateValue::U32(self.trace_mark_tgid)),
+            ("payload", TemplateValue::Str(&self.payload)),
+        ]);
+        Ok(template
+            .format(&values)
+            .expect("trace mark end template must render"))
     }
 }
 
@@ -113,7 +187,7 @@ impl TracingMark {
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        if !contains_event_name(line, Self::EVENT_NAME) {
+        if !Self::quick_check(line) {
             return None;
         }
         let parts = parse_event::<Self>(line)?;
@@ -144,30 +218,16 @@ impl TraceMarkBegin {
         if !Self::can_be_parsed(line) {
             return None;
         }
-        parse_template_event::<Self, _>(line, |parts, captures| {
-            Some(Self {
-                mark: TracingMark {
-                    base: Trace::from_parts(parts),
-                },
-                trace_mark_tgid: cap_parse(captures, "trace_mark_tgid")?,
-                payload: cap_str(captures, "payload")?,
-            })
-        })
+        parse_template_event::<Self>(line)
     }
 
     pub(crate) fn payload_to_string(&self) -> PyResult<String> {
-        let values = HashMap::from([
-            ("trace_mark_tgid", TemplateValue::U32(self.trace_mark_tgid)),
-            ("payload", TemplateValue::Str(&self.payload)),
-        ]);
-        Ok(Self::template()
-            .format(&values)
-            .expect("trace mark begin template must render"))
+        self.render_payload()
     }
 
     pub(crate) fn to_string(&self) -> PyResult<String> {
-        validate_timestamp(self.mark.base.timestamp)?;
-        Ok(self.mark.base.to_string_with_payload(&self.payload_to_string()?))
+        validate_timestamp(self.base.timestamp)?;
+        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
 }
 
@@ -183,30 +243,16 @@ impl TraceMarkEnd {
         if !Self::can_be_parsed(line) {
             return None;
         }
-        parse_template_event::<Self, _>(line, |parts, captures| {
-            Some(Self {
-                mark: TracingMark {
-                    base: Trace::from_parts(parts),
-                },
-                trace_mark_tgid: cap_parse(captures, "trace_mark_tgid")?,
-                payload: cap_str(captures, "payload")?,
-            })
-        })
+        parse_template_event::<Self>(line)
     }
 
     pub(crate) fn payload_to_string(&self) -> PyResult<String> {
-        let values = HashMap::from([
-            ("trace_mark_tgid", TemplateValue::U32(self.trace_mark_tgid)),
-            ("payload", TemplateValue::Str(&self.payload)),
-        ]);
-        Ok(Self::template()
-            .format(&values)
-            .expect("trace mark end template must render"))
+        self.render_payload()
     }
 
     pub(crate) fn to_string(&self) -> PyResult<String> {
-        validate_timestamp(self.mark.base.timestamp)?;
-        Ok(self.mark.base.to_string_with_payload(&self.payload_to_string()?))
+        validate_timestamp(self.base.timestamp)?;
+        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
 }
 

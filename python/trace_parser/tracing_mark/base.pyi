@@ -18,7 +18,8 @@ class TracingMark:
 
 
 class TraceMarkBegin:
-    mark: TracingMark
+    base: Trace
+    format_id: int
     trace_mark_tgid: int
     payload: str
 
@@ -34,7 +35,8 @@ class TraceMarkBegin:
 
 
 class TraceMarkEnd:
-    mark: TracingMark
+    base: Trace
+    format_id: int
     trace_mark_tgid: int
     payload: str
 

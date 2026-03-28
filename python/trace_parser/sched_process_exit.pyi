@@ -5,7 +5,7 @@ from .trace import Trace
 
 class TraceSchedProcessExit:
     base: Trace
-    format_id: str
+    format_id: int
     comm: str
     pid: int
     prio: int

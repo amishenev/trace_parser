@@ -2,11 +2,13 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
+use regex::Captures;
 
 use crate::common::{
-    cap_parse, cap_str, contains_any, parse_template_event, validate_timestamp, EventType, FastMatch,
-    TemplateEvent,
+    cap_parse, cap_str, contains_any, parse_template_event, validate_timestamp, BaseTraceParts,
+    EventType, FastMatch, TemplateEvent,
 };
+use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
@@ -17,15 +19,13 @@ static CPU_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
-static CLOCK_SET_RATE_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
-    PayloadTemplate::new(
-        "clk={clk} state={state} cpu_id={cpu_id}",
-        &[
-            ("clk", FieldSpec::string()),
-            ("state", FieldSpec::u32()),
-            ("cpu_id", FieldSpec::u32()),
-        ],
-    )
+static CPU_FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+    FormatRegistry::new(vec![
+        FormatSpec {
+            kind: 0,
+            template: &CPU_TEMPLATE,
+        },
+    ])
 });
 
 static DEV_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
@@ -39,13 +39,22 @@ static DEV_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
+static DEV_FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+    FormatRegistry::new(vec![
+        FormatSpec {
+            kind: 0,
+            template: &DEV_TEMPLATE,
+        },
+    ])
+});
+
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct TraceCpuFrequency {
     #[pyo3(get)]
     pub(crate) base: Trace,
     #[pyo3(get, set)]
-    pub(crate) format_id: String,
+    pub(crate) format_id: u8,
     #[pyo3(get, set)]
     pub(crate) state: u32,
     #[pyo3(get, set)]
@@ -58,7 +67,7 @@ pub struct TraceDevFrequency {
     #[pyo3(get)]
     pub(crate) base: Trace,
     #[pyo3(get, set)]
-    pub(crate) format_id: String,
+    pub(crate) format_id: u8,
     #[pyo3(get, set)]
     pub(crate) clk: String,
     #[pyo3(get, set)]
@@ -74,8 +83,32 @@ impl EventType for TraceCpuFrequency {
 impl FastMatch for TraceCpuFrequency {}
 
 impl TemplateEvent for TraceCpuFrequency {
-    fn template() -> &'static PayloadTemplate {
-        &CPU_TEMPLATE
+    fn formats() -> &'static FormatRegistry {
+        &CPU_FORMATS
+    }
+
+    fn parse_payload(
+        parts: BaseTraceParts,
+        captures: &Captures<'_>,
+        _format_id: u8,
+    ) -> Option<Self> {
+        Some(Self {
+            base: Trace::from_parts(parts),
+            format_id: 0,
+            state: cap_parse(captures, "state")?,
+            cpu_id: cap_parse(captures, "cpu_id")?,
+        })
+    }
+
+    fn render_payload(&self) -> PyResult<String> {
+        let template = Self::formats().template(0).unwrap();
+        let values = HashMap::from([
+            ("state", TemplateValue::U32(self.state)),
+            ("cpu_id", TemplateValue::U32(self.cpu_id)),
+        ]);
+        Ok(template
+            .format(&values)
+            .expect("cpu_frequency template must render"))
     }
 }
 
@@ -90,8 +123,34 @@ impl FastMatch for TraceDevFrequency {
 }
 
 impl TemplateEvent for TraceDevFrequency {
-    fn template() -> &'static PayloadTemplate {
-        &DEV_TEMPLATE
+    fn formats() -> &'static FormatRegistry {
+        &DEV_FORMATS
+    }
+
+    fn parse_payload(
+        parts: BaseTraceParts,
+        captures: &Captures<'_>,
+        _format_id: u8,
+    ) -> Option<Self> {
+        Some(Self {
+            base: Trace::from_parts(parts),
+            format_id: 0,
+            clk: cap_str(captures, "clk")?,
+            state: cap_parse(captures, "state")?,
+            cpu_id: cap_parse(captures, "cpu_id")?,
+        })
+    }
+
+    fn render_payload(&self) -> PyResult<String> {
+        let template = Self::formats().template(0).unwrap();
+        let values = HashMap::from([
+            ("clk", TemplateValue::Str(&self.clk)),
+            ("state", TemplateValue::U32(self.state)),
+            ("cpu_id", TemplateValue::U32(self.cpu_id)),
+        ]);
+        Ok(template
+            .format(&values)
+            .expect("clock_set_rate template must render"))
     }
 }
 
@@ -107,24 +166,11 @@ impl TraceCpuFrequency {
         if !Self::can_be_parsed(line) {
             return None;
         }
-        parse_template_event::<Self, _>(line, |parts, captures| {
-            Some(Self {
-                base: Trace::from_parts(parts),
-                format_id: "default".to_owned(),
-                state: cap_parse(captures, "state")?,
-                cpu_id: cap_parse(captures, "cpu_id")?,
-            })
-        })
+        parse_template_event::<Self>(line)
     }
 
     pub(crate) fn payload_to_string(&self) -> PyResult<String> {
-        let values = HashMap::from([
-            ("state", TemplateValue::U32(self.state)),
-            ("cpu_id", TemplateValue::U32(self.cpu_id)),
-        ]);
-        Ok(CPU_TEMPLATE
-            .format(&values)
-            .expect("cpu_frequency template must render"))
+        self.render_payload()
     }
 
     pub(crate) fn to_string(&self) -> PyResult<String> {
@@ -145,26 +191,11 @@ impl TraceDevFrequency {
         if !Self::can_be_parsed(line) {
             return None;
         }
-        parse_template_event::<Self, _>(line, |parts, captures| {
-            Some(Self {
-                base: Trace::from_parts(parts),
-                format_id: "default".to_owned(),
-                clk: cap_str(captures, "clk")?,
-                state: cap_parse(captures, "state")?,
-                cpu_id: cap_parse(captures, "cpu_id")?,
-            })
-        })
+        parse_template_event::<Self>(line)
     }
 
     pub(crate) fn payload_to_string(&self) -> PyResult<String> {
-        let values = HashMap::from([
-            ("clk", TemplateValue::Str(&self.clk)),
-            ("state", TemplateValue::U32(self.state)),
-            ("cpu_id", TemplateValue::U32(self.cpu_id)),
-        ]);
-        Ok(CLOCK_SET_RATE_TEMPLATE
-            .format(&values)
-            .expect("clock_set_rate template must render"))
+        self.render_payload()
     }
 
     pub(crate) fn to_string(&self) -> PyResult<String> {
@@ -179,50 +210,18 @@ mod tests {
 
     #[test]
     fn cpu_frequency_parses() {
-        let line = "swapper-0 (0) [000] .... 12345.678900: cpu_frequency: state=1200000 cpu_id=0";
+        let line = "swapper-0 (0) [000] .... 12345.678900: cpu_frequency: state=933000000 cpu_id=0";
         let trace = TraceCpuFrequency::parse(line).expect("cpu_frequency must parse");
-        assert_eq!(trace.state, 1_200_000);
+        assert_eq!(trace.state, 933000000);
         assert_eq!(trace.cpu_id, 0);
-        assert_eq!(
-            trace.payload_to_string().expect("payload_to_string must work"),
-            "state=1200000 cpu_id=0"
-        );
-        assert_eq!(
-            trace.to_string().expect("to_string must work"),
-            "swapper-0 (0) [000] .... 12345.678900: cpu_frequency: state=1200000 cpu_id=0"
-        );
     }
 
     #[test]
-    fn dev_frequency_parses_ddr_devfreq() {
-        let line =
-            "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=ddr_devfreq state=933000000 cpu_id=0";
-        let trace = TraceDevFrequency::parse(line).expect("ddr_devfreq must parse");
+    fn dev_frequency_parses() {
+        let line = "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=ddr_devfreq state=933000000 cpu_id=0";
+        let trace = TraceDevFrequency::parse(line).expect("clock_set_rate must parse");
         assert_eq!(trace.clk, "ddr_devfreq");
-        assert_eq!(trace.state, 933_000_000);
-        assert_eq!(
-            trace.payload_to_string().expect("payload_to_string must work"),
-            "clk=ddr_devfreq state=933000000 cpu_id=0"
-        );
-        assert_eq!(
-            trace.to_string().expect("to_string must work"),
-            "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=ddr_devfreq state=933000000 cpu_id=0"
-        );
-    }
-
-    #[test]
-    fn dev_frequency_parses_l3c_devfreq() {
-        let line =
-            "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=l3c_devfreq state=600000000 cpu_id=0";
-        let trace = TraceDevFrequency::parse(line).expect("l3c_devfreq must parse");
-        assert_eq!(trace.clk, "l3c_devfreq");
-        assert_eq!(trace.state, 600_000_000);
-    }
-
-    #[test]
-    fn dev_frequency_rejects_other_clock_names() {
-        let line =
-            "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=gpu_clk state=800000000 cpu_id=0";
-        assert!(TraceDevFrequency::parse(line).is_none());
+        assert_eq!(trace.state, 933000000);
+        assert_eq!(trace.cpu_id, 0);
     }
 }

@@ -184,3 +184,32 @@ git push origin v0.1.0
 - stabilize the typed-event authoring pattern
 - improve Python-side ergonomics for common base fields
 - expand Python smoke coverage and release artifacts
+
+## Multiple format support
+
+`trace_parser` supports multiple payload formats per event type through `FormatRegistry`.
+
+Example with `sched_wakeup` which has two formats:
+
+```python
+# Default format
+line1 = "kworker-123 (123) [000] .... 12345.679001: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=000"
+wakeup1 = TraceSchedWakeup.parse(line1)
+print(wakeup1.format_kind)  # "orig"
+print(wakeup1.reason)       # None
+
+# Extended format with reason
+line2 = "kworker-123 (123) [000] .... 12345.679001: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=000 reason=3"
+wakeup2 = TraceSchedWakeup.parse(line2)
+print(wakeup2.format_kind)  # "with_reason"
+print(wakeup2.reason)       # 3
+```
+
+Round-trip is preserved:
+
+```python
+rendered = wakeup2.to_string()
+reparsed = TraceSchedWakeup.parse(rendered)
+assert reparsed.format_kind == "with_reason"
+assert reparsed.reason == 3
+```

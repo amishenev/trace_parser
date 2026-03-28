@@ -2,11 +2,13 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
+use regex::Captures;
 
 use crate::common::{
-    cap_parse, cap_str, parse_template_event, validate_timestamp, EventType, FastMatch,
-    TemplateEvent,
+    cap_parse, cap_str, parse_template_event, validate_timestamp, BaseTraceParts, EventType,
+    FastMatch, TemplateEvent,
 };
+use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
@@ -25,13 +27,22 @@ static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
+static FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+    FormatRegistry::new(vec![
+        FormatSpec {
+            kind: 0,
+            template: &TEMPLATE,
+        },
+    ])
+});
+
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct TraceSchedSwitch {
     #[pyo3(get)]
     pub(crate) base: Trace,
     #[pyo3(get, set)]
-    pub(crate) format_id: String,
+    pub(crate) format_id: u8,
     #[pyo3(get, set)]
     pub(crate) prev_comm: String,
     #[pyo3(get, set)]
@@ -55,8 +66,42 @@ impl EventType for TraceSchedSwitch {
 impl FastMatch for TraceSchedSwitch {}
 
 impl TemplateEvent for TraceSchedSwitch {
-    fn template() -> &'static PayloadTemplate {
-        &TEMPLATE
+    fn formats() -> &'static FormatRegistry {
+        &FORMATS
+    }
+
+    fn parse_payload(
+        parts: BaseTraceParts,
+        captures: &Captures<'_>,
+        _format_id: u8,
+    ) -> Option<Self> {
+        Some(Self {
+            base: Trace::from_parts(parts),
+            format_id: 0,
+            prev_comm: cap_str(captures, "prev_comm")?,
+            prev_pid: cap_parse(captures, "prev_pid")?,
+            prev_prio: cap_parse(captures, "prev_prio")?,
+            prev_state: cap_str(captures, "prev_state")?,
+            next_comm: cap_str(captures, "next_comm")?,
+            next_pid: cap_parse(captures, "next_pid")?,
+            next_prio: cap_parse(captures, "next_prio")?,
+        })
+    }
+
+    fn render_payload(&self) -> PyResult<String> {
+        let template = Self::formats().template(0).unwrap();
+        let values = HashMap::from([
+            ("prev_comm", TemplateValue::Str(&self.prev_comm)),
+            ("prev_pid", TemplateValue::U32(self.prev_pid)),
+            ("prev_prio", TemplateValue::I32(self.prev_prio)),
+            ("prev_state", TemplateValue::Str(&self.prev_state)),
+            ("next_comm", TemplateValue::Str(&self.next_comm)),
+            ("next_pid", TemplateValue::U32(self.next_pid)),
+            ("next_prio", TemplateValue::I32(self.next_prio)),
+        ]);
+        Ok(template
+            .format(&values)
+            .expect("sched_switch payload template must render"))
     }
 }
 
@@ -72,35 +117,11 @@ impl TraceSchedSwitch {
         if !Self::can_be_parsed(line) {
             return None;
         }
-        parse_template_event::<Self, _>(line, |parts, captures| {
-            Some(Self {
-                base: Trace::from_parts(parts),
-                format_id: "default".to_owned(),
-                prev_comm: cap_str(captures, "prev_comm")?,
-                prev_pid: cap_parse(captures, "prev_pid")?,
-                prev_prio: cap_parse(captures, "prev_prio")?,
-                prev_state: cap_str(captures, "prev_state")?,
-                next_comm: cap_str(captures, "next_comm")?,
-                next_pid: cap_parse(captures, "next_pid")?,
-                next_prio: cap_parse(captures, "next_prio")?,
-            })
-        })
+        parse_template_event::<Self>(line)
     }
 
     pub(crate) fn payload_to_string(&self) -> PyResult<String> {
-        let values = HashMap::from([
-            ("prev_comm", TemplateValue::Str(&self.prev_comm)),
-            ("prev_pid", TemplateValue::U32(self.prev_pid)),
-            ("prev_prio", TemplateValue::I32(self.prev_prio)),
-            ("prev_state", TemplateValue::Str(&self.prev_state)),
-            ("next_comm", TemplateValue::Str(&self.next_comm)),
-            ("next_pid", TemplateValue::U32(self.next_pid)),
-            ("next_prio", TemplateValue::I32(self.next_prio)),
-        ]);
-
-        Ok(Self::template()
-            .format(&values)
-            .expect("sched_switch payload template must render"))
+        self.render_payload()
     }
 
     pub(crate) fn to_string(&self) -> PyResult<String> {

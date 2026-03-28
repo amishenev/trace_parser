@@ -5,7 +5,7 @@ from .trace import Trace
 
 class TraceSchedSwitch:
     base: Trace
-    format_id: str
+    format_id: int
     prev_comm: str
     prev_pid: int
     prev_prio: int

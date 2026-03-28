@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use regex::{Captures, Regex};
 use std::str::FromStr;
 
-use crate::payload_template::PayloadTemplate;
+use crate::format_registry::FormatRegistry;
 
 pub(crate) static BASE_TRACE_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -13,6 +13,7 @@ pub(crate) static BASE_TRACE_RE: Lazy<Regex> = Lazy::new(|| {
     .expect("base trace regex must compile")
 });
 
+#[derive(Clone)]
 pub(crate) struct BaseTraceParts {
     pub(crate) thread_name: String,
     pub(crate) tid: u32,
@@ -59,7 +60,26 @@ pub(crate) trait FastMatch: EventType {
 }
 
 pub(crate) trait TemplateEvent: EventType {
-    fn template() -> &'static PayloadTemplate;
+    /// Словарь форматов для этого события
+    fn formats() -> &'static FormatRegistry;
+
+    /// Детекция формата по payload
+    /// По умолчанию возвращает 0 (формат по умолчанию)
+    fn detect_format(_payload: &str) -> u8 {
+        0
+    }
+
+    /// Парсинг полей из captures с учётом формата
+    fn parse_payload(
+        parts: BaseTraceParts,
+        captures: &Captures<'_>,
+        format_id: u8,
+    ) -> Option<Self>
+    where
+        Self: Sized;
+
+    /// Рендер полей в payload с учётом формата
+    fn render_payload(&self) -> PyResult<String>;
 }
 
 pub(crate) fn contains_event_name(line: &str, event_name: &str) -> bool {
@@ -100,14 +120,21 @@ pub(crate) fn parse_event<T: EventType>(line: &str) -> Option<BaseTraceParts> {
     Some(parts)
 }
 
-pub(crate) fn parse_template_event<T: TemplateEvent, R>(
-    line: &str,
-    build: impl FnOnce(BaseTraceParts, &Captures<'_>) -> Option<R>,
-) -> Option<R> {
+pub(crate) fn parse_template_event<T: TemplateEvent>(line: &str) -> Option<T> {
     let parts = parse_event::<T>(line)?;
     let payload_raw = parts.payload_raw.clone();
-    let captures = T::template().captures(&payload_raw)?;
-    build(parts, &captures)
+
+    // Детекция формата
+    let format_id = T::detect_format(&payload_raw);
+
+    // Выбор шаблона по формату
+    let template = T::formats().template(format_id)?;
+
+    // Парсинг через regex
+    let captures = template.captures(&payload_raw)?;
+
+    // Создание объекта
+    T::parse_payload(parts, &captures, format_id)
 }
 
 pub(crate) fn cap_str(captures: &Captures<'_>, name: &str) -> Option<String> {

@@ -5,7 +5,7 @@ from .trace import Trace
 
 class TraceCpuFrequency:
     base: Trace
-    format_id: str
+    format_id: int
     state: int
     cpu_id: int
 
@@ -22,7 +22,7 @@ class TraceCpuFrequency:
 
 class TraceDevFrequency:
     base: Trace
-    format_id: str
+    format_id: int
     clk: str
     state: int
     cpu_id: int
