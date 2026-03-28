@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 
-use crate::common::{can_parse_template_event, parse_template_event, validate_timestamp, EventType, TemplateEvent};
+use crate::common::{
+    can_parse_template_event, cap_parse, cap_str, parse_template_event, validate_timestamp,
+    EventType, TemplateEvent,
+};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
@@ -55,19 +58,15 @@ impl TraceSchedProcessExit {
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
-        let captures = Self::template().captures(&payload_raw)?;
-        let comm = captures.name("comm")?.as_str().to_owned();
-        let pid = captures.name("pid")?.as_str().parse().ok()?;
-        let prio = captures.name("prio")?.as_str().parse().ok()?;
-        let group_dead = matches!(captures.name("group_dead")?.as_str(), "1");
-        Some(Self {
-            base: Trace::from_parts(parts),
-            format_id: "default".to_owned(),
-            comm,
-            pid,
-            prio,
-            group_dead,
+        parse_template_event::<Self, _>(line, |parts, captures| {
+            Some(Self {
+                base: Trace::from_parts(parts),
+                format_id: "default".to_owned(),
+                comm: cap_str(captures, "comm")?,
+                pid: cap_parse(captures, "pid")?,
+                prio: cap_parse(captures, "prio")?,
+                group_dead: cap_parse::<u8>(captures, "group_dead")? == 1,
+            })
         })
     }
 

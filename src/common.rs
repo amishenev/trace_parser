@@ -1,7 +1,8 @@
 use once_cell::sync::Lazy;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use regex::Regex;
+use regex::{Captures, Regex};
+use std::str::FromStr;
 
 use crate::payload_template::PayloadTemplate;
 
@@ -73,13 +74,22 @@ pub(crate) fn can_parse_template_event<T: TemplateEvent>(line: &str) -> bool {
     parts.event_name == T::EVENT_NAME && T::template().is_match(&parts.payload_raw)
 }
 
-pub(crate) fn parse_template_event<T: TemplateEvent>(line: &str) -> Option<(BaseTraceParts, String)> {
+pub(crate) fn parse_template_event<T: TemplateEvent, R>(
+    line: &str,
+    build: impl FnOnce(BaseTraceParts, &Captures<'_>) -> Option<R>,
+) -> Option<R> {
     let parts = parse_event::<T>(line)?;
-    if !T::template().is_match(&parts.payload_raw) {
-        return None;
-    }
     let payload_raw = parts.payload_raw.clone();
-    Some((parts, payload_raw))
+    let captures = T::template().captures(&payload_raw)?;
+    build(parts, &captures)
+}
+
+pub(crate) fn cap_str(captures: &Captures<'_>, name: &str) -> Option<String> {
+    Some(captures.name(name)?.as_str().to_owned())
+}
+
+pub(crate) fn cap_parse<T: FromStr>(captures: &Captures<'_>, name: &str) -> Option<T> {
+    captures.name(name)?.as_str().parse().ok()
 }
 
 pub(crate) fn validate_timestamp(value: f64) -> PyResult<f64> {

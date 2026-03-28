@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 
-use crate::common::{can_parse_template_event, parse_template_event, validate_timestamp, EventType, TemplateEvent};
+use crate::common::{
+    can_parse_template_event, cap_parse, cap_str, parse_template_event, validate_timestamp,
+    EventType, TemplateEvent,
+};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
@@ -64,25 +67,18 @@ impl TraceSchedSwitch {
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
-        let captures = Self::template().captures(&payload_raw)?;
-        let prev_comm = captures.name("prev_comm")?.as_str().to_owned();
-        let prev_pid = captures.name("prev_pid")?.as_str().parse().ok()?;
-        let prev_prio = captures.name("prev_prio")?.as_str().parse().ok()?;
-        let prev_state = captures.name("prev_state")?.as_str().to_owned();
-        let next_comm = captures.name("next_comm")?.as_str().to_owned();
-        let next_pid = captures.name("next_pid")?.as_str().parse().ok()?;
-        let next_prio = captures.name("next_prio")?.as_str().parse().ok()?;
-        Some(Self {
-            base: Trace::from_parts(parts),
-            format_id: "default".to_owned(),
-            prev_comm,
-            prev_pid,
-            prev_prio,
-            prev_state,
-            next_comm,
-            next_pid,
-            next_prio,
+        parse_template_event::<Self, _>(line, |parts, captures| {
+            Some(Self {
+                base: Trace::from_parts(parts),
+                format_id: "default".to_owned(),
+                prev_comm: cap_str(captures, "prev_comm")?,
+                prev_pid: cap_parse(captures, "prev_pid")?,
+                prev_prio: cap_parse(captures, "prev_prio")?,
+                prev_state: cap_str(captures, "prev_state")?,
+                next_comm: cap_str(captures, "next_comm")?,
+                next_pid: cap_parse(captures, "next_pid")?,
+                next_prio: cap_parse(captures, "next_prio")?,
+            })
         })
     }
 

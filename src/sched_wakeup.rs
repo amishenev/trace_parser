@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 
-use crate::common::{can_parse_template_event, parse_template_event, validate_timestamp, EventType, TemplateEvent};
+use crate::common::{
+    can_parse_template_event, cap_parse, cap_str, parse_template_event, validate_timestamp,
+    EventType, TemplateEvent,
+};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
@@ -65,19 +68,15 @@ impl TraceSchedWakeup {
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
-        let captures = Self::template().captures(&payload_raw)?;
-        let comm = captures.name("comm")?.as_str().to_owned();
-        let pid = captures.name("pid")?.as_str().parse().ok()?;
-        let prio = captures.name("prio")?.as_str().parse().ok()?;
-        let target_cpu = captures.name("target_cpu")?.as_str().parse().ok()?;
-        Some(Self {
-            base: Trace::from_parts(parts),
-            format_id: "default".to_owned(),
-            comm,
-            pid,
-            prio,
-            target_cpu,
+        parse_template_event::<Self, _>(line, |parts, captures| {
+            Some(Self {
+                base: Trace::from_parts(parts),
+                format_id: "default".to_owned(),
+                comm: cap_str(captures, "comm")?,
+                pid: cap_parse(captures, "pid")?,
+                prio: cap_parse(captures, "prio")?,
+                target_cpu: cap_parse(captures, "target_cpu")?,
+            })
         })
     }
 
@@ -126,19 +125,15 @@ impl TraceSchedWakeupNew {
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
-        let captures = Self::template().captures(&payload_raw)?;
-        let comm = captures.name("comm")?.as_str().to_owned();
-        let pid = captures.name("pid")?.as_str().parse().ok()?;
-        let prio = captures.name("prio")?.as_str().parse().ok()?;
-        let target_cpu = captures.name("target_cpu")?.as_str().parse().ok()?;
-        Some(Self {
-            base: Trace::from_parts(parts),
-            format_id: "default".to_owned(),
-            comm,
-            pid,
-            prio,
-            target_cpu,
+        parse_template_event::<Self, _>(line, |parts, captures| {
+            Some(Self {
+                base: Trace::from_parts(parts),
+                format_id: "default".to_owned(),
+                comm: cap_str(captures, "comm")?,
+                pid: cap_parse(captures, "pid")?,
+                prio: cap_parse(captures, "prio")?,
+                target_cpu: cap_parse(captures, "target_cpu")?,
+            })
         })
     }
 

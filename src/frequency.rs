@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 
-use crate::common::{can_parse_template_event, parse_template_event, validate_timestamp, EventType, TemplateEvent};
+use crate::common::{
+    can_parse_template_event, cap_parse, cap_str, parse_template_event, validate_timestamp,
+    EventType, TemplateEvent,
+};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
@@ -78,15 +81,13 @@ impl TraceCpuFrequency {
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
-        let captures = Self::template().captures(&payload_raw)?;
-        let state = captures.name("state")?.as_str().parse().ok()?;
-        let cpu_id = captures.name("cpu_id")?.as_str().parse().ok()?;
-        Some(Self {
-            base: Trace::from_parts(parts),
-            format_id: "default".to_owned(),
-            state,
-            cpu_id,
+        parse_template_event::<Self, _>(line, |parts, captures| {
+            Some(Self {
+                base: Trace::from_parts(parts),
+                format_id: "default".to_owned(),
+                state: cap_parse(captures, "state")?,
+                cpu_id: cap_parse(captures, "cpu_id")?,
+            })
         })
     }
 
@@ -130,17 +131,14 @@ impl TraceDevFrequency {
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
-        let captures = Self::template().captures(&payload_raw)?;
-        let clk = captures.name("clk")?.as_str().to_owned();
-        let state = captures.name("state")?.as_str().parse().ok()?;
-        let cpu_id = captures.name("cpu_id")?.as_str().parse().ok()?;
-        Some(Self {
-            base: Trace::from_parts(parts),
-            format_id: "default".to_owned(),
-            clk,
-            state,
-            cpu_id,
+        parse_template_event::<Self, _>(line, |parts, captures| {
+            Some(Self {
+                base: Trace::from_parts(parts),
+                format_id: "default".to_owned(),
+                clk: cap_str(captures, "clk")?,
+                state: cap_parse(captures, "state")?,
+                cpu_id: cap_parse(captures, "cpu_id")?,
+            })
         })
     }
 

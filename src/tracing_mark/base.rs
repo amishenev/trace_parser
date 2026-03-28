@@ -2,7 +2,10 @@ use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
-use crate::common::{can_parse_event, can_parse_template_event, parse_event, parse_template_event, validate_timestamp, EventType, TemplateEvent};
+use crate::common::{
+    can_parse_event, can_parse_template_event, cap_parse, cap_str, parse_event,
+    parse_template_event, validate_timestamp, EventType, TemplateEvent,
+};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
@@ -102,16 +105,14 @@ impl TraceMarkBegin {
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
-        let captures = Self::template().captures(&payload_raw)?;
-        let trace_mark_tgid = captures.name("trace_mark_tgid")?.as_str().parse().ok()?;
-        let payload = captures.name("payload")?.as_str().to_owned();
-        Some(Self {
-            mark: TracingMark {
-                base: Trace::from_parts(parts),
-            },
-            trace_mark_tgid,
-            payload,
+        parse_template_event::<Self, _>(line, |parts, captures| {
+            Some(Self {
+                mark: TracingMark {
+                    base: Trace::from_parts(parts),
+                },
+                trace_mark_tgid: cap_parse(captures, "trace_mark_tgid")?,
+                payload: cap_str(captures, "payload")?,
+            })
         })
     }
 
@@ -152,16 +153,14 @@ impl TraceMarkEnd {
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
-        let captures = Self::template().captures(&payload_raw)?;
-        let trace_mark_tgid = captures.name("trace_mark_tgid")?.as_str().parse().ok()?;
-        let payload = captures.name("payload")?.as_str().to_owned();
-        Some(Self {
-            mark: TracingMark {
-                base: Trace::from_parts(parts),
-            },
-            trace_mark_tgid,
-            payload,
+        parse_template_event::<Self, _>(line, |parts, captures| {
+            Some(Self {
+                mark: TracingMark {
+                    base: Trace::from_parts(parts),
+                },
+                trace_mark_tgid: cap_parse(captures, "trace_mark_tgid")?,
+                payload: cap_str(captures, "payload")?,
+            })
         })
     }
 
