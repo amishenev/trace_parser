@@ -4,8 +4,8 @@ use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 
 use crate::common::{
-    cap_parse, cap_str, contains_any, parse_template_event, validate_timestamp, EventType,
-    FastMatch, TemplateEvent,
+    cap_parse, cap_str, contains_any, parse_template_event, validate_timestamp, EventType, FastMatch,
+    TemplateEvent,
 };
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
@@ -39,6 +39,34 @@ static DEV_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
+#[pyclass]
+#[derive(Clone, Debug)]
+pub struct TraceCpuFrequency {
+    #[pyo3(get)]
+    pub(crate) base: Trace,
+    #[pyo3(get, set)]
+    pub(crate) format_id: String,
+    #[pyo3(get, set)]
+    pub(crate) state: u32,
+    #[pyo3(get, set)]
+    pub(crate) cpu_id: u32,
+}
+
+#[pyclass]
+#[derive(Clone, Debug)]
+pub struct TraceDevFrequency {
+    #[pyo3(get)]
+    pub(crate) base: Trace,
+    #[pyo3(get, set)]
+    pub(crate) format_id: String,
+    #[pyo3(get, set)]
+    pub(crate) clk: String,
+    #[pyo3(get, set)]
+    pub(crate) state: u32,
+    #[pyo3(get, set)]
+    pub(crate) cpu_id: u32,
+}
+
 impl EventType for TraceCpuFrequency {
     const EVENT_NAME: &'static str = "cpu_frequency";
 }
@@ -65,19 +93,6 @@ impl TemplateEvent for TraceDevFrequency {
     fn template() -> &'static PayloadTemplate {
         &DEV_TEMPLATE
     }
-}
-
-#[pyclass]
-#[derive(Clone, Debug)]
-pub struct TraceCpuFrequency {
-    #[pyo3(get)]
-    pub(crate) base: Trace,
-    #[pyo3(get, set)]
-    pub(crate) format_id: String,
-    #[pyo3(get, set)]
-    pub(crate) state: u32,
-    #[pyo3(get, set)]
-    pub(crate) cpu_id: u32,
 }
 
 #[pymethods]
@@ -116,21 +131,6 @@ impl TraceCpuFrequency {
         validate_timestamp(self.base.timestamp)?;
         Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
-}
-
-#[pyclass]
-#[derive(Clone, Debug)]
-pub struct TraceDevFrequency {
-    #[pyo3(get)]
-    pub(crate) base: Trace,
-    #[pyo3(get, set)]
-    pub(crate) format_id: String,
-    #[pyo3(get, set)]
-    pub(crate) clk: String,
-    #[pyo3(get, set)]
-    pub(crate) state: u32,
-    #[pyo3(get, set)]
-    pub(crate) cpu_id: u32,
 }
 
 #[pymethods]

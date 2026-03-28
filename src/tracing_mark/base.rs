@@ -3,8 +3,8 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 
 use crate::common::{
-    cap_parse, cap_str, contains_event_name, parse_event, parse_template_event,
-    validate_timestamp, EventType, FastMatch, TemplateEvent,
+    cap_parse, cap_str, contains_event_name, parse_event, parse_template_event, validate_timestamp,
+    EventType, FastMatch, TemplateEvent,
 };
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
@@ -19,12 +19,51 @@ pub(crate) static BEGIN_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
+pub(crate) static END_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+    PayloadTemplate::new(
+        "E|{trace_mark_tgid}|{payload}",
+        &[
+            ("trace_mark_tgid", FieldSpec::u32()),
+            ("payload", FieldSpec::custom(r".*")),
+        ],
+    )
+});
+
 pub(crate) fn contains_begin_marker(line: &str) -> bool {
     line.contains(" B|") || line.contains(": B|") || line.contains("tracing_mark_write: B|")
 }
 
 pub(crate) fn contains_end_marker(line: &str) -> bool {
     line.contains(" E|") || line.contains(": E|") || line.contains("tracing_mark_write: E|")
+}
+
+#[pyclass]
+#[derive(Clone, Debug)]
+pub struct TracingMark {
+    #[pyo3(get)]
+    pub(crate) base: Trace,
+}
+
+#[pyclass]
+#[derive(Clone, Debug)]
+pub struct TraceMarkBegin {
+    #[pyo3(get)]
+    pub(crate) mark: TracingMark,
+    #[pyo3(get, set)]
+    pub(crate) trace_mark_tgid: u32,
+    #[pyo3(get, set)]
+    pub(crate) payload: String,
+}
+
+#[pyclass]
+#[derive(Clone, Debug)]
+pub struct TraceMarkEnd {
+    #[pyo3(get)]
+    pub(crate) mark: TracingMark,
+    #[pyo3(get, set)]
+    pub(crate) trace_mark_tgid: u32,
+    #[pyo3(get, set)]
+    pub(crate) payload: String,
 }
 
 impl EventType for TracingMark {
@@ -65,23 +104,6 @@ impl TemplateEvent for TraceMarkEnd {
     }
 }
 
-pub(crate) static END_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
-    PayloadTemplate::new(
-        "E|{trace_mark_tgid}|{payload}",
-        &[
-            ("trace_mark_tgid", FieldSpec::u32()),
-            ("payload", FieldSpec::custom(r".*")),
-        ],
-    )
-});
-
-#[pyclass]
-#[derive(Clone, Debug)]
-pub struct TracingMark {
-    #[pyo3(get)]
-    pub(crate) base: Trace,
-}
-
 #[pymethods]
 impl TracingMark {
     #[staticmethod]
@@ -110,17 +132,6 @@ impl TracingMark {
     }
 }
 
-#[pyclass]
-#[derive(Clone, Debug)]
-pub struct TraceMarkBegin {
-    #[pyo3(get)]
-    pub(crate) mark: TracingMark,
-    #[pyo3(get, set)]
-    pub(crate) trace_mark_tgid: u32,
-    #[pyo3(get, set)]
-    pub(crate) payload: String,
-}
-
 #[pymethods]
 impl TraceMarkBegin {
     #[staticmethod]
@@ -144,32 +155,20 @@ impl TraceMarkBegin {
         })
     }
 
-    pub(crate) fn to_string(&self) -> PyResult<String> {
-        validate_timestamp(self.mark.base.timestamp)?;
-        Ok(self.mark.base.to_string_with_payload(&self.payload_to_string()?))
-    }
-
     pub(crate) fn payload_to_string(&self) -> PyResult<String> {
         let values = HashMap::from([
             ("trace_mark_tgid", TemplateValue::U32(self.trace_mark_tgid)),
             ("payload", TemplateValue::Str(&self.payload)),
         ]);
-
         Ok(Self::template()
             .format(&values)
             .expect("trace mark begin template must render"))
     }
-}
 
-#[pyclass]
-#[derive(Clone, Debug)]
-pub struct TraceMarkEnd {
-    #[pyo3(get)]
-    pub(crate) mark: TracingMark,
-    #[pyo3(get, set)]
-    pub(crate) trace_mark_tgid: u32,
-    #[pyo3(get, set)]
-    pub(crate) payload: String,
+    pub(crate) fn to_string(&self) -> PyResult<String> {
+        validate_timestamp(self.mark.base.timestamp)?;
+        Ok(self.mark.base.to_string_with_payload(&self.payload_to_string()?))
+    }
 }
 
 #[pymethods]
@@ -200,7 +199,6 @@ impl TraceMarkEnd {
             ("trace_mark_tgid", TemplateValue::U32(self.trace_mark_tgid)),
             ("payload", TemplateValue::Str(&self.payload)),
         ]);
-
         Ok(Self::template()
             .format(&values)
             .expect("trace mark end template must render"))
@@ -247,8 +245,7 @@ mod tests {
 
     #[test]
     fn trace_mark_end_parses_generic_end_payload() {
-        let line =
-            "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: E|10|done";
+        let line = "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: E|10|done";
         let mark = TraceMarkEnd::parse(line).expect("end mark must parse");
         assert_eq!(mark.trace_mark_tgid, 10);
         assert_eq!(mark.payload, "done");

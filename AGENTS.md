@@ -148,6 +148,23 @@ Important constraint for future work:
 - if flattened access like `vsync.timestamp` is added later, it must come from one shared mechanism
 - do not add one-off convenience properties per class
 
+### File layout convention
+
+- Put the `#[pyclass]` type definition first.
+- Follow it with any inherent `impl Type` helpers.
+- Trait implementations (`EventType`, `FastMatch`, `TemplateEvent`) go next so readers see the metadata after knowing the type.
+- The `#[pymethods] impl Type` block comes after the trait impls, exposing the Python API.
+- Tests remain at the bottom. Keeping this order makes the file easier to scan and keeps trait impls from floating above their struct.
+
+### Fast-match heuristics
+
+- `FastMatch::quick_check` now defaults to an `event_name` match (`contains_event_name(line, Self::EVENT_NAME)`); override `payload_quick_check` only when payload clues matter.
+- `contains_all(line, [...])` and `contains_any(line, [...])` helpers exist for future multi-format heuristics.
+- `TraceDevFrequency` overrides `payload_quick_check` to require `clk=ddr_devfreq` or `clk=l3c_devfreq`.
+- Shared helpers `contains_begin_marker` / `contains_end_marker` back `TraceMarkBegin`, `TraceMarkEnd`, and `TraceReceiveVsync`.
+- The heavy regex work is now gated by cheap fast checks, and `parse_trace()` routes a line to a single parser after these heuristics pass.
+- `benches/can_be_parsed.rs` captures the cost of each check path; rerun it whenever you touch the heuristic to judge regression risk.
+
 ## Payload templates
 
 ### File

@@ -25,18 +25,6 @@ static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
-impl EventType for TraceSchedSwitch {
-    const EVENT_NAME: &'static str = "sched_switch";
-}
-
-impl FastMatch for TraceSchedSwitch {}
-
-impl TemplateEvent for TraceSchedSwitch {
-    fn template() -> &'static PayloadTemplate {
-        &TEMPLATE
-    }
-}
-
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct TraceSchedSwitch {
@@ -58,6 +46,18 @@ pub struct TraceSchedSwitch {
     pub(crate) next_pid: u32,
     #[pyo3(get, set)]
     pub(crate) next_prio: i32,
+}
+
+impl EventType for TraceSchedSwitch {
+    const EVENT_NAME: &'static str = "sched_switch";
+}
+
+impl FastMatch for TraceSchedSwitch {}
+
+impl TemplateEvent for TraceSchedSwitch {
+    fn template() -> &'static PayloadTemplate {
+        &TEMPLATE
+    }
 }
 
 #[pymethods]

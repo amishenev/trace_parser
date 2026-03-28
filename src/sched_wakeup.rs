@@ -22,6 +22,23 @@ static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
+#[pyclass]
+#[derive(Clone, Debug)]
+pub struct TraceSchedWakeup {
+    #[pyo3(get)]
+    pub(crate) base: Trace,
+    #[pyo3(get, set)]
+    pub(crate) format_id: String,
+    #[pyo3(get, set)]
+    pub(crate) comm: String,
+    #[pyo3(get, set)]
+    pub(crate) pid: u32,
+    #[pyo3(get, set)]
+    pub(crate) prio: i32,
+    #[pyo3(get, set)]
+    pub(crate) target_cpu: u32,
+}
+
 impl EventType for TraceSchedWakeup {
     const EVENT_NAME: &'static str = "sched_wakeup";
 }
@@ -44,23 +61,6 @@ impl TemplateEvent for TraceSchedWakeupNew {
     fn template() -> &'static PayloadTemplate {
         &TEMPLATE
     }
-}
-
-#[pyclass]
-#[derive(Clone, Debug)]
-pub struct TraceSchedWakeup {
-    #[pyo3(get)]
-    pub(crate) base: Trace,
-    #[pyo3(get, set)]
-    pub(crate) format_id: String,
-    #[pyo3(get, set)]
-    pub(crate) comm: String,
-    #[pyo3(get, set)]
-    pub(crate) pid: u32,
-    #[pyo3(get, set)]
-    pub(crate) prio: i32,
-    #[pyo3(get, set)]
-    pub(crate) target_cpu: u32,
 }
 
 #[pymethods]

@@ -22,18 +22,6 @@ static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
-impl EventType for TraceSchedProcessExit {
-    const EVENT_NAME: &'static str = "sched_process_exit";
-}
-
-impl FastMatch for TraceSchedProcessExit {}
-
-impl TemplateEvent for TraceSchedProcessExit {
-    fn template() -> &'static PayloadTemplate {
-        &TEMPLATE
-    }
-}
-
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct TraceSchedProcessExit {
@@ -49,6 +37,18 @@ pub struct TraceSchedProcessExit {
     pub(crate) prio: i32,
     #[pyo3(get, set)]
     pub(crate) group_dead: bool,
+}
+
+impl EventType for TraceSchedProcessExit {
+    const EVENT_NAME: &'static str = "sched_process_exit";
+}
+
+impl FastMatch for TraceSchedProcessExit {}
+
+impl TemplateEvent for TraceSchedProcessExit {
+    fn template() -> &'static PayloadTemplate {
+        &TEMPLATE
+    }
 }
 
 #[pymethods]
