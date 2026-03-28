@@ -1,5 +1,8 @@
 # trace_parser
 
+[![CI](https://github.com/amishenev/trace_parser/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/amishenev/trace_parser/actions/workflows/ci.yml)
+[![Release](https://github.com/amishenev/trace_parser/actions/workflows/release.yml/badge.svg)](https://github.com/amishenev/trace_parser/actions/workflows/release.yml)
+
 `trace_parser` is a `Rust + PyO3` library for parsing large text `ftrace` / `tracefs` logs.
 
 It targets lines shaped like:
@@ -78,6 +81,22 @@ cargo test -q
 pytest -q tests/python
 ```
 
+## Installation for development
+
+```bash
+uv venv .venv -p 3.10
+source .venv/bin/activate
+uv pip install maturin pytest
+maturin develop
+```
+
+After that, imports work directly from the local package:
+
+```python
+from trace_parser import Trace
+from trace_parser.tracing_mark.receive_vsync import TraceReceiveVsync
+```
+
 ## Example
 
 ```python
@@ -153,3 +172,27 @@ GitHub Actions CI runs:
 - `cargo test -q`
 - `maturin develop`
 - `pytest -q tests/python`
+
+## Releases
+
+GitHub Actions also provides a release workflow.
+
+When you push a tag like `v0.1.0`, it will:
+
+- build wheels for Linux, macOS, and Windows
+- build an sdist
+- attach the artifacts to a GitHub Release
+
+Example:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+## Roadmap
+
+- add more typed trace events
+- stabilize the typed-event authoring pattern
+- improve Python-side ergonomics for common base fields
+- expand Python smoke coverage and release artifacts
