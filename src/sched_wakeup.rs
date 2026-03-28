@@ -1,0 +1,188 @@
+use std::collections::HashMap;
+
+use once_cell::sync::Lazy;
+use pyo3::prelude::*;
+
+use crate::common::{parse_base_parts, validate_timestamp};
+use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
+use crate::trace::Trace;
+
+static SCHED_WAKEUP_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+    PayloadTemplate::new(
+        "comm={comm} pid={pid} prio={prio} target_cpu={target_cpu}",
+        &[
+            ("comm", FieldSpec::string()),
+            ("pid", FieldSpec::u32()),
+            ("prio", FieldSpec::i32()),
+            ("target_cpu", FieldSpec::custom(r"\d{3}")),
+        ],
+    )
+});
+
+#[pyclass]
+#[derive(Clone, Debug)]
+pub struct TraceSchedWakeup {
+    #[pyo3(get)]
+    pub(crate) base: Trace,
+    #[pyo3(get, set)]
+    pub(crate) format_id: String,
+    #[pyo3(get, set)]
+    pub(crate) comm: String,
+    #[pyo3(get, set)]
+    pub(crate) pid: u32,
+    #[pyo3(get, set)]
+    pub(crate) prio: i32,
+    #[pyo3(get, set)]
+    pub(crate) target_cpu: u32,
+}
+
+impl TraceSchedWakeup {
+    fn payload_string(&self) -> String {
+        let target_cpu = format!("{:03}", self.target_cpu);
+        let values = HashMap::from([
+            ("comm", TemplateValue::Str(&self.comm)),
+            ("pid", TemplateValue::U32(self.pid)),
+            ("prio", TemplateValue::I32(self.prio)),
+            ("target_cpu", TemplateValue::Str(&target_cpu)),
+        ]);
+        SCHED_WAKEUP_TEMPLATE
+            .format(&values)
+            .expect("sched_wakeup template must render")
+    }
+}
+
+#[pymethods]
+impl TraceSchedWakeup {
+    #[staticmethod]
+    pub fn can_be_parsed(line: &str) -> bool {
+        let Some(parts) = parse_base_parts(line) else {
+            return false;
+        };
+        parts.event_name == "sched_wakeup" && SCHED_WAKEUP_TEMPLATE.is_match(&parts.payload_raw)
+    }
+
+    #[staticmethod]
+    pub fn parse(line: &str) -> Option<Self> {
+        let parts = parse_base_parts(line)?;
+        if parts.event_name != "sched_wakeup" {
+            return None;
+        }
+        let captures = SCHED_WAKEUP_TEMPLATE.captures(&parts.payload_raw)?;
+        let comm = captures.name("comm")?.as_str().to_owned();
+        let pid = captures.name("pid")?.as_str().parse().ok()?;
+        let prio = captures.name("prio")?.as_str().parse().ok()?;
+        let target_cpu = captures.name("target_cpu")?.as_str().parse().ok()?;
+        Some(Self {
+            base: Trace::from_parts(parts),
+            format_id: "default".to_owned(),
+            comm,
+            pid,
+            prio,
+            target_cpu,
+        })
+    }
+
+    pub(crate) fn to_string(&self) -> PyResult<String> {
+        validate_timestamp(self.base.timestamp)?;
+        Ok(self.base.to_string_with_payload(&self.payload_string()))
+    }
+}
+
+#[pyclass]
+#[derive(Clone, Debug)]
+pub struct TraceSchedWakeupNew {
+    #[pyo3(get)]
+    pub(crate) base: Trace,
+    #[pyo3(get, set)]
+    pub(crate) format_id: String,
+    #[pyo3(get, set)]
+    pub(crate) comm: String,
+    #[pyo3(get, set)]
+    pub(crate) pid: u32,
+    #[pyo3(get, set)]
+    pub(crate) prio: i32,
+    #[pyo3(get, set)]
+    pub(crate) target_cpu: u32,
+}
+
+impl TraceSchedWakeupNew {
+    fn payload_string(&self) -> String {
+        let target_cpu = format!("{:03}", self.target_cpu);
+        let values = HashMap::from([
+            ("comm", TemplateValue::Str(&self.comm)),
+            ("pid", TemplateValue::U32(self.pid)),
+            ("prio", TemplateValue::I32(self.prio)),
+            ("target_cpu", TemplateValue::Str(&target_cpu)),
+        ]);
+        SCHED_WAKEUP_TEMPLATE
+            .format(&values)
+            .expect("sched_wakeup_new template must render")
+    }
+}
+
+#[pymethods]
+impl TraceSchedWakeupNew {
+    #[staticmethod]
+    pub fn can_be_parsed(line: &str) -> bool {
+        let Some(parts) = parse_base_parts(line) else {
+            return false;
+        };
+        parts.event_name == "sched_wakeup_new"
+            && SCHED_WAKEUP_TEMPLATE.is_match(&parts.payload_raw)
+    }
+
+    #[staticmethod]
+    pub fn parse(line: &str) -> Option<Self> {
+        let parts = parse_base_parts(line)?;
+        if parts.event_name != "sched_wakeup_new" {
+            return None;
+        }
+        let captures = SCHED_WAKEUP_TEMPLATE.captures(&parts.payload_raw)?;
+        let comm = captures.name("comm")?.as_str().to_owned();
+        let pid = captures.name("pid")?.as_str().parse().ok()?;
+        let prio = captures.name("prio")?.as_str().parse().ok()?;
+        let target_cpu = captures.name("target_cpu")?.as_str().parse().ok()?;
+        Some(Self {
+            base: Trace::from_parts(parts),
+            format_id: "default".to_owned(),
+            comm,
+            pid,
+            prio,
+            target_cpu,
+        })
+    }
+
+    pub(crate) fn to_string(&self) -> PyResult<String> {
+        validate_timestamp(self.base.timestamp)?;
+        Ok(self.base.to_string_with_payload(&self.payload_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{TraceSchedWakeup, TraceSchedWakeupNew};
+
+    #[test]
+    fn sched_wakeup_parses() {
+        let line = "kworker-123 ( 123) [000] .... 12345.679001: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=000";
+        let trace = TraceSchedWakeup::parse(line).expect("sched_wakeup must parse");
+        assert_eq!(trace.comm, "bash");
+        assert_eq!(trace.pid, 1977);
+        assert_eq!(trace.prio, 120);
+        assert_eq!(trace.target_cpu, 0);
+        assert_eq!(
+            trace.to_string().expect("to_string must work"),
+            "kworker-123 (123) [000] .... 12345.679001: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=000"
+        );
+    }
+
+    #[test]
+    fn sched_wakeup_new_parses() {
+        let line = "kworker-123 ( 123) [000] .... 12345.679001: sched_wakeup_new: comm=bash pid=1977 prio=120 target_cpu=000";
+        let trace = TraceSchedWakeupNew::parse(line).expect("sched_wakeup_new must parse");
+        assert_eq!(trace.comm, "bash");
+        assert_eq!(trace.pid, 1977);
+        assert_eq!(trace.prio, 120);
+        assert_eq!(trace.target_cpu, 0);
+    }
+}

@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        python-version:
+          - "3.10"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Create virtual environment
+        run: uv venv .venv -p ${{ matrix.python-version }}
+
+      - name: Install Python tools
+        run: |
+          source .venv/bin/activate
+          uv pip install maturin pytest
+
+      - name: Run Rust tests
+        run: cargo test -q
+
+      - name: Build editable Python package
+        run: |
+          source .venv/bin/activate
+          maturin develop
+
+      - name: Run Python smoke tests
+        run: |
+          source .venv/bin/activate
+          pytest -q tests/python

@@ -1,0 +1,13 @@
+[package]
+name = "trace_parser"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "trace_parser"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+once_cell = "1.19"
+pyo3 = { version = "0.22", features = ["abi3-py310", "extension-module"] }
+regex = "1.10"

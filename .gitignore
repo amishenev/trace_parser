@@ -1,0 +1,17 @@
+.venv/
+.uv-cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+target/
+
+*.egg-info/
+*.pyc
+*.pyo
+*.so
+*.dylib
+*.dSYM/
+
+__pycache__/
