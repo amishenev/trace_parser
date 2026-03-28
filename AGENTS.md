@@ -164,6 +164,11 @@ Important constraint for future work:
 - Shared helpers `contains_begin_marker` / `contains_end_marker` back `TraceMarkBegin`, `TraceMarkEnd`, and `TraceReceiveVsync`.
 - The heavy regex work is now gated by cheap fast checks, and `parse_trace()` routes a line to a single parser after these heuristics pass.
 - `benches/can_be_parsed.rs` captures the cost of each check path; rerun it whenever you touch the heuristic to judge regression risk.
+- Current design intent:
+  - for ordinary non-`tracing_mark` events, `event_name` is usually enough for `quick_check`
+  - payload-specific `payload_quick_check` should be used sparingly, mostly where false positives would be common or there is subtype routing
+  - `tracing_mark` subtypes are the main place where payload quick checks matter
+- `contains_all(...)` may be unused at times, but keep it because it is intended for future multi-format event matching.
 
 ## Payload templates
 
@@ -267,6 +272,9 @@ Current intended usage:
 - `TraceMarkBegin`: payload shape `B|trace_mark_tgid|payload`
 - `TraceMarkEnd`: payload shape `E|trace_mark_tgid|payload`
 - `TraceReceiveVsync`: specific begin mark example
+- keep `TracingMark` on the default `FastMatch` behavior; the class already participates in fast matching via `event_name`
+- `TraceMarkBegin` and `TraceMarkEnd` should specialize only the begin/end payload marker checks
+- `TraceReceiveVsync` should reuse the shared begin-marker helper and add only its own message clue such as `ReceiveVsync `
 
 ### Important unfinished work
 
@@ -363,6 +371,12 @@ trace_parser.parse_trace(line)
 ```
 
 It should return the most specific known class first, then fall back to `Trace`, then `None`.
+
+Current performance intent:
+
+- `parse_trace(...)` should rely on cheap quick checks before invoking regex-heavy parsing.
+- `can_be_parsed()` for typed events is intended as a cheap heuristic, not a full parse guarantee.
+- `parse()` should call the cheap `can_be_parsed()` first and only then do the full regex/template parse.
 
 ## Python-facing artifacts
 
@@ -466,3 +480,30 @@ Use:
 ```bash
 cargo test -q
 ```
+
+Also use when touching Python/package behavior:
+
+```bash
+source .venv/bin/activate
+maturin develop
+pytest -q tests/python
+```
+
+And for fast-match changes:
+
+```bash
+cargo bench --bench can_be_parsed --quiet
+```
+
+Recent benchmark reference points for `sched_switch` on this machine:
+
+- positive case:
+  - `Trace::can_be_parsed` about `319 ns/op`
+  - `TraceSchedSwitch::can_be_parsed` about `116 ns/op`
+  - `TraceSchedSwitch::parse().is_some()` about `9.7 us/op`
+- negative case:
+  - `Trace::can_be_parsed` about `194 ns/op`
+  - `TraceSchedSwitch::can_be_parsed` about `111 ns/op`
+  - `TraceSchedSwitch::parse().is_some()` about `147 ns/op`
+
+Treat these only as rough regression anchors, not hard targets.
