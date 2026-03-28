@@ -49,18 +49,6 @@ pub struct TraceCpuFrequency {
     pub(crate) cpu_id: u32,
 }
 
-impl TraceCpuFrequency {
-    fn payload_string(&self) -> String {
-        let values = HashMap::from([
-            ("state", TemplateValue::U32(self.state)),
-            ("cpu_id", TemplateValue::U32(self.cpu_id)),
-        ]);
-        CPU_FREQUENCY_TEMPLATE
-            .format(&values)
-            .expect("cpu_frequency template must render")
-    }
-}
-
 #[pymethods]
 impl TraceCpuFrequency {
     #[staticmethod]
@@ -88,9 +76,19 @@ impl TraceCpuFrequency {
         })
     }
 
+    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+        let values = HashMap::from([
+            ("state", TemplateValue::U32(self.state)),
+            ("cpu_id", TemplateValue::U32(self.cpu_id)),
+        ]);
+        Ok(CPU_FREQUENCY_TEMPLATE
+            .format(&values)
+            .expect("cpu_frequency template must render"))
+    }
+
     pub(crate) fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
-        Ok(self.base.to_string_with_payload(&self.payload_string()))
+        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
 }
 
@@ -138,18 +136,20 @@ impl TraceDevFrequency {
         })
     }
 
-    pub(crate) fn to_string(&self) -> PyResult<String> {
-        validate_timestamp(self.base.timestamp)?;
+    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
         let values = HashMap::from([
             ("clk", TemplateValue::Str(&self.clk)),
             ("state", TemplateValue::U32(self.state)),
             ("cpu_id", TemplateValue::U32(self.cpu_id)),
         ]);
-        Ok(self.base.to_string_with_payload(
-            &CLOCK_SET_RATE_TEMPLATE
-                .format(&values)
-                .expect("clock_set_rate template must render"),
-        ))
+        Ok(CLOCK_SET_RATE_TEMPLATE
+            .format(&values)
+            .expect("clock_set_rate template must render"))
+    }
+
+    pub(crate) fn to_string(&self) -> PyResult<String> {
+        validate_timestamp(self.base.timestamp)?;
+        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
 }
 
@@ -164,6 +164,10 @@ mod tests {
         assert_eq!(trace.state, 1_200_000);
         assert_eq!(trace.cpu_id, 0);
         assert_eq!(
+            trace.payload_to_string().expect("payload_to_string must work"),
+            "state=1200000 cpu_id=0"
+        );
+        assert_eq!(
             trace.to_string().expect("to_string must work"),
             "swapper-0 (0) [000] .... 12345.678900: cpu_frequency: state=1200000 cpu_id=0"
         );
@@ -176,6 +180,10 @@ mod tests {
         let trace = TraceDevFrequency::parse(line).expect("ddr_devfreq must parse");
         assert_eq!(trace.clk, "ddr_devfreq");
         assert_eq!(trace.state, 933_000_000);
+        assert_eq!(
+            trace.payload_to_string().expect("payload_to_string must work"),
+            "clk=ddr_devfreq state=933000000 cpu_id=0"
+        );
         assert_eq!(
             trace.to_string().expect("to_string must work"),
             "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=ddr_devfreq state=933000000 cpu_id=0"

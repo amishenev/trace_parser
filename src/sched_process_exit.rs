@@ -36,20 +36,6 @@ pub struct TraceSchedProcessExit {
     pub(crate) group_dead: bool,
 }
 
-impl TraceSchedProcessExit {
-    fn payload_string(&self) -> String {
-        let values = HashMap::from([
-            ("comm", TemplateValue::Str(&self.comm)),
-            ("pid", TemplateValue::U32(self.pid)),
-            ("prio", TemplateValue::I32(self.prio)),
-            ("group_dead", TemplateValue::BoolInt(self.group_dead)),
-        ]);
-        SCHED_PROCESS_EXIT_TEMPLATE
-            .format(&values)
-            .expect("sched_process_exit template must render")
-    }
-}
-
 #[pymethods]
 impl TraceSchedProcessExit {
     #[staticmethod]
@@ -82,9 +68,21 @@ impl TraceSchedProcessExit {
         })
     }
 
+    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+        let values = HashMap::from([
+            ("comm", TemplateValue::Str(&self.comm)),
+            ("pid", TemplateValue::U32(self.pid)),
+            ("prio", TemplateValue::I32(self.prio)),
+            ("group_dead", TemplateValue::BoolInt(self.group_dead)),
+        ]);
+        Ok(SCHED_PROCESS_EXIT_TEMPLATE
+            .format(&values)
+            .expect("sched_process_exit template must render"))
+    }
+
     pub(crate) fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
-        Ok(self.base.to_string_with_payload(&self.payload_string()))
+        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
 }
 
@@ -100,6 +98,10 @@ mod tests {
         assert_eq!(trace.pid, 1977);
         assert_eq!(trace.prio, 120);
         assert!(trace.group_dead);
+        assert_eq!(
+            trace.payload_to_string().expect("payload_to_string must work"),
+            "comm=bash pid=1977 prio=120 group_dead=1"
+        );
         assert_eq!(
             trace.to_string().expect("to_string must work"),
             "bash-1977 (12) [000] .... 12345.678901: sched_process_exit: comm=bash pid=1977 prio=120 group_dead=1"

@@ -46,12 +46,16 @@ impl TraceReceiveVsync {
         })
     }
 
+    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+        let payload_values = HashMap::from([("frame_number", TemplateValue::U32(self.frame_number))]);
+        Ok(RECEIVE_VSYNC_TEMPLATE
+            .format(&payload_values)
+            .expect("receive vsync template must render"))
+    }
+
     pub(crate) fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.begin.mark.base.timestamp)?;
-        let payload_values = HashMap::from([("frame_number", TemplateValue::U32(self.frame_number))]);
-        let payload = RECEIVE_VSYNC_TEMPLATE
-            .format(&payload_values)
-            .expect("receive vsync template must render");
+        let payload = self.payload_to_string()?;
         let begin_values = HashMap::from([
             ("trace_mark_tgid", TemplateValue::U32(self.begin.trace_mark_tgid)),
             ("payload", TemplateValue::Str(&payload)),
@@ -77,6 +81,10 @@ mod tests {
             .expect("receive vsync begin mark must parse");
         assert_eq!(mark.begin.trace_mark_tgid, 10);
         assert_eq!(mark.frame_number, 42);
+        assert_eq!(
+            mark.payload_to_string().expect("payload_to_string must work"),
+            "ReceiveVsync 42"
+        );
         assert_eq!(
             mark.to_string().expect("to_string must work"),
             "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|ReceiveVsync 42"

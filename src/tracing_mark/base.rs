@@ -54,8 +54,13 @@ impl TracingMark {
         })
     }
 
+    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+        self.base.payload_to_string()
+    }
+
     pub(crate) fn to_string(&self) -> PyResult<String> {
-        self.base.to_string()
+        validate_timestamp(self.base.timestamp)?;
+        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
 }
 
@@ -68,19 +73,6 @@ pub struct TraceMarkBegin {
     pub(crate) trace_mark_tgid: u32,
     #[pyo3(get, set)]
     pub(crate) payload: String,
-}
-
-impl TraceMarkBegin {
-    pub(crate) fn payload_string(&self) -> String {
-        let values = HashMap::from([
-            ("trace_mark_tgid", TemplateValue::U32(self.trace_mark_tgid)),
-            ("payload", TemplateValue::Str(&self.payload)),
-        ]);
-
-        TRACE_MARK_BEGIN_TEMPLATE
-            .format(&values)
-            .expect("trace mark begin template must render")
-    }
 }
 
 #[pymethods]
@@ -108,7 +100,18 @@ impl TraceMarkBegin {
 
     pub(crate) fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.mark.base.timestamp)?;
-        Ok(self.mark.base.to_string_with_payload(&self.payload_string()))
+        Ok(self.mark.base.to_string_with_payload(&self.payload_to_string()?))
+    }
+
+    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+        let values = HashMap::from([
+            ("trace_mark_tgid", TemplateValue::U32(self.trace_mark_tgid)),
+            ("payload", TemplateValue::Str(&self.payload)),
+        ]);
+
+        Ok(TRACE_MARK_BEGIN_TEMPLATE
+            .format(&values)
+            .expect("trace mark begin template must render"))
     }
 }
 
@@ -121,19 +124,6 @@ pub struct TraceMarkEnd {
     pub(crate) trace_mark_tgid: u32,
     #[pyo3(get, set)]
     pub(crate) payload: String,
-}
-
-impl TraceMarkEnd {
-    fn payload_string(&self) -> String {
-        let values = HashMap::from([
-            ("trace_mark_tgid", TemplateValue::U32(self.trace_mark_tgid)),
-            ("payload", TemplateValue::Str(&self.payload)),
-        ]);
-
-        TRACE_MARK_END_TEMPLATE
-            .format(&values)
-            .expect("trace mark end template must render")
-    }
 }
 
 #[pymethods]
@@ -159,9 +149,20 @@ impl TraceMarkEnd {
         })
     }
 
+    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+        let values = HashMap::from([
+            ("trace_mark_tgid", TemplateValue::U32(self.trace_mark_tgid)),
+            ("payload", TemplateValue::Str(&self.payload)),
+        ]);
+
+        Ok(TRACE_MARK_END_TEMPLATE
+            .format(&values)
+            .expect("trace mark end template must render"))
+    }
+
     pub(crate) fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.mark.base.timestamp)?;
-        Ok(self.mark.base.to_string_with_payload(&self.payload_string()))
+        Ok(self.mark.base.to_string_with_payload(&self.payload_to_string()?))
     }
 }
 
@@ -175,6 +176,10 @@ mod tests {
         let mark = TracingMark::parse(line).expect("tracing mark must parse");
         assert_eq!(mark.base.event_name, "tracing_mark_write");
         assert_eq!(mark.base.payload_raw, "anything at all");
+        assert_eq!(
+            mark.payload_to_string().expect("payload_to_string must work"),
+            "anything at all"
+        );
     }
 
     #[test]
@@ -184,6 +189,10 @@ mod tests {
         let mark = TraceMarkBegin::parse(line).expect("begin mark must parse");
         assert_eq!(mark.trace_mark_tgid, 10);
         assert_eq!(mark.payload, "some_custom_message");
+        assert_eq!(
+            mark.payload_to_string().expect("payload_to_string must work"),
+            "B|10|some_custom_message"
+        );
         assert_eq!(
             mark.to_string().expect("to_string must work"),
             "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|some_custom_message"
@@ -199,4 +208,3 @@ mod tests {
         assert_eq!(mark.payload, "done");
     }
 }
-

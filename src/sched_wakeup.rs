@@ -36,21 +36,6 @@ pub struct TraceSchedWakeup {
     pub(crate) target_cpu: u32,
 }
 
-impl TraceSchedWakeup {
-    fn payload_string(&self) -> String {
-        let target_cpu = format!("{:03}", self.target_cpu);
-        let values = HashMap::from([
-            ("comm", TemplateValue::Str(&self.comm)),
-            ("pid", TemplateValue::U32(self.pid)),
-            ("prio", TemplateValue::I32(self.prio)),
-            ("target_cpu", TemplateValue::Str(&target_cpu)),
-        ]);
-        SCHED_WAKEUP_TEMPLATE
-            .format(&values)
-            .expect("sched_wakeup template must render")
-    }
-}
-
 #[pymethods]
 impl TraceSchedWakeup {
     #[staticmethod]
@@ -82,9 +67,22 @@ impl TraceSchedWakeup {
         })
     }
 
+    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+        let target_cpu = format!("{:03}", self.target_cpu);
+        let values = HashMap::from([
+            ("comm", TemplateValue::Str(&self.comm)),
+            ("pid", TemplateValue::U32(self.pid)),
+            ("prio", TemplateValue::I32(self.prio)),
+            ("target_cpu", TemplateValue::Str(&target_cpu)),
+        ]);
+        Ok(SCHED_WAKEUP_TEMPLATE
+            .format(&values)
+            .expect("sched_wakeup template must render"))
+    }
+
     pub(crate) fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
-        Ok(self.base.to_string_with_payload(&self.payload_string()))
+        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
 }
 
@@ -103,21 +101,6 @@ pub struct TraceSchedWakeupNew {
     pub(crate) prio: i32,
     #[pyo3(get, set)]
     pub(crate) target_cpu: u32,
-}
-
-impl TraceSchedWakeupNew {
-    fn payload_string(&self) -> String {
-        let target_cpu = format!("{:03}", self.target_cpu);
-        let values = HashMap::from([
-            ("comm", TemplateValue::Str(&self.comm)),
-            ("pid", TemplateValue::U32(self.pid)),
-            ("prio", TemplateValue::I32(self.prio)),
-            ("target_cpu", TemplateValue::Str(&target_cpu)),
-        ]);
-        SCHED_WAKEUP_TEMPLATE
-            .format(&values)
-            .expect("sched_wakeup_new template must render")
-    }
 }
 
 #[pymethods]
@@ -152,9 +135,22 @@ impl TraceSchedWakeupNew {
         })
     }
 
+    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+        let target_cpu = format!("{:03}", self.target_cpu);
+        let values = HashMap::from([
+            ("comm", TemplateValue::Str(&self.comm)),
+            ("pid", TemplateValue::U32(self.pid)),
+            ("prio", TemplateValue::I32(self.prio)),
+            ("target_cpu", TemplateValue::Str(&target_cpu)),
+        ]);
+        Ok(SCHED_WAKEUP_TEMPLATE
+            .format(&values)
+            .expect("sched_wakeup_new template must render"))
+    }
+
     pub(crate) fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
-        Ok(self.base.to_string_with_payload(&self.payload_string()))
+        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
 }
 
@@ -170,6 +166,10 @@ mod tests {
         assert_eq!(trace.pid, 1977);
         assert_eq!(trace.prio, 120);
         assert_eq!(trace.target_cpu, 0);
+        assert_eq!(
+            trace.payload_to_string().expect("payload_to_string must work"),
+            "comm=bash pid=1977 prio=120 target_cpu=000"
+        );
         assert_eq!(
             trace.to_string().expect("to_string must work"),
             "kworker-123 (123) [000] .... 12345.679001: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=000"

@@ -45,25 +45,6 @@ pub struct TraceSchedSwitch {
     pub(crate) next_prio: i32,
 }
 
-impl TraceSchedSwitch {
-    fn payload_string(&self) -> String {
-        let values = HashMap::from([
-            ("prev_comm", TemplateValue::Str(&self.prev_comm)),
-            ("prev_pid", TemplateValue::U32(self.prev_pid)),
-            ("prev_prio", TemplateValue::I32(self.prev_prio)),
-            ("prev_state", TemplateValue::Str(&self.prev_state)),
-            ("next_comm", TemplateValue::Str(&self.next_comm)),
-            ("next_pid", TemplateValue::U32(self.next_pid)),
-            ("next_prio", TemplateValue::I32(self.next_prio)),
-        ]);
-
-        SCHED_SWITCH_TEMPLATE
-            .format(&values)
-            .expect("sched_switch payload template must render")
-    }
-
-}
-
 #[pymethods]
 impl TraceSchedSwitch {
     #[staticmethod]
@@ -102,9 +83,25 @@ impl TraceSchedSwitch {
         })
     }
 
+    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+        let values = HashMap::from([
+            ("prev_comm", TemplateValue::Str(&self.prev_comm)),
+            ("prev_pid", TemplateValue::U32(self.prev_pid)),
+            ("prev_prio", TemplateValue::I32(self.prev_prio)),
+            ("prev_state", TemplateValue::Str(&self.prev_state)),
+            ("next_comm", TemplateValue::Str(&self.next_comm)),
+            ("next_pid", TemplateValue::U32(self.next_pid)),
+            ("next_prio", TemplateValue::I32(self.next_prio)),
+        ]);
+
+        Ok(SCHED_SWITCH_TEMPLATE
+            .format(&values)
+            .expect("sched_switch payload template must render"))
+    }
+
     pub(crate) fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
-        Ok(self.base.to_string_with_payload(&self.payload_string()))
+        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
 }
 
@@ -133,6 +130,10 @@ mod tests {
         assert_eq!(trace.next_comm, "worker");
         assert_eq!(trace.next_pid, 123);
         assert_eq!(trace.next_prio, 120);
+        assert_eq!(
+            trace.payload_to_string().expect("payload_to_string must work"),
+            "prev_comm=bash prev_pid=1977 prev_prio=120 prev_state=S ==> next_comm=worker next_pid=123 next_prio=120"
+        );
         assert_eq!(
             trace.to_string().expect("to_string must work"),
             "bash-1977 (12) [000] .... 12345.678901: sched_switch: prev_comm=bash prev_pid=1977 prev_prio=120 prev_state=S ==> next_comm=worker next_pid=123 next_prio=120"

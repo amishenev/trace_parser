@@ -86,9 +86,13 @@ impl Trace {
         Ok(())
     }
 
+    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+        Ok(self.payload_raw.clone())
+    }
+
     pub(crate) fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        Ok(self.to_string_with_payload(&self.payload_raw))
+        Ok(self.to_string_with_payload(&self.payload_to_string()?))
     }
 }
 
@@ -125,5 +129,15 @@ mod tests {
     #[test]
     fn base_can_be_parsed_rejects_invalid_lines() {
         assert!(!Trace::can_be_parsed("not a trace line"));
+    }
+
+    #[test]
+    fn base_payload_to_string_returns_raw_payload() {
+        let line = "bash-1977   (  12) [000] .... 12345.678901: sched_switch: prev_comm=bash prev_pid=1977 ==> next_comm=worker next_pid=123";
+        let trace = Trace::parse(line).expect("trace must parse");
+        assert_eq!(
+            trace.payload_to_string().expect("payload_to_string must work"),
+            "prev_comm=bash prev_pid=1977 ==> next_comm=worker next_pid=123"
+        );
     }
 }
