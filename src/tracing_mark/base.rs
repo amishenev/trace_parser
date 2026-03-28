@@ -3,8 +3,8 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 
 use crate::common::{
-    can_parse_event, can_parse_template_event, cap_parse, cap_str, parse_event,
-    parse_template_event, validate_timestamp, EventType, TemplateEvent,
+    cap_parse, cap_str, contains_event_name, parse_event, parse_template_event,
+    validate_timestamp, EventType, FastMatch, TemplateEvent,
 };
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
@@ -19,12 +19,28 @@ pub(crate) static BEGIN_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
+pub(crate) fn contains_begin_marker(line: &str) -> bool {
+    line.contains(" B|") || line.contains(": B|") || line.contains("tracing_mark_write: B|")
+}
+
+pub(crate) fn contains_end_marker(line: &str) -> bool {
+    line.contains(" E|") || line.contains(": E|") || line.contains("tracing_mark_write: E|")
+}
+
 impl EventType for TracingMark {
     const EVENT_NAME: &'static str = "tracing_mark_write";
 }
 
+impl FastMatch for TracingMark {}
+
 impl EventType for TraceMarkBegin {
     const EVENT_NAME: &'static str = "tracing_mark_write";
+}
+
+impl FastMatch for TraceMarkBegin {
+    fn payload_quick_check(line: &str) -> bool {
+        contains_begin_marker(line)
+    }
 }
 
 impl TemplateEvent for TraceMarkBegin {
@@ -35,6 +51,12 @@ impl TemplateEvent for TraceMarkBegin {
 
 impl EventType for TraceMarkEnd {
     const EVENT_NAME: &'static str = "tracing_mark_write";
+}
+
+impl FastMatch for TraceMarkEnd {
+    fn payload_quick_check(line: &str) -> bool {
+        contains_end_marker(line)
+    }
 }
 
 impl TemplateEvent for TraceMarkEnd {
@@ -64,11 +86,14 @@ pub struct TracingMark {
 impl TracingMark {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        can_parse_event::<Self>(line)
+        Self::quick_check(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
+        if !contains_event_name(line, Self::EVENT_NAME) {
+            return None;
+        }
         let parts = parse_event::<Self>(line)?;
         Some(Self {
             base: Trace::from_parts(parts),
@@ -100,11 +125,14 @@ pub struct TraceMarkBegin {
 impl TraceMarkBegin {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        can_parse_template_event::<Self>(line)
+        Self::quick_check(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
+        if !Self::can_be_parsed(line) {
+            return None;
+        }
         parse_template_event::<Self, _>(line, |parts, captures| {
             Some(Self {
                 mark: TracingMark {
@@ -148,11 +176,14 @@ pub struct TraceMarkEnd {
 impl TraceMarkEnd {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        can_parse_template_event::<Self>(line)
+        Self::quick_check(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
+        if !Self::can_be_parsed(line) {
+            return None;
+        }
         parse_template_event::<Self, _>(line, |parts, captures| {
             Some(Self {
                 mark: TracingMark {

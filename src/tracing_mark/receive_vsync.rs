@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::common::validate_timestamp;
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
-use super::base::{BEGIN_TEMPLATE, TraceMarkBegin};
+use super::base::{contains_begin_marker, BEGIN_TEMPLATE, TraceMarkBegin};
 
 static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     PayloadTemplate::new(
@@ -29,14 +29,14 @@ pub struct TraceReceiveVsync {
 impl TraceReceiveVsync {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        let Some(begin) = TraceMarkBegin::parse(line) else {
-            return false;
-        };
-        TEMPLATE.is_match(&begin.payload)
+        contains_begin_marker(line) && line.contains("ReceiveVsync ")
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
+        if !Self::can_be_parsed(line) {
+            return None;
+        }
         let begin = TraceMarkBegin::parse(line)?;
         let captures = TEMPLATE.captures(&begin.payload)?;
         let frame_number = captures.name("frame_number")?.as_str().parse().ok()?;

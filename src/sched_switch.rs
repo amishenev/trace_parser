@@ -4,8 +4,8 @@ use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 
 use crate::common::{
-    can_parse_template_event, cap_parse, cap_str, parse_template_event, validate_timestamp,
-    EventType, TemplateEvent,
+    cap_parse, cap_str, parse_template_event, validate_timestamp, EventType, FastMatch,
+    TemplateEvent,
 };
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
@@ -28,6 +28,8 @@ static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
 impl EventType for TraceSchedSwitch {
     const EVENT_NAME: &'static str = "sched_switch";
 }
+
+impl FastMatch for TraceSchedSwitch {}
 
 impl TemplateEvent for TraceSchedSwitch {
     fn template() -> &'static PayloadTemplate {
@@ -62,11 +64,14 @@ pub struct TraceSchedSwitch {
 impl TraceSchedSwitch {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        can_parse_template_event::<Self>(line)
+        Self::quick_check(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
+        if !Self::can_be_parsed(line) {
+            return None;
+        }
         parse_template_event::<Self, _>(line, |parts, captures| {
             Some(Self {
                 base: Trace::from_parts(parts),

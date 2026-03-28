@@ -48,15 +48,48 @@ pub(crate) trait EventType {
     const EVENT_NAME: &'static str;
 }
 
+pub(crate) trait FastMatch: EventType {
+    fn quick_check(line: &str) -> bool {
+        contains_event_name(line, Self::EVENT_NAME) && Self::payload_quick_check(line)
+    }
+
+    fn payload_quick_check(_line: &str) -> bool {
+        true
+    }
+}
+
 pub(crate) trait TemplateEvent: EventType {
     fn template() -> &'static PayloadTemplate;
 }
 
-pub(crate) fn can_parse_event<T: EventType>(line: &str) -> bool {
-    let Some(parts) = parse_base_parts(line) else {
-        return false;
-    };
-    parts.event_name == T::EVENT_NAME
+pub(crate) fn contains_event_name(line: &str, event_name: &str) -> bool {
+    let needle = event_name.as_bytes();
+    let bytes = line.as_bytes();
+    let mut start = 0;
+
+    while start + needle.len() <= bytes.len() {
+        let Some(offset) = line[start..].find(event_name) else {
+            return false;
+        };
+        let index = start + offset;
+        let before_ok = index >= 2 && &bytes[index - 2..index] == b": ";
+        let after_index = index + needle.len();
+        let after_ok = after_index + 2 <= bytes.len() && &bytes[after_index..after_index + 2] == b": ";
+        if before_ok && after_ok {
+            return true;
+        }
+        start = index + 1;
+    }
+
+    false
+}
+
+pub(crate) fn contains_all(line: &str, needles: &[&str]) -> bool {
+    needles.iter().all(|needle| line.contains(needle))
+}
+
+pub(crate) fn contains_any(line: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|needle| line.contains(needle))
 }
 
 pub(crate) fn parse_event<T: EventType>(line: &str) -> Option<BaseTraceParts> {
@@ -65,13 +98,6 @@ pub(crate) fn parse_event<T: EventType>(line: &str) -> Option<BaseTraceParts> {
         return None;
     }
     Some(parts)
-}
-
-pub(crate) fn can_parse_template_event<T: TemplateEvent>(line: &str) -> bool {
-    let Some(parts) = parse_base_parts(line) else {
-        return false;
-    };
-    parts.event_name == T::EVENT_NAME && T::template().is_match(&parts.payload_raw)
 }
 
 pub(crate) fn parse_template_event<T: TemplateEvent, R>(

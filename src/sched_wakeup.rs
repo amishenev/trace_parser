@@ -4,8 +4,8 @@ use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 
 use crate::common::{
-    can_parse_template_event, cap_parse, cap_str, parse_template_event, validate_timestamp,
-    EventType, TemplateEvent,
+    cap_parse, cap_str, parse_template_event, validate_timestamp, EventType, FastMatch,
+    TemplateEvent,
 };
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
@@ -26,6 +26,8 @@ impl EventType for TraceSchedWakeup {
     const EVENT_NAME: &'static str = "sched_wakeup";
 }
 
+impl FastMatch for TraceSchedWakeup {}
+
 impl TemplateEvent for TraceSchedWakeup {
     fn template() -> &'static PayloadTemplate {
         &TEMPLATE
@@ -35,6 +37,8 @@ impl TemplateEvent for TraceSchedWakeup {
 impl EventType for TraceSchedWakeupNew {
     const EVENT_NAME: &'static str = "sched_wakeup_new";
 }
+
+impl FastMatch for TraceSchedWakeupNew {}
 
 impl TemplateEvent for TraceSchedWakeupNew {
     fn template() -> &'static PayloadTemplate {
@@ -63,11 +67,14 @@ pub struct TraceSchedWakeup {
 impl TraceSchedWakeup {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        can_parse_template_event::<Self>(line)
+        Self::quick_check(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
+        if !Self::can_be_parsed(line) {
+            return None;
+        }
         parse_template_event::<Self, _>(line, |parts, captures| {
             Some(Self {
                 base: Trace::from_parts(parts),
@@ -120,11 +127,14 @@ pub struct TraceSchedWakeupNew {
 impl TraceSchedWakeupNew {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        can_parse_template_event::<Self>(line)
+        Self::quick_check(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
+        if !Self::can_be_parsed(line) {
+            return None;
+        }
         parse_template_event::<Self, _>(line, |parts, captures| {
             Some(Self {
                 base: Trace::from_parts(parts),

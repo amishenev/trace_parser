@@ -18,35 +18,55 @@ pub use tracing_mark::{TraceMarkBegin, TraceMarkEnd, TraceReceiveVsync, TracingM
 
 #[pyfunction]
 fn parse_trace(py: Python<'_>, line: &str) -> PyResult<Option<PyObject>> {
-    if let Some(event) = TraceReceiveVsync::parse(line) {
-        return Ok(Some(Py::new(py, event)?.to_object(py)));
+    if TraceReceiveVsync::can_be_parsed(line) {
+        if let Some(event) = TraceReceiveVsync::parse(line) {
+            return Ok(Some(Py::new(py, event)?.to_object(py)));
+        }
     }
-    if let Some(event) = TraceMarkBegin::parse(line) {
-        return Ok(Some(Py::new(py, event)?.to_object(py)));
+    if TraceMarkBegin::can_be_parsed(line) {
+        if let Some(event) = TraceMarkBegin::parse(line) {
+            return Ok(Some(Py::new(py, event)?.to_object(py)));
+        }
     }
-    if let Some(event) = TraceMarkEnd::parse(line) {
-        return Ok(Some(Py::new(py, event)?.to_object(py)));
+    if TraceMarkEnd::can_be_parsed(line) {
+        if let Some(event) = TraceMarkEnd::parse(line) {
+            return Ok(Some(Py::new(py, event)?.to_object(py)));
+        }
     }
-    if let Some(event) = TracingMark::parse(line) {
-        return Ok(Some(Py::new(py, event)?.to_object(py)));
+    if TracingMark::can_be_parsed(line) {
+        if let Some(event) = TracingMark::parse(line) {
+            return Ok(Some(Py::new(py, event)?.to_object(py)));
+        }
     }
-    if let Some(event) = TraceDevFrequency::parse(line) {
-        return Ok(Some(Py::new(py, event)?.to_object(py)));
+    if TraceDevFrequency::can_be_parsed(line) {
+        if let Some(event) = TraceDevFrequency::parse(line) {
+            return Ok(Some(Py::new(py, event)?.to_object(py)));
+        }
     }
-    if let Some(event) = TraceCpuFrequency::parse(line) {
-        return Ok(Some(Py::new(py, event)?.to_object(py)));
+    if TraceCpuFrequency::can_be_parsed(line) {
+        if let Some(event) = TraceCpuFrequency::parse(line) {
+            return Ok(Some(Py::new(py, event)?.to_object(py)));
+        }
     }
-    if let Some(event) = TraceSchedWakeupNew::parse(line) {
-        return Ok(Some(Py::new(py, event)?.to_object(py)));
+    if TraceSchedWakeupNew::can_be_parsed(line) {
+        if let Some(event) = TraceSchedWakeupNew::parse(line) {
+            return Ok(Some(Py::new(py, event)?.to_object(py)));
+        }
     }
-    if let Some(event) = TraceSchedWakeup::parse(line) {
-        return Ok(Some(Py::new(py, event)?.to_object(py)));
+    if TraceSchedWakeup::can_be_parsed(line) {
+        if let Some(event) = TraceSchedWakeup::parse(line) {
+            return Ok(Some(Py::new(py, event)?.to_object(py)));
+        }
     }
-    if let Some(event) = TraceSchedProcessExit::parse(line) {
-        return Ok(Some(Py::new(py, event)?.to_object(py)));
+    if TraceSchedProcessExit::can_be_parsed(line) {
+        if let Some(event) = TraceSchedProcessExit::parse(line) {
+            return Ok(Some(Py::new(py, event)?.to_object(py)));
+        }
     }
-    if let Some(event) = TraceSchedSwitch::parse(line) {
-        return Ok(Some(Py::new(py, event)?.to_object(py)));
+    if TraceSchedSwitch::can_be_parsed(line) {
+        if let Some(event) = TraceSchedSwitch::parse(line) {
+            return Ok(Some(Py::new(py, event)?.to_object(py)));
+        }
     }
     if let Some(trace) = Trace::parse(line) {
         return Ok(Some(Py::new(py, trace)?.to_object(py)));

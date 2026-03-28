@@ -4,8 +4,8 @@ use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 
 use crate::common::{
-    can_parse_template_event, cap_parse, cap_str, parse_template_event, validate_timestamp,
-    EventType, TemplateEvent,
+    cap_parse, cap_str, contains_any, parse_template_event, validate_timestamp, EventType,
+    FastMatch, TemplateEvent,
 };
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
@@ -43,6 +43,8 @@ impl EventType for TraceCpuFrequency {
     const EVENT_NAME: &'static str = "cpu_frequency";
 }
 
+impl FastMatch for TraceCpuFrequency {}
+
 impl TemplateEvent for TraceCpuFrequency {
     fn template() -> &'static PayloadTemplate {
         &CPU_TEMPLATE
@@ -51,6 +53,12 @@ impl TemplateEvent for TraceCpuFrequency {
 
 impl EventType for TraceDevFrequency {
     const EVENT_NAME: &'static str = "clock_set_rate";
+}
+
+impl FastMatch for TraceDevFrequency {
+    fn payload_quick_check(line: &str) -> bool {
+        contains_any(line, &["clk=ddr_devfreq", "clk=l3c_devfreq"])
+    }
 }
 
 impl TemplateEvent for TraceDevFrequency {
@@ -76,11 +84,14 @@ pub struct TraceCpuFrequency {
 impl TraceCpuFrequency {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        can_parse_template_event::<Self>(line)
+        Self::quick_check(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
+        if !Self::can_be_parsed(line) {
+            return None;
+        }
         parse_template_event::<Self, _>(line, |parts, captures| {
             Some(Self {
                 base: Trace::from_parts(parts),
@@ -126,11 +137,14 @@ pub struct TraceDevFrequency {
 impl TraceDevFrequency {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        can_parse_template_event::<Self>(line)
+        Self::quick_check(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
+        if !Self::can_be_parsed(line) {
+            return None;
+        }
         parse_template_event::<Self, _>(line, |parts, captures| {
             Some(Self {
                 base: Trace::from_parts(parts),
