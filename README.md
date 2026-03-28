@@ -81,22 +81,6 @@ cargo test -q
 pytest -q tests/python
 ```
 
-## Installation for development
-
-```bash
-uv venv .venv -p 3.10
-source .venv/bin/activate
-uv pip install maturin pytest
-maturin develop
-```
-
-After that, imports work directly from the local package:
-
-```python
-from trace_parser import Trace
-from trace_parser.tracing_mark.receive_vsync import TraceReceiveVsync
-```
-
 ## Example
 
 ```python
@@ -172,16 +156,19 @@ GitHub Actions CI runs:
 - `cargo test -q`
 - `maturin develop`
 - `pytest -q tests/python`
+- on Python `3.10`, `3.11`, `3.12`, and `3.13`
 
 ## Releases
 
-GitHub Actions also provides a release workflow.
+GitHub Actions also provides a release workflow for GitHub Releases only.
 
 When you push a tag like `v0.1.0`, it will:
 
 - build wheels for Linux, macOS, and Windows
 - build an sdist
 - attach the artifacts to a GitHub Release
+
+PyPI publishing is intentionally not configured yet.
 
 Example:
 
