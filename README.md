@@ -156,7 +156,8 @@ GitHub Actions CI runs:
 - `cargo test -q`
 - `maturin develop`
 - `pytest -q tests/python`
-- on Python `3.10`, `3.11`, `3.12`, and `3.13`
+- on Python `3.10`, `3.11`, `3.12`, `3.13`, and `3.14`
+- plus an allowed-to-fail check on `3.15-dev`
 
 ## Releases
 
