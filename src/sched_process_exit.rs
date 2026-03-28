@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 
-use crate::common::{parse_base_parts, validate_timestamp};
+use crate::common::{can_parse_template_event, parse_template_event, validate_timestamp, EventType, TemplateEvent};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
-static SCHED_PROCESS_EXIT_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     PayloadTemplate::new(
         "comm={comm} pid={pid} prio={prio} group_dead={group_dead}",
         &[
@@ -18,6 +18,16 @@ static SCHED_PROCESS_EXIT_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
         ],
     )
 });
+
+impl EventType for TraceSchedProcessExit {
+    const EVENT_NAME: &'static str = "sched_process_exit";
+}
+
+impl TemplateEvent for TraceSchedProcessExit {
+    fn template() -> &'static PayloadTemplate {
+        &TEMPLATE
+    }
+}
 
 #[pyclass]
 #[derive(Clone, Debug)]
@@ -40,20 +50,13 @@ pub struct TraceSchedProcessExit {
 impl TraceSchedProcessExit {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        let Some(parts) = parse_base_parts(line) else {
-            return false;
-        };
-        parts.event_name == "sched_process_exit"
-            && SCHED_PROCESS_EXIT_TEMPLATE.is_match(&parts.payload_raw)
+        can_parse_template_event::<Self>(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let parts = parse_base_parts(line)?;
-        if parts.event_name != "sched_process_exit" {
-            return None;
-        }
-        let captures = SCHED_PROCESS_EXIT_TEMPLATE.captures(&parts.payload_raw)?;
+        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
+        let captures = Self::template().captures(&payload_raw)?;
         let comm = captures.name("comm")?.as_str().to_owned();
         let pid = captures.name("pid")?.as_str().parse().ok()?;
         let prio = captures.name("prio")?.as_str().parse().ok()?;
@@ -75,7 +78,7 @@ impl TraceSchedProcessExit {
             ("prio", TemplateValue::I32(self.prio)),
             ("group_dead", TemplateValue::BoolInt(self.group_dead)),
         ]);
-        Ok(SCHED_PROCESS_EXIT_TEMPLATE
+        Ok(Self::template()
             .format(&values)
             .expect("sched_process_exit template must render"))
     }

@@ -2,11 +2,11 @@ use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
-use crate::common::{parse_base_parts, validate_timestamp};
+use crate::common::{can_parse_event, can_parse_template_event, parse_event, parse_template_event, validate_timestamp, EventType, TemplateEvent};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
-pub(crate) static TRACE_MARK_BEGIN_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+pub(crate) static BEGIN_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     PayloadTemplate::new(
         "B|{trace_mark_tgid}|{payload}",
         &[
@@ -16,7 +16,31 @@ pub(crate) static TRACE_MARK_BEGIN_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|
     )
 });
 
-pub(crate) static TRACE_MARK_END_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+impl EventType for TracingMark {
+    const EVENT_NAME: &'static str = "tracing_mark_write";
+}
+
+impl EventType for TraceMarkBegin {
+    const EVENT_NAME: &'static str = "tracing_mark_write";
+}
+
+impl TemplateEvent for TraceMarkBegin {
+    fn template() -> &'static PayloadTemplate {
+        &BEGIN_TEMPLATE
+    }
+}
+
+impl EventType for TraceMarkEnd {
+    const EVENT_NAME: &'static str = "tracing_mark_write";
+}
+
+impl TemplateEvent for TraceMarkEnd {
+    fn template() -> &'static PayloadTemplate {
+        &END_TEMPLATE
+    }
+}
+
+pub(crate) static END_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     PayloadTemplate::new(
         "E|{trace_mark_tgid}|{payload}",
         &[
@@ -37,18 +61,12 @@ pub struct TracingMark {
 impl TracingMark {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        let Some(parts) = parse_base_parts(line) else {
-            return false;
-        };
-        parts.event_name == "tracing_mark_write"
+        can_parse_event::<Self>(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let parts = parse_base_parts(line)?;
-        if parts.event_name != "tracing_mark_write" {
-            return None;
-        }
+        let parts = parse_event::<Self>(line)?;
         Some(Self {
             base: Trace::from_parts(parts),
         })
@@ -79,20 +97,19 @@ pub struct TraceMarkBegin {
 impl TraceMarkBegin {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        let Some(mark) = TracingMark::parse(line) else {
-            return false;
-        };
-        TRACE_MARK_BEGIN_TEMPLATE.is_match(&mark.base.payload_raw)
+        can_parse_template_event::<Self>(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let mark = TracingMark::parse(line)?;
-        let captures = TRACE_MARK_BEGIN_TEMPLATE.captures(&mark.base.payload_raw)?;
+        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
+        let captures = Self::template().captures(&payload_raw)?;
         let trace_mark_tgid = captures.name("trace_mark_tgid")?.as_str().parse().ok()?;
         let payload = captures.name("payload")?.as_str().to_owned();
         Some(Self {
-            mark,
+            mark: TracingMark {
+                base: Trace::from_parts(parts),
+            },
             trace_mark_tgid,
             payload,
         })
@@ -109,7 +126,7 @@ impl TraceMarkBegin {
             ("payload", TemplateValue::Str(&self.payload)),
         ]);
 
-        Ok(TRACE_MARK_BEGIN_TEMPLATE
+        Ok(Self::template()
             .format(&values)
             .expect("trace mark begin template must render"))
     }
@@ -130,20 +147,19 @@ pub struct TraceMarkEnd {
 impl TraceMarkEnd {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        let Some(mark) = TracingMark::parse(line) else {
-            return false;
-        };
-        TRACE_MARK_END_TEMPLATE.is_match(&mark.base.payload_raw)
+        can_parse_template_event::<Self>(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let mark = TracingMark::parse(line)?;
-        let captures = TRACE_MARK_END_TEMPLATE.captures(&mark.base.payload_raw)?;
+        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
+        let captures = Self::template().captures(&payload_raw)?;
         let trace_mark_tgid = captures.name("trace_mark_tgid")?.as_str().parse().ok()?;
         let payload = captures.name("payload")?.as_str().to_owned();
         Some(Self {
-            mark,
+            mark: TracingMark {
+                base: Trace::from_parts(parts),
+            },
             trace_mark_tgid,
             payload,
         })
@@ -155,7 +171,7 @@ impl TraceMarkEnd {
             ("payload", TemplateValue::Str(&self.payload)),
         ]);
 
-        Ok(TRACE_MARK_END_TEMPLATE
+        Ok(Self::template()
             .format(&values)
             .expect("trace mark end template must render"))
     }

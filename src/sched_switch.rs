@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 
-use crate::common::{parse_base_parts, validate_timestamp};
+use crate::common::{can_parse_template_event, parse_template_event, validate_timestamp, EventType, TemplateEvent};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
-static SCHED_SWITCH_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     PayloadTemplate::new(
         "prev_comm={prev_comm} prev_pid={prev_pid} prev_prio={prev_prio} prev_state={prev_state} ==> next_comm={next_comm} next_pid={next_pid} next_prio={next_prio}",
         &[
@@ -21,6 +21,16 @@ static SCHED_SWITCH_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
         ],
     )
 });
+
+impl EventType for TraceSchedSwitch {
+    const EVENT_NAME: &'static str = "sched_switch";
+}
+
+impl TemplateEvent for TraceSchedSwitch {
+    fn template() -> &'static PayloadTemplate {
+        &TEMPLATE
+    }
+}
 
 #[pyclass]
 #[derive(Clone, Debug)]
@@ -49,20 +59,13 @@ pub struct TraceSchedSwitch {
 impl TraceSchedSwitch {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        let Some(parts) = parse_base_parts(line) else {
-            return false;
-        };
-        parts.event_name == "sched_switch" && SCHED_SWITCH_TEMPLATE.is_match(&parts.payload_raw)
+        can_parse_template_event::<Self>(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let parts = parse_base_parts(line)?;
-        if parts.event_name != "sched_switch" {
-            return None;
-        }
-
-        let captures = SCHED_SWITCH_TEMPLATE.captures(&parts.payload_raw)?;
+        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
+        let captures = Self::template().captures(&payload_raw)?;
         let prev_comm = captures.name("prev_comm")?.as_str().to_owned();
         let prev_pid = captures.name("prev_pid")?.as_str().parse().ok()?;
         let prev_prio = captures.name("prev_prio")?.as_str().parse().ok()?;
@@ -94,7 +97,7 @@ impl TraceSchedSwitch {
             ("next_prio", TemplateValue::I32(self.next_prio)),
         ]);
 
-        Ok(SCHED_SWITCH_TEMPLATE
+        Ok(Self::template()
             .format(&values)
             .expect("sched_switch payload template must render"))
     }

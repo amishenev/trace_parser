@@ -3,6 +3,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use regex::Regex;
 
+use crate::payload_template::PayloadTemplate;
+
 pub(crate) static BASE_TRACE_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r"^(?P<thread_name>.+)-(?P<tid>\d+)\s+\(\s*(?P<tgid>\d+)\)\s+\[(?P<cpu>\d+)\]\s+(?P<flags>\S+)\s+(?P<timestamp>\d+(?:\.\d+)?):\s+(?P<event_name>[^:]+):\s*(?P<payload>.*)$",
@@ -39,6 +41,45 @@ impl BaseTraceParts {
 
 pub(crate) fn parse_base_parts(line: &str) -> Option<BaseTraceParts> {
     BaseTraceParts::parse(line)
+}
+
+pub(crate) trait EventType {
+    const EVENT_NAME: &'static str;
+}
+
+pub(crate) trait TemplateEvent: EventType {
+    fn template() -> &'static PayloadTemplate;
+}
+
+pub(crate) fn can_parse_event<T: EventType>(line: &str) -> bool {
+    let Some(parts) = parse_base_parts(line) else {
+        return false;
+    };
+    parts.event_name == T::EVENT_NAME
+}
+
+pub(crate) fn parse_event<T: EventType>(line: &str) -> Option<BaseTraceParts> {
+    let parts = parse_base_parts(line)?;
+    if parts.event_name != T::EVENT_NAME {
+        return None;
+    }
+    Some(parts)
+}
+
+pub(crate) fn can_parse_template_event<T: TemplateEvent>(line: &str) -> bool {
+    let Some(parts) = parse_base_parts(line) else {
+        return false;
+    };
+    parts.event_name == T::EVENT_NAME && T::template().is_match(&parts.payload_raw)
+}
+
+pub(crate) fn parse_template_event<T: TemplateEvent>(line: &str) -> Option<(BaseTraceParts, String)> {
+    let parts = parse_event::<T>(line)?;
+    if !T::template().is_match(&parts.payload_raw) {
+        return None;
+    }
+    let payload_raw = parts.payload_raw.clone();
+    Some((parts, payload_raw))
 }
 
 pub(crate) fn validate_timestamp(value: f64) -> PyResult<f64> {

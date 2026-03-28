@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 
-use crate::common::{parse_base_parts, validate_timestamp};
+use crate::common::{can_parse_template_event, parse_template_event, validate_timestamp, EventType, TemplateEvent};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
-static CPU_FREQUENCY_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+static CPU_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     PayloadTemplate::new(
         "state={state} cpu_id={cpu_id}",
         &[("state", FieldSpec::u32()), ("cpu_id", FieldSpec::u32())],
@@ -25,7 +25,7 @@ static CLOCK_SET_RATE_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
-static DEV_FREQUENCY_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+static DEV_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     PayloadTemplate::new(
         "clk={clk} state={state} cpu_id={cpu_id}",
         &[
@@ -35,6 +35,26 @@ static DEV_FREQUENCY_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
         ],
     )
 });
+
+impl EventType for TraceCpuFrequency {
+    const EVENT_NAME: &'static str = "cpu_frequency";
+}
+
+impl TemplateEvent for TraceCpuFrequency {
+    fn template() -> &'static PayloadTemplate {
+        &CPU_TEMPLATE
+    }
+}
+
+impl EventType for TraceDevFrequency {
+    const EVENT_NAME: &'static str = "clock_set_rate";
+}
+
+impl TemplateEvent for TraceDevFrequency {
+    fn template() -> &'static PayloadTemplate {
+        &DEV_TEMPLATE
+    }
+}
 
 #[pyclass]
 #[derive(Clone, Debug)]
@@ -53,19 +73,13 @@ pub struct TraceCpuFrequency {
 impl TraceCpuFrequency {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        let Some(parts) = parse_base_parts(line) else {
-            return false;
-        };
-        parts.event_name == "cpu_frequency" && CPU_FREQUENCY_TEMPLATE.is_match(&parts.payload_raw)
+        can_parse_template_event::<Self>(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let parts = parse_base_parts(line)?;
-        if parts.event_name != "cpu_frequency" {
-            return None;
-        }
-        let captures = CPU_FREQUENCY_TEMPLATE.captures(&parts.payload_raw)?;
+        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
+        let captures = Self::template().captures(&payload_raw)?;
         let state = captures.name("state")?.as_str().parse().ok()?;
         let cpu_id = captures.name("cpu_id")?.as_str().parse().ok()?;
         Some(Self {
@@ -81,7 +95,7 @@ impl TraceCpuFrequency {
             ("state", TemplateValue::U32(self.state)),
             ("cpu_id", TemplateValue::U32(self.cpu_id)),
         ]);
-        Ok(CPU_FREQUENCY_TEMPLATE
+        Ok(CPU_TEMPLATE
             .format(&values)
             .expect("cpu_frequency template must render"))
     }
@@ -111,19 +125,13 @@ pub struct TraceDevFrequency {
 impl TraceDevFrequency {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        let Some(parts) = parse_base_parts(line) else {
-            return false;
-        };
-        parts.event_name == "clock_set_rate" && DEV_FREQUENCY_TEMPLATE.is_match(&parts.payload_raw)
+        can_parse_template_event::<Self>(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let parts = parse_base_parts(line)?;
-        if parts.event_name != "clock_set_rate" {
-            return None;
-        }
-        let captures = DEV_FREQUENCY_TEMPLATE.captures(&parts.payload_raw)?;
+        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
+        let captures = Self::template().captures(&payload_raw)?;
         let clk = captures.name("clk")?.as_str().to_owned();
         let state = captures.name("state")?.as_str().parse().ok()?;
         let cpu_id = captures.name("cpu_id")?.as_str().parse().ok()?;

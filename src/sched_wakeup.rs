@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 
-use crate::common::{parse_base_parts, validate_timestamp};
+use crate::common::{can_parse_template_event, parse_template_event, validate_timestamp, EventType, TemplateEvent};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
-static SCHED_WAKEUP_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     PayloadTemplate::new(
         "comm={comm} pid={pid} prio={prio} target_cpu={target_cpu}",
         &[
@@ -18,6 +18,26 @@ static SCHED_WAKEUP_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
         ],
     )
 });
+
+impl EventType for TraceSchedWakeup {
+    const EVENT_NAME: &'static str = "sched_wakeup";
+}
+
+impl TemplateEvent for TraceSchedWakeup {
+    fn template() -> &'static PayloadTemplate {
+        &TEMPLATE
+    }
+}
+
+impl EventType for TraceSchedWakeupNew {
+    const EVENT_NAME: &'static str = "sched_wakeup_new";
+}
+
+impl TemplateEvent for TraceSchedWakeupNew {
+    fn template() -> &'static PayloadTemplate {
+        &TEMPLATE
+    }
+}
 
 #[pyclass]
 #[derive(Clone, Debug)]
@@ -40,19 +60,13 @@ pub struct TraceSchedWakeup {
 impl TraceSchedWakeup {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        let Some(parts) = parse_base_parts(line) else {
-            return false;
-        };
-        parts.event_name == "sched_wakeup" && SCHED_WAKEUP_TEMPLATE.is_match(&parts.payload_raw)
+        can_parse_template_event::<Self>(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let parts = parse_base_parts(line)?;
-        if parts.event_name != "sched_wakeup" {
-            return None;
-        }
-        let captures = SCHED_WAKEUP_TEMPLATE.captures(&parts.payload_raw)?;
+        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
+        let captures = Self::template().captures(&payload_raw)?;
         let comm = captures.name("comm")?.as_str().to_owned();
         let pid = captures.name("pid")?.as_str().parse().ok()?;
         let prio = captures.name("prio")?.as_str().parse().ok()?;
@@ -75,7 +89,7 @@ impl TraceSchedWakeup {
             ("prio", TemplateValue::I32(self.prio)),
             ("target_cpu", TemplateValue::Str(&target_cpu)),
         ]);
-        Ok(SCHED_WAKEUP_TEMPLATE
+        Ok(Self::template()
             .format(&values)
             .expect("sched_wakeup template must render"))
     }
@@ -107,20 +121,13 @@ pub struct TraceSchedWakeupNew {
 impl TraceSchedWakeupNew {
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        let Some(parts) = parse_base_parts(line) else {
-            return false;
-        };
-        parts.event_name == "sched_wakeup_new"
-            && SCHED_WAKEUP_TEMPLATE.is_match(&parts.payload_raw)
+        can_parse_template_event::<Self>(line)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
-        let parts = parse_base_parts(line)?;
-        if parts.event_name != "sched_wakeup_new" {
-            return None;
-        }
-        let captures = SCHED_WAKEUP_TEMPLATE.captures(&parts.payload_raw)?;
+        let (parts, payload_raw) = parse_template_event::<Self>(line)?;
+        let captures = Self::template().captures(&payload_raw)?;
         let comm = captures.name("comm")?.as_str().to_owned();
         let pid = captures.name("pid")?.as_str().parse().ok()?;
         let prio = captures.name("prio")?.as_str().parse().ok()?;
@@ -143,7 +150,7 @@ impl TraceSchedWakeupNew {
             ("prio", TemplateValue::I32(self.prio)),
             ("target_cpu", TemplateValue::Str(&target_cpu)),
         ]);
-        Ok(SCHED_WAKEUP_TEMPLATE
+        Ok(Self::template()
             .format(&values)
             .expect("sched_wakeup_new template must render"))
     }

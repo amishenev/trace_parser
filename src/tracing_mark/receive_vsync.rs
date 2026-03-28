@@ -4,9 +4,9 @@ use std::collections::HashMap;
 
 use crate::common::validate_timestamp;
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
-use super::base::{TraceMarkBegin, TRACE_MARK_BEGIN_TEMPLATE};
+use super::base::{BEGIN_TEMPLATE, TraceMarkBegin};
 
-static RECEIVE_VSYNC_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     PayloadTemplate::new(
         "{?ignore:extra_info}ReceiveVsync {frame_number}",
         &[
@@ -32,13 +32,13 @@ impl TraceReceiveVsync {
         let Some(begin) = TraceMarkBegin::parse(line) else {
             return false;
         };
-        RECEIVE_VSYNC_TEMPLATE.is_match(&begin.payload)
+        TEMPLATE.is_match(&begin.payload)
     }
 
     #[staticmethod]
     pub fn parse(line: &str) -> Option<Self> {
         let begin = TraceMarkBegin::parse(line)?;
-        let captures = RECEIVE_VSYNC_TEMPLATE.captures(&begin.payload)?;
+        let captures = TEMPLATE.captures(&begin.payload)?;
         let frame_number = captures.name("frame_number")?.as_str().parse().ok()?;
         Some(Self {
             begin,
@@ -48,7 +48,7 @@ impl TraceReceiveVsync {
 
     pub(crate) fn payload_to_string(&self) -> PyResult<String> {
         let payload_values = HashMap::from([("frame_number", TemplateValue::U32(self.frame_number))]);
-        Ok(RECEIVE_VSYNC_TEMPLATE
+        Ok(TEMPLATE
             .format(&payload_values)
             .expect("receive vsync template must render"))
     }
@@ -62,7 +62,7 @@ impl TraceReceiveVsync {
         ]);
 
         Ok(self.begin.mark.base.to_string_with_payload(
-            &TRACE_MARK_BEGIN_TEMPLATE
+            &BEGIN_TEMPLATE
                 .format(&begin_values)
                 .expect("trace mark begin template must render"),
         ))
