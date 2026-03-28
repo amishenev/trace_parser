@@ -1,0 +1,21 @@
+name: Commitlint
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  commitlint:
+    name: Check commit messages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Lint commit messages
+        uses: wagoid/commitlint-github-action@v6

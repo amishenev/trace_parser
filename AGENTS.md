@@ -47,6 +47,24 @@ Editable build artifacts:
 - they must be ignored by git
 - do not manually copy or symlink native libraries into `python/trace_parser/`
 
+## Commit messages
+
+All future commit messages in this repository must:
+
+- use Conventional Commits
+- be written in English
+
+Preferred examples:
+
+- `feat: add sched_waking parser`
+- `fix: separate pyo3 extension-module feature for CI`
+- `docs: update README with release workflow`
+- `ci: expand Python version matrix`
+
+Do not use free-form commit messages in this repository anymore.
+
+This rule is also enforced in GitHub Actions through a dedicated commitlint workflow.
+
 ## Base Trace Format
 
 Current parser targets trace lines shaped like:
