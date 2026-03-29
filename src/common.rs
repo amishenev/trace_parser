@@ -1,8 +1,9 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use regex::{Captures, Regex};
-use std::str::FromStr;
 use std::sync::LazyLock;
+use lexical_core::parse;
+use memchr::memmem;
 
 use crate::format_registry::FormatRegistry;
 
@@ -30,11 +31,11 @@ impl BaseTraceParts {
         let captures = BASE_TRACE_RE.captures(line)?;
         Some(Self {
             thread_name: captures.name("thread_name")?.as_str().to_owned(),
-            tid: captures.name("tid")?.as_str().parse().ok()?,
-            tgid: captures.name("tgid")?.as_str().parse().ok()?,
-            cpu: captures.name("cpu")?.as_str().parse().ok()?,
+            tid: parse(captures.name("tid")?.as_str().as_bytes()).ok()?,
+            tgid: parse(captures.name("tgid")?.as_str().as_bytes()).ok()?,
+            cpu: parse(captures.name("cpu")?.as_str().as_bytes()).ok()?,
             flags: captures.name("flags")?.as_str().to_owned(),
-            timestamp: captures.name("timestamp")?.as_str().parse().ok()?,
+            timestamp: parse(captures.name("timestamp")?.as_str().as_bytes()).ok()?,
             event_name: captures.name("event_name")?.as_str().trim().to_owned(),
             payload_raw: captures.name("payload")?.as_str().to_owned(),
         })
@@ -88,7 +89,7 @@ pub(crate) fn contains_event_name(line: &str, event_name: &str) -> bool {
     let mut start = 0;
 
     while start + needle.len() <= bytes.len() {
-        let Some(offset) = line[start..].find(event_name) else {
+        let Some(offset) = memmem::find(&bytes[start..], needle) else {
             return false;
         };
         let index = start + offset;
@@ -141,8 +142,8 @@ pub(crate) fn cap_str(captures: &Captures<'_>, name: &str) -> Option<String> {
     Some(captures.name(name)?.as_str().to_owned())
 }
 
-pub(crate) fn cap_parse<T: FromStr>(captures: &Captures<'_>, name: &str) -> Option<T> {
-    captures.name(name)?.as_str().parse().ok()
+pub(crate) fn cap_parse<T: lexical_core::FromLexical>(captures: &Captures<'_>, name: &str) -> Option<T> {
+    parse(captures.name(name)?.as_str().as_bytes()).ok()
 }
 
 pub(crate) fn validate_timestamp(value: f64) -> PyResult<f64> {

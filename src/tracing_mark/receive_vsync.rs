@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 use std::sync::LazyLock;
+use lexical_core::parse;
 
 use crate::common::validate_timestamp;
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
@@ -38,7 +39,7 @@ impl TraceReceiveVsync {
         }
         let begin = TraceMarkBegin::parse(line)?;
         let captures = TEMPLATE.captures(&begin.payload)?;
-        let frame_number = captures.name("frame_number")?.as_str().parse().ok()?;
+        let frame_number = parse(captures.name("frame_number")?.as_str().as_bytes()).ok()?;
         Some(Self {
             begin,
             frame_number,

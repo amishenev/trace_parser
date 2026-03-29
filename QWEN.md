@@ -368,6 +368,30 @@ where
 }
 ```
 
+### SIMD оптимизации
+
+**Зависимости:**
+- `memchr = "2.7"` — SIMD поиск подстроки
+- `lexical-core = "1.0"` — SIMD парсинг чисел
+
+**Примеры:**
+```rust
+use memchr::memmem;
+use lexical_core::parse;
+
+// Поиск подстроки
+let pos = memmem::find(line.as_bytes(), b": ")?;
+
+// Парсинг чисел
+let tid: u32 = parse(captures.name("tid")?.as_str().as_bytes()).ok()?;
+let timestamp: f64 = parse(captures.name("timestamp")?.as_str().as_bytes()).ok()?;
+```
+
+**Где используется:**
+- `extract_event_name()` — memchr для поиска `": "`
+- `BaseTraceParts::parse()` — lexical-core для tid, tgid, cpu, timestamp
+- `cap_parse()` — универсальная функция через `FromLexical`
+
 ### Парсинг timestamp
 
 - Хранится в секундах как `f64`

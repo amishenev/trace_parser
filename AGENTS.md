@@ -20,6 +20,32 @@ Primary goals:
 - **PyO3:** 0.28 (with `Bound` API)
 - **Python:** 3.10+
 - **regex:** 1.12
+- **memchr:** 2.7 (SIMD substring search)
+- **lexical-core:** 1.0 (SIMD number parsing)
+
+## SIMD Optimizations
+
+The project uses SIMD instructions for faster parsing:
+
+**memchr::memmem** — SIMD substring search:
+```rust
+use memchr::memmem;
+let pos = memmem::find(line.as_bytes(), b": ")?;
+```
+
+**lexical-core::parse** — SIMD number parsing:
+```rust
+use lexical_core::parse;
+let tid: u32 = parse(captures.name("tid")?.as_str().as_bytes()).ok()?;
+let timestamp: f64 = parse(captures.name("timestamp")?.as_str().as_bytes()).ok()?;
+```
+
+**Used in:**
+- `extract_event_name()` — memchr for finding `": "`
+- `BaseTraceParts::parse()` — lexical-core for tid, tgid, cpu, timestamp
+- `cap_parse()` — generic parser via `FromLexical`
+
+Expected speedup: ~30-50% faster per-line parsing.
 
 ## PyO3 0.28 Notes
 

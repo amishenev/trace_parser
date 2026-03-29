@@ -12,6 +12,8 @@ default = []
 extension-module = ["pyo3/extension-module"]
 
 [dependencies]
+lexical-core = { version = "1.0", features = ["parse"] }
+memchr = "2.7"
 pyo3 = { version = "0.28", features = ["abi3-py310"] }
 regex = "1.12"
 

@@ -18,6 +18,7 @@ pub use tracing_mark::{TraceMarkBegin, TraceMarkEnd, TraceReceiveVsync, TracingM
 
 use pyo3::prelude::*;
 use pyo3::BoundObject;
+use memchr::memmem;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
@@ -45,9 +46,10 @@ fn parse_tracing_mark(py: Python<'_>, line: &str) -> Option<Py<PyAny>> {
 
 /// Извлечь event_name из строки трассировки
 fn extract_event_name(line: &str) -> Option<&str> {
-    let colon_pos = line.find(": ")? + 2;
+    // Используем SIMD поиск через memchr
+    let colon_pos = memmem::find(line.as_bytes(), b": ")? + 2;
     let rest = &line[colon_pos..];
-    let end_pos = rest.find(": ")?;
+    let end_pos = memmem::find(rest.as_bytes(), b": ")?;
     Some(rest[..end_pos].trim())
 }
 
