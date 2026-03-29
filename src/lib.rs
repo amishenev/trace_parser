@@ -9,9 +9,6 @@ mod trace;
 mod tracing_mark;
 
 pub use format_registry::{FormatRegistry, FormatSpec};
-
-use pyo3::prelude::*;
-
 pub use frequency::{TraceCpuFrequency, TraceDevFrequency};
 pub use sched_process_exit::TraceSchedProcessExit;
 pub use sched_switch::TraceSchedSwitch;
@@ -19,62 +16,54 @@ pub use sched_wakeup::{TraceSchedWakeup, TraceSchedWakeupNew};
 pub use trace::Trace;
 pub use tracing_mark::{TraceMarkBegin, TraceMarkEnd, TraceReceiveVsync, TracingMark};
 
+use pyo3::prelude::*;
+
+/// Хелпер для парсинга и создания Python объекта из Rust события
+fn parse_and_wrap<T: IntoPy<PyObject>>(py: Python<'_>, line: &str, parser: fn(&str) -> Option<T>) -> Option<PyObject> {
+    parser(line).map(|e| e.into_py(py))
+}
+
+/// Парсинг tracing_mark_write с приоритетом событий
+fn parse_tracing_mark(py: Python<'_>, line: &str) -> Option<PyObject> {
+    parse_and_wrap(py, line, TraceReceiveVsync::parse)
+        .or_else(|| parse_and_wrap(py, line, TraceMarkBegin::parse))
+        .or_else(|| parse_and_wrap(py, line, TraceMarkEnd::parse))
+        .or_else(|| parse_and_wrap(py, line, TracingMark::parse))
+}
+
+/// Извлечь event_name из строки трассировки
+fn extract_event_name(line: &str) -> Option<&str> {
+    let colon_pos = line.find(": ")? + 2;
+    let rest = &line[colon_pos..];
+    let end_pos = rest.find(": ")?;
+    Some(rest[..end_pos].trim())
+}
+
 #[pyfunction]
 fn parse_trace(py: Python<'_>, line: &str) -> PyResult<Option<PyObject>> {
-    if TraceReceiveVsync::can_be_parsed(line) {
-        if let Some(event) = TraceReceiveVsync::parse(line) {
-            return Ok(Some(Py::new(py, event)?.to_object(py)));
-        }
-    }
-    if TraceMarkBegin::can_be_parsed(line) {
-        if let Some(event) = TraceMarkBegin::parse(line) {
-            return Ok(Some(Py::new(py, event)?.to_object(py)));
-        }
-    }
-    if TraceMarkEnd::can_be_parsed(line) {
-        if let Some(event) = TraceMarkEnd::parse(line) {
-            return Ok(Some(Py::new(py, event)?.to_object(py)));
-        }
-    }
-    if TracingMark::can_be_parsed(line) {
-        if let Some(event) = TracingMark::parse(line) {
-            return Ok(Some(Py::new(py, event)?.to_object(py)));
-        }
-    }
-    if TraceDevFrequency::can_be_parsed(line) {
-        if let Some(event) = TraceDevFrequency::parse(line) {
-            return Ok(Some(Py::new(py, event)?.to_object(py)));
-        }
-    }
-    if TraceCpuFrequency::can_be_parsed(line) {
-        if let Some(event) = TraceCpuFrequency::parse(line) {
-            return Ok(Some(Py::new(py, event)?.to_object(py)));
-        }
-    }
-    if TraceSchedWakeupNew::can_be_parsed(line) {
-        if let Some(event) = TraceSchedWakeupNew::parse(line) {
-            return Ok(Some(Py::new(py, event)?.to_object(py)));
-        }
-    }
-    if TraceSchedWakeup::can_be_parsed(line) {
-        if let Some(event) = TraceSchedWakeup::parse(line) {
-            return Ok(Some(Py::new(py, event)?.to_object(py)));
-        }
-    }
-    if TraceSchedProcessExit::can_be_parsed(line) {
-        if let Some(event) = TraceSchedProcessExit::parse(line) {
-            return Ok(Some(Py::new(py, event)?.to_object(py)));
-        }
-    }
-    if TraceSchedSwitch::can_be_parsed(line) {
-        if let Some(event) = TraceSchedSwitch::parse(line) {
-            return Ok(Some(Py::new(py, event)?.to_object(py)));
-        }
-    }
-    if let Some(trace) = Trace::parse(line) {
-        return Ok(Some(Py::new(py, trace)?.to_object(py)));
-    }
-    Ok(None)
+    let Some(event_name) = extract_event_name(line) else {
+        return Ok(None);
+    };
+
+    let result = match event_name {
+        // Tracing mark события
+        "tracing_mark_write" => parse_tracing_mark(py, line),
+
+        // Частотные события
+        "clock_set_rate" => parse_and_wrap(py, line, TraceDevFrequency::parse),
+        "cpu_frequency" => parse_and_wrap(py, line, TraceCpuFrequency::parse),
+
+        // Sched события
+        "sched_switch" => parse_and_wrap(py, line, TraceSchedSwitch::parse),
+        "sched_wakeup" => parse_and_wrap(py, line, TraceSchedWakeup::parse),
+        "sched_wakeup_new" => parse_and_wrap(py, line, TraceSchedWakeupNew::parse),
+        "sched_process_exit" => parse_and_wrap(py, line, TraceSchedProcessExit::parse),
+
+        // Неизвестное событие — fallback на базовый Trace
+        _ => parse_and_wrap(py, line, Trace::parse),
+    };
+
+    Ok(result)
 }
 
 #[pyfunction]
