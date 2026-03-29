@@ -1,11 +1,11 @@
-use once_cell::sync::Lazy;
 use pyo3::prelude::*;
+use std::sync::LazyLock;
 
 use crate::common::validate_timestamp;
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use super::base::{contains_begin_marker, BEGIN_TEMPLATE, TraceMarkBegin};
 
-static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+static TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
         "{?ignore:extra_info}ReceiveVsync {frame_number}",
         &[
@@ -15,7 +15,7 @@ static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct TraceReceiveVsync {
     #[pyo3(get)]

@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 
 use crate::common::{parse_base_parts, validate_timestamp, BaseTraceParts, BASE_TRACE_RE};
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct Trace {
     #[pyo3(get, set)]

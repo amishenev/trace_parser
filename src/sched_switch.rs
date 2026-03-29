@@ -1,6 +1,6 @@
-use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use regex::Captures;
+use std::sync::LazyLock;
 
 use crate::common::{
     cap_parse, cap_str, parse_template_event, validate_timestamp, BaseTraceParts, EventType,
@@ -10,7 +10,7 @@ use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
-static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+static TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
         "prev_comm={prev_comm} prev_pid={prev_pid} prev_prio={prev_prio} prev_state={prev_state} ==> next_comm={next_comm} next_pid={next_pid} next_prio={next_prio}",
         &[
@@ -25,7 +25,7 @@ static TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
-static FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+static FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
     FormatRegistry::new(vec![
         FormatSpec {
             kind: 0,
@@ -34,7 +34,7 @@ static FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
     ])
 });
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct TraceSchedSwitch {
     #[pyo3(get)]

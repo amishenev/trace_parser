@@ -1,7 +1,7 @@
 [package]
 name = "trace_parser"
-version = "0.1.0"
-edition = "2021"
+version = "0.2.0"
+edition = "2024"
 
 [lib]
 name = "trace_parser"
@@ -12,9 +12,8 @@ default = []
 extension-module = ["pyo3/extension-module"]
 
 [dependencies]
-once_cell = "1.19"
-pyo3 = { version = "0.22", features = ["abi3-py310"] }
-regex = "1.10"
+pyo3 = { version = "0.28", features = ["abi3-py310"] }
+regex = "1.12"
 
 [[bench]]
 name = "can_be_parsed"

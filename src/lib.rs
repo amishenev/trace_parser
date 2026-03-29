@@ -17,16 +17,26 @@ pub use trace::Trace;
 pub use tracing_mark::{TraceMarkBegin, TraceMarkEnd, TraceReceiveVsync, TracingMark};
 
 use pyo3::prelude::*;
+use pyo3::BoundObject;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
 /// Хелпер для парсинга и создания Python объекта из Rust события
-fn parse_and_wrap<T: IntoPy<PyObject>>(py: Python<'_>, line: &str, parser: fn(&str) -> Option<T>) -> Option<PyObject> {
-    parser(line).map(|e| e.into_py(py))
+fn parse_and_wrap<'py, T>(
+    py: Python<'py>,
+    line: &str,
+    parser: fn(&str) -> Option<T>,
+) -> Option<Py<PyAny>>
+where
+    T: IntoPyObject<'py>,
+{
+    parser(line)
+        .and_then(|e| e.into_pyobject(py).ok())
+        .map(|bound| bound.into_any().unbind())
 }
 
 /// Парсинг tracing_mark_write с приоритетом событий
-fn parse_tracing_mark(py: Python<'_>, line: &str) -> Option<PyObject> {
+fn parse_tracing_mark(py: Python<'_>, line: &str) -> Option<Py<PyAny>> {
     parse_and_wrap(py, line, TraceReceiveVsync::parse)
         .or_else(|| parse_and_wrap(py, line, TraceMarkBegin::parse))
         .or_else(|| parse_and_wrap(py, line, TraceMarkEnd::parse))
@@ -42,7 +52,7 @@ fn extract_event_name(line: &str) -> Option<&str> {
 }
 
 #[pyfunction]
-fn parse_trace(py: Python<'_>, line: &str) -> PyResult<Option<PyObject>> {
+fn parse_trace(py: Python<'_>, line: &str) -> PyResult<Option<Py<PyAny>>> {
     let Some(event_name) = extract_event_name(line) else {
         return Ok(None);
     };
@@ -89,7 +99,7 @@ fn parse_trace_file(
     py: Python<'_>,
     path: &str,
     filter_event: Option<&str>,
-) -> PyResult<Vec<PyObject>> {
+) -> PyResult<Vec<Py<PyAny>>> {
     let file = File::open(path).map_err(|e| {
         PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("Failed to open file: {}", e))
     })?;

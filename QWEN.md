@@ -54,7 +54,7 @@ TASK-TID (TGID) [CPU] FLAGS TIMESTAMP: event_name: payload
 ### Требования
 
 - Python 3.10+
-- Rust toolchain
+- Rust 1.80+ (текущая: 1.94)
 - `uv` (менеджер пакетов)
 
 ### Установка окружения
@@ -156,14 +156,60 @@ pub struct TraceSchedSwitch {
 - `sched_switch.base.timestamp`
 - `sched_switch.prev_comm`
 
+#### PyO3 0.28 + Bound API
+
+Проект использует PyO3 0.28 с новым `Bound` API:
+
+```rust
+use pyo3::prelude::*;
+use pyo3::BoundObject;
+
+// Возврат Python объектов
+fn parse_trace(py: Python<'_>, line: &str) -> PyResult<Option<Py<PyAny>>> {
+    // ...
+}
+
+// Хелпер для конвертации
+fn parse_and_wrap<'py, T>(
+    py: Python<'py>,
+    line: &str,
+    parser: fn(&str) -> Option<T>,
+) -> Option<Py<PyAny>>
+where
+    T: IntoPyObject<'py>,
+{
+    parser(line)
+        .and_then(|e| e.into_pyobject(py).ok())
+        .map(|bound| bound.into_any().unbind())
+}
+```
+
+**Ключевые изменения:**
+- `IntoPy` → `IntoPyObject`
+- `PyObject` → `Py<PyAny>`
+- `into_py()` → `into_pyobject().into_any().unbind()`
+
+#### std::sync::LazyLock
+
+Rust 2024 использует `LazyLock` вместо `once_cell`:
+
+```rust
+use std::sync::LazyLock;
+
+static FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
+    FormatRegistry::new(vec![...])
+});
+```
+
 #### FormatRegistry — словарь форматов
 
 Для поддержки нескольких форматов payload используется `FormatRegistry`:
 
 ```rust
 use crate::format_registry::{FormatRegistry, FormatSpec};
+use std::sync::LazyLock;
 
-static FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+static FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
     FormatRegistry::new(vec![
         FormatSpec { kind: "orig", template: &TEMPLATE_DEFAULT },
         FormatSpec { kind: "with_reason", template: &TEMPLATE_WITH_REASON },
@@ -171,7 +217,7 @@ static FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
 });
 
 // Для событий с одним форматом:
-static FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+static FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
     FormatRegistry::single(&TEMPLATE)
 });
 ```
@@ -250,7 +296,8 @@ ci: expand Python version matrix
 - Использовать `uv` для всех Python операций
 - Виртуальное окружение: `.venv`
 - Python 3.10 — минимальная версия
-- `pyo3` использует `abi3-py310`
+- `pyo3` использует `abi3-py310` (версия 0.28.2+)
+- Rust edition 2024
 - Native extension: `trace_parser._native`
 
 **Артефакты сборки:**
@@ -294,6 +341,32 @@ git push origin v0.1.0
 ```
 
 ## Важные детали реализации
+
+### PyO3 0.28 миграция
+
+**Текущая версия:** PyO3 0.28, Rust 2024
+
+**Ключевые изменения:**
+- `IntoPy<T>` → `IntoPyObject<'py>`
+- `PyObject` → `Py<PyAny>`
+- `into_py(py)` → `into_pyobject(py)?.into_any().unbind()`
+- `once_cell::sync::Lazy` → `std::sync::LazyLock`
+
+**Хелпер для конвертации:**
+```rust
+fn parse_and_wrap<'py, T>(
+    py: Python<'py>,
+    line: &str,
+    parser: fn(&str) -> Option<T>,
+) -> Option<Py<PyAny>>
+where
+    T: IntoPyObject<'py>,
+{
+    parser(line)
+        .and_then(|e| e.into_pyobject(py).ok())
+        .map(|bound| bound.into_any().unbind())
+}
+```
 
 ### Парсинг timestamp
 

@@ -1,12 +1,12 @@
-use once_cell::sync::Lazy;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use regex::{Captures, Regex};
 use std::str::FromStr;
+use std::sync::LazyLock;
 
 use crate::format_registry::FormatRegistry;
 
-pub(crate) static BASE_TRACE_RE: Lazy<Regex> = Lazy::new(|| {
+pub(crate) static BASE_TRACE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"^(?P<thread_name>.+)-(?P<tid>\d+)\s+\(\s*(?P<tgid>\d+)\)\s+\[(?P<cpu>\d+)\]\s+(?P<flags>\S+)\s+(?P<timestamp>\d+(?:\.\d+)?):\s+(?P<event_name>[^:]+):\s*(?P<payload>.*)$",
     )

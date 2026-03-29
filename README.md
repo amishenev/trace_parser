@@ -57,7 +57,7 @@ event = parse_trace(line)
 Requirements:
 
 - Python `3.10+`
-- Rust toolchain
+- Rust toolchain (1.83+, edition 2024)
 - `uv`
 
 Create the environment and install development tools:
@@ -148,6 +148,8 @@ python/trace_parser/
 - `maturin develop` creates local native artifacts under `python/trace_parser/`
 - those native build artifacts are ignored by git
 - Python smoke tests live in `tests/python/`
+- Minimum Rust version: 1.83 (edition 2024)
+- PyO3 version: 0.28.2+
 
 ## CI
 

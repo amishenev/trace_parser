@@ -1,6 +1,6 @@
-use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use regex::Captures;
+use std::sync::LazyLock;
 
 use crate::common::{
     cap_parse, cap_str, parse_template_event, validate_timestamp, BaseTraceParts, EventType,
@@ -10,7 +10,7 @@ use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
-static TEMPLATE_DEFAULT: Lazy<PayloadTemplate> = Lazy::new(|| {
+static TEMPLATE_DEFAULT: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
         "comm={comm} pid={pid} prio={prio} target_cpu={target_cpu}",
         &[
@@ -22,7 +22,7 @@ static TEMPLATE_DEFAULT: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
-static TEMPLATE_WITH_REASON: Lazy<PayloadTemplate> = Lazy::new(|| {
+static TEMPLATE_WITH_REASON: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
         "comm={comm} pid={pid} prio={prio} target_cpu={target_cpu} reason={reason}",
         &[
@@ -35,7 +35,7 @@ static TEMPLATE_WITH_REASON: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
-static FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+static FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
     FormatRegistry::new(vec![
         FormatSpec {
             kind: 0,
@@ -48,7 +48,7 @@ static FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
     ])
 });
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct TraceSchedWakeup {
     #[pyo3(get)]
@@ -67,7 +67,7 @@ pub struct TraceSchedWakeup {
     pub(crate) reason: Option<u32>,
 }
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct TraceSchedWakeupNew {
     #[pyo3(get)]

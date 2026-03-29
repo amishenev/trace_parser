@@ -298,8 +298,8 @@ agg = TraceAggregator()
 - [x] Dispatch таблица для `parse_trace()` (#1.1)
 - [x] HashMap → Array в `render_payload()` (#1.2)
 - [x] Кэширование в CI (#3.2)
-- [ ] SIMD оптимизации (#1.4)
-- [ ] `parse_trace_file()` для массового парсинга (#1.3)
+- [x] `parse_trace_file()` для массового парсинга (#1.3)
+- [ ] SIMD оптимизации (#1.4) — memchr + lexical-core
 
 ### Среднесрочная (1-2 месяца)
 - [ ] Proc-macro для событий (#2.1)

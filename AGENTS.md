@@ -13,6 +13,40 @@ Primary goals:
 - support semantic round-trip via `to_string()`
 - allow service groups which are accepted during parse but omitted or normalized on output
 
+## Tech Stack
+
+- **Rust:** 1.94 (minimum 1.80 for `LazyLock`)
+- **Edition:** 2024
+- **PyO3:** 0.28 (with `Bound` API)
+- **Python:** 3.10+
+- **regex:** 1.12
+
+## PyO3 0.28 Notes
+
+PyO3 0.28 uses the new `Bound` API:
+
+- `IntoPy<T>` → `IntoPyObject<'py>`
+- `PyObject` → `Py<PyAny>`
+- `into_py(py)` → `into_pyobject(py)?.into_any().unbind()`
+- `once_cell::sync::Lazy` → `std::sync::LazyLock`
+
+Helper function for conversion:
+
+```rust
+fn parse_and_wrap<'py, T>(
+    py: Python<'py>,
+    line: &str,
+    parser: fn(&str) -> Option<T>,
+) -> Option<Py<PyAny>>
+where
+    T: IntoPyObject<'py>,
+{
+    parser(line)
+        .and_then(|e| e.into_pyobject(py).ok())
+        .map(|bound| bound.into_any().unbind())
+}
+```
+
 ## Python workflow
 
 Use `uv` for Python work in this repository.

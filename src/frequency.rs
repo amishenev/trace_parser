@@ -1,6 +1,6 @@
-use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use regex::Captures;
+use std::sync::LazyLock;
 
 use crate::common::{
     cap_parse, cap_str, contains_any, parse_template_event, validate_timestamp, BaseTraceParts,
@@ -10,14 +10,14 @@ use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
-static CPU_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+static CPU_TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
         "state={state} cpu_id={cpu_id}",
         &[("state", FieldSpec::u32()), ("cpu_id", FieldSpec::u32())],
     )
 });
 
-static CPU_FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+static CPU_FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
     FormatRegistry::new(vec![
         FormatSpec {
             kind: 0,
@@ -26,7 +26,7 @@ static CPU_FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
     ])
 });
 
-static DEV_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+static DEV_TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
         "clk={clk} state={state} cpu_id={cpu_id}",
         &[
@@ -37,7 +37,7 @@ static DEV_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
-static DEV_FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+static DEV_FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
     FormatRegistry::new(vec![
         FormatSpec {
             kind: 0,
@@ -46,7 +46,7 @@ static DEV_FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
     ])
 });
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct TraceCpuFrequency {
     #[pyo3(get)]
@@ -59,7 +59,7 @@ pub struct TraceCpuFrequency {
     pub(crate) cpu_id: u32,
 }
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct TraceDevFrequency {
     #[pyo3(get)]

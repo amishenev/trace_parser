@@ -1,6 +1,6 @@
-use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use regex::Captures;
+use std::sync::LazyLock;
 
 use crate::common::{
     cap_parse, cap_str, parse_template_event, validate_timestamp, BaseTraceParts, EventType,
@@ -10,7 +10,7 @@ use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::Trace;
 
-pub(crate) static BEGIN_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+pub(crate) static BEGIN_TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
         "B|{trace_mark_tgid}|{payload}",
         &[
@@ -20,7 +20,7 @@ pub(crate) static BEGIN_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
-pub(crate) static BEGIN_FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+pub(crate) static BEGIN_FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
     FormatRegistry::new(vec![
         FormatSpec {
             kind: 0,
@@ -29,7 +29,7 @@ pub(crate) static BEGIN_FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
     ])
 });
 
-pub(crate) static END_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
+pub(crate) static END_TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
         "E|{trace_mark_tgid}|{payload}",
         &[
@@ -39,7 +39,7 @@ pub(crate) static END_TEMPLATE: Lazy<PayloadTemplate> = Lazy::new(|| {
     )
 });
 
-pub(crate) static END_FORMATS: Lazy<FormatRegistry> = Lazy::new(|| {
+pub(crate) static END_FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
     FormatRegistry::new(vec![
         FormatSpec {
             kind: 0,
@@ -58,14 +58,14 @@ pub(crate) fn contains_end_marker(line: &str) -> bool {
     line.contains(" E|") || line.contains(": E|") || line.contains("tracing_mark_write: E|")
 }
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct TracingMark {
     #[pyo3(get)]
     pub(crate) base: Trace,
 }
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct TraceMarkBegin {
     #[pyo3(get)]
@@ -78,7 +78,7 @@ pub struct TraceMarkBegin {
     pub(crate) payload: String,
 }
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct TraceMarkEnd {
     #[pyo3(get)]
