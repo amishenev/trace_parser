@@ -1,0 +1,5 @@
+# Benchmark output directory
+.benchmarks/
+
+# Generated test traces
+*_trace_*.trace
