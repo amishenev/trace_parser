@@ -17,16 +17,50 @@ static TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
 });
 
 #[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TraceReceiveVsync {
     #[pyo3(get)]
-    pub(crate) begin: TraceMarkBegin,
+    pub begin: TraceMarkBegin,
     #[pyo3(get, set)]
-    pub(crate) frame_number: u32,
+    pub frame_number: u32,
 }
 
 #[pymethods]
 impl TraceReceiveVsync {
+    #[new]
+    #[pyo3(signature = (begin, frame_number))]
+    fn new(begin: TraceMarkBegin, frame_number: u32) -> Self {
+        Self {
+            begin,
+            frame_number,
+        }
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "TraceReceiveVsync(begin={:?}, frame_number={})",
+            self.begin, self.frame_number
+        ))
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        self.to_string()
+    }
+
+    fn __copy__(slf: PyRef<'_, Self>, py: Python<'_>) -> PyResult<Py<Self>> {
+        Ok(slf.clone().into_pyobject(py)?.unbind())
+    }
+
+    fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> PyResult<Py<Self>> {
+        unsafe {
+            Ok(self.clone().into_pyobject(Python::assume_attached())?.unbind())
+        }
+    }
+
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
         contains_begin_marker(line) && line.contains("ReceiveVsync ")
@@ -46,14 +80,14 @@ impl TraceReceiveVsync {
         })
     }
 
-    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+    pub fn payload_to_string(&self) -> PyResult<String> {
         let payload_values = [("frame_number", Some(TemplateValue::U32(self.frame_number)))];
         Ok(TEMPLATE
             .format(&payload_values)
             .expect("receive vsync template must render"))
     }
 
-    pub(crate) fn to_string(&self) -> PyResult<String> {
+    pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.begin.base.timestamp)?;
         let payload = self.payload_to_string()?;
         let begin_values = [

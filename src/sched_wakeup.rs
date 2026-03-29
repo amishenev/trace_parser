@@ -49,39 +49,39 @@ static FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
 });
 
 #[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TraceSchedWakeup {
     #[pyo3(get)]
-    pub(crate) base: Trace,
+    pub base: Trace,
     #[pyo3(get, set)]
-    pub(crate) format_id: u8,
+    pub format_id: u8,
     #[pyo3(get, set)]
-    pub(crate) comm: String,
+    pub comm: String,
     #[pyo3(get, set)]
-    pub(crate) pid: u32,
+    pub pid: u32,
     #[pyo3(get, set)]
-    pub(crate) prio: i32,
+    pub prio: i32,
     #[pyo3(get, set)]
-    pub(crate) target_cpu: u32,
+    pub target_cpu: u32,
     #[pyo3(get, set)]
-    pub(crate) reason: Option<u32>,
+    pub reason: Option<u32>,
 }
 
 #[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TraceSchedWakeupNew {
     #[pyo3(get)]
-    pub(crate) base: Trace,
+    pub base: Trace,
     #[pyo3(get, set)]
-    pub(crate) format_id: u8,
+    pub format_id: u8,
     #[pyo3(get, set)]
-    pub(crate) comm: String,
+    pub comm: String,
     #[pyo3(get, set)]
-    pub(crate) pid: u32,
+    pub pid: u32,
     #[pyo3(get, set)]
-    pub(crate) prio: i32,
+    pub prio: i32,
     #[pyo3(get, set)]
-    pub(crate) target_cpu: u32,
+    pub target_cpu: u32,
 }
 
 impl EventType for TraceSchedWakeup {
@@ -184,6 +184,59 @@ impl TemplateEvent for TraceSchedWakeupNew {
 
 #[pymethods]
 impl TraceSchedWakeup {
+    #[new]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, format_id, comm, pid, prio, target_cpu, reason=None))]
+    fn new(
+        thread_name: String,
+        tid: u32,
+        tgid: u32,
+        cpu: u32,
+        flags: String,
+        timestamp: f64,
+        event_name: String,
+        payload_raw: String,
+        format_id: u8,
+        comm: String,
+        pid: u32,
+        prio: i32,
+        target_cpu: u32,
+        reason: Option<u32>,
+    ) -> PyResult<Self> {
+        validate_timestamp(timestamp)?;
+        Ok(Self {
+            base: Trace::new(thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw)?,
+            format_id,
+            comm,
+            pid,
+            prio,
+            target_cpu,
+            reason,
+        })
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "TraceSchedWakeup(comm={:?}, pid={}, prio={}, target_cpu={}, reason={:?})",
+            self.comm, self.pid, self.prio, self.target_cpu, self.reason
+        ))
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        self.to_string()
+    }
+
+    fn __copy__(slf: PyRef<'_, Self>, py: Python<'_>) -> PyResult<Py<Self>> {
+        slf.clone().into_pyobject(py).map(|o| o.unbind())
+    }
+
+    fn __deepcopy__(&self, py: Python<'_>, _memo: &Bound<'_, PyAny>) -> PyResult<Py<Self>> {
+        self.clone().into_pyobject(py).map(|o| o.unbind())
+    }
+
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
         Self::quick_check(line)
@@ -197,11 +250,11 @@ impl TraceSchedWakeup {
         parse_template_event::<Self>(line)
     }
 
-    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+    pub fn payload_to_string(&self) -> PyResult<String> {
         self.render_payload()
     }
 
-    pub(crate) fn to_string(&self) -> PyResult<String> {
+    pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
         Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
@@ -209,6 +262,57 @@ impl TraceSchedWakeup {
 
 #[pymethods]
 impl TraceSchedWakeupNew {
+    #[new]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, format_id, comm, pid, prio, target_cpu))]
+    fn new(
+        thread_name: String,
+        tid: u32,
+        tgid: u32,
+        cpu: u32,
+        flags: String,
+        timestamp: f64,
+        event_name: String,
+        payload_raw: String,
+        format_id: u8,
+        comm: String,
+        pid: u32,
+        prio: i32,
+        target_cpu: u32,
+    ) -> PyResult<Self> {
+        validate_timestamp(timestamp)?;
+        Ok(Self {
+            base: Trace::new(thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw)?,
+            format_id,
+            comm,
+            pid,
+            prio,
+            target_cpu,
+        })
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "TraceSchedWakeupNew(comm={:?}, pid={}, prio={}, target_cpu={})",
+            self.comm, self.pid, self.prio, self.target_cpu
+        ))
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        self.to_string()
+    }
+
+    fn __copy__(slf: PyRef<'_, Self>, py: Python<'_>) -> PyResult<Py<Self>> {
+        slf.clone().into_pyobject(py).map(|o| o.unbind())
+    }
+
+    fn __deepcopy__(&self, py: Python<'_>, _memo: &Bound<'_, PyAny>) -> PyResult<Py<Self>> {
+        self.clone().into_pyobject(py).map(|o| o.unbind())
+    }
+
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
         Self::quick_check(line)
@@ -222,11 +326,11 @@ impl TraceSchedWakeupNew {
         parse_template_event::<Self>(line)
     }
 
-    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+    pub fn payload_to_string(&self) -> PyResult<String> {
         self.render_payload()
     }
 
-    pub(crate) fn to_string(&self) -> PyResult<String> {
+    pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
         Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }

@@ -16,5 +16,5 @@ dev = [
 
 [tool.maturin]
 module-name = "trace_parser._native"
-python-source = "python"
 features = ["extension-module"]
+generate-stub-files = true

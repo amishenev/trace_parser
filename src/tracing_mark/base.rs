@@ -59,36 +59,36 @@ pub(crate) fn contains_end_marker(line: &str) -> bool {
 }
 
 #[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TracingMark {
     #[pyo3(get)]
-    pub(crate) base: Trace,
+    pub base: Trace,
 }
 
-#[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug)]
+#[pyclass(from_py_object)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TraceMarkBegin {
     #[pyo3(get)]
-    pub(crate) base: Trace,
+    pub base: Trace,
     #[pyo3(get, set)]
-    pub(crate) format_id: u8,
+    pub format_id: u8,
     #[pyo3(get, set)]
-    pub(crate) trace_mark_tgid: u32,
+    pub trace_mark_tgid: u32,
     #[pyo3(get, set)]
-    pub(crate) payload: String,
+    pub payload: String,
 }
 
 #[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TraceMarkEnd {
     #[pyo3(get)]
-    pub(crate) base: Trace,
+    pub base: Trace,
     #[pyo3(get, set)]
-    pub(crate) format_id: u8,
+    pub format_id: u8,
     #[pyo3(get, set)]
-    pub(crate) trace_mark_tgid: u32,
+    pub trace_mark_tgid: u32,
     #[pyo3(get, set)]
-    pub(crate) payload: String,
+    pub payload: String,
 }
 
 impl EventType for TracingMark {
@@ -179,6 +179,55 @@ impl TemplateEvent for TraceMarkEnd {
 
 #[pymethods]
 impl TracingMark {
+    #[new]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw))]
+    fn new(
+        thread_name: String,
+        tid: u32,
+        tgid: u32,
+        cpu: u32,
+        flags: String,
+        timestamp: f64,
+        event_name: String,
+        payload_raw: String,
+    ) -> PyResult<Self> {
+        validate_timestamp(timestamp)?;
+        let base = Trace {
+            thread_name,
+            tid,
+            tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
+        };
+        Ok(Self { base })
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "TracingMark(base={:?})",
+            self.base
+        ))
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self.base == other.base
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        self.to_string()
+    }
+
+    fn __copy__(slf: PyRef<'_, Self>, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(slf.into_pyobject(py).map(|o| o.into_any().unbind())?)
+    }
+
+    fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(self.clone())
+    }
+
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
         Self::quick_check(line)
@@ -195,11 +244,11 @@ impl TracingMark {
         })
     }
 
-    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+    pub fn payload_to_string(&self) -> PyResult<String> {
         self.base.payload_to_string()
     }
 
-    pub(crate) fn to_string(&self) -> PyResult<String> {
+    pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
         Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
@@ -207,6 +256,67 @@ impl TracingMark {
 
 #[pymethods]
 impl TraceMarkBegin {
+    #[new]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, format_id, trace_mark_tgid, payload))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        thread_name: String,
+        tid: u32,
+        tgid: u32,
+        cpu: u32,
+        flags: String,
+        timestamp: f64,
+        event_name: String,
+        payload_raw: String,
+        format_id: u8,
+        trace_mark_tgid: u32,
+        payload: String,
+    ) -> PyResult<Self> {
+        validate_timestamp(timestamp)?;
+        let base = Trace {
+            thread_name,
+            tid,
+            tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
+        };
+        Ok(Self {
+            base,
+            format_id,
+            trace_mark_tgid,
+            payload,
+        })
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "TraceMarkBegin(base={:?}, format_id={}, trace_mark_tgid={}, payload='{}')",
+            self.base, self.format_id, self.trace_mark_tgid, self.payload
+        ))
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self.base == other.base
+            && self.format_id == other.format_id
+            && self.trace_mark_tgid == other.trace_mark_tgid
+            && self.payload == other.payload
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        self.to_string()
+    }
+
+    fn __copy__(slf: PyRef<'_, Self>, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(slf.into_pyobject(py).map(|o| o.into_any().unbind())?)
+    }
+
+    fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(self.clone())
+    }
+
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
         Self::quick_check(line)
@@ -220,11 +330,11 @@ impl TraceMarkBegin {
         parse_template_event::<Self>(line)
     }
 
-    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+    pub fn payload_to_string(&self) -> PyResult<String> {
         self.render_payload()
     }
 
-    pub(crate) fn to_string(&self) -> PyResult<String> {
+    pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
         Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }
@@ -232,6 +342,67 @@ impl TraceMarkBegin {
 
 #[pymethods]
 impl TraceMarkEnd {
+    #[new]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, format_id, trace_mark_tgid, payload))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        thread_name: String,
+        tid: u32,
+        tgid: u32,
+        cpu: u32,
+        flags: String,
+        timestamp: f64,
+        event_name: String,
+        payload_raw: String,
+        format_id: u8,
+        trace_mark_tgid: u32,
+        payload: String,
+    ) -> PyResult<Self> {
+        validate_timestamp(timestamp)?;
+        let base = Trace {
+            thread_name,
+            tid,
+            tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
+        };
+        Ok(Self {
+            base,
+            format_id,
+            trace_mark_tgid,
+            payload,
+        })
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "TraceMarkEnd(base={:?}, format_id={}, trace_mark_tgid={}, payload='{}')",
+            self.base, self.format_id, self.trace_mark_tgid, self.payload
+        ))
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self.base == other.base
+            && self.format_id == other.format_id
+            && self.trace_mark_tgid == other.trace_mark_tgid
+            && self.payload == other.payload
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        self.to_string()
+    }
+
+    fn __copy__(slf: PyRef<'_, Self>, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(slf.into_pyobject(py).map(|o| o.into_any().unbind())?)
+    }
+
+    fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(self.clone())
+    }
+
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
         Self::quick_check(line)
@@ -245,11 +416,11 @@ impl TraceMarkEnd {
         parse_template_event::<Self>(line)
     }
 
-    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+    pub fn payload_to_string(&self) -> PyResult<String> {
         self.render_payload()
     }
 
-    pub(crate) fn to_string(&self) -> PyResult<String> {
+    pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
         Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }

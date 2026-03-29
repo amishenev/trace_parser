@@ -15,7 +15,7 @@ from ._native import (
     version,
 )
 
-__all__ = [
+__all__ = (
     "Trace",
     "TraceCpuFrequency",
     "TraceDevFrequency",
@@ -30,5 +30,4 @@ __all__ = [
     "parse_trace",
     "parse_trace_file",
     "version",
-]
-
+)

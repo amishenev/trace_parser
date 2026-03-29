@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from trace_parser import ParsedTrace, TraceReceiveVsync, TraceSchedSwitch, parse_trace
-from trace_parser.frequency import TraceDevFrequency
+from trace_parser import Trace, TraceDevFrequency, TraceReceiveVsync, TraceSchedSwitch, parse_trace
 
 
 def handle_line(line: str) -> None:
-    event: ParsedTrace | None = parse_trace(line)
+    event: Trace | None = parse_trace(line)
     if event is None:
         return
 

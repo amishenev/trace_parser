@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use crate::common::{parse_base_parts, validate_timestamp, BaseTraceParts, BASE_TRACE_RE};
 
 #[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Trace {
     #[pyo3(get, set)]
     pub(crate) thread_name: String,
@@ -24,7 +24,30 @@ pub struct Trace {
 }
 
 impl Trace {
-    pub(crate) fn from_parts(parts: BaseTraceParts) -> Self {
+    pub fn new(
+        thread_name: String,
+        tid: u32,
+        tgid: u32,
+        cpu: u32,
+        flags: String,
+        timestamp: f64,
+        event_name: String,
+        payload_raw: String,
+    ) -> PyResult<Self> {
+        validate_timestamp(timestamp)?;
+        Ok(Self {
+            thread_name,
+            tid,
+            tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
+        })
+    }
+
+    pub fn from_parts(parts: BaseTraceParts) -> Self {
         Self {
             thread_name: parts.thread_name,
             tid: parts.tid,
@@ -37,7 +60,7 @@ impl Trace {
         }
     }
 
-    pub(crate) fn to_string_with_payload(&self, payload: &str) -> String {
+    pub fn to_string_with_payload(&self, payload: &str) -> String {
         format!(
             "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
             self.thread_name,
@@ -54,6 +77,21 @@ impl Trace {
 
 #[pymethods]
 impl Trace {
+    #[new]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw))]
+    fn py_new(
+        thread_name: String,
+        tid: u32,
+        tgid: u32,
+        cpu: u32,
+        flags: String,
+        timestamp: f64,
+        event_name: String,
+        payload_raw: String,
+    ) -> PyResult<Self> {
+        Self::new(thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw)
+    }
+
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
         BASE_TRACE_RE.is_match(line)
@@ -64,33 +102,63 @@ impl Trace {
         Some(Self::from_parts(parse_base_parts(line)?))
     }
 
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "Trace(thread_name='{}', tid={}, timestamp={:.6}, event_name='{}')",
+            self.thread_name, self.tid, self.timestamp, self.event_name
+        ))
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self.thread_name == other.thread_name
+            && self.tid == other.tid
+            && self.tgid == other.tgid
+            && self.cpu == other.cpu
+            && self.flags == other.flags
+            && self.timestamp == other.timestamp
+            && self.event_name == other.event_name
+            && self.payload_raw == other.payload_raw
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        self.to_string()
+    }
+
+    fn __copy__(slf: PyRef<'_, Self>, py: Python<'_>) -> PyResult<Py<Self>> {
+        slf.clone().into_pyobject(py).map(|o| o.unbind())
+    }
+
+    fn __deepcopy__(&self, py: Python<'_>, _memo: &Bound<'_, PyAny>) -> PyResult<Py<Self>> {
+        self.clone().into_pyobject(py).map(|o| o.unbind())
+    }
+
     #[getter]
-    pub(crate) fn timestamp_ms(&self) -> f64 {
+    pub fn timestamp_ms(&self) -> f64 {
         self.timestamp * 1_000.0
     }
 
     #[setter]
-    pub(crate) fn set_timestamp_ms(&mut self, value: f64) -> PyResult<()> {
+    pub fn set_timestamp_ms(&mut self, value: f64) -> PyResult<()> {
         self.timestamp = validate_timestamp(value / 1_000.0)?;
         Ok(())
     }
 
     #[getter]
-    pub(crate) fn timestamp_ns(&self) -> u64 {
+    pub fn timestamp_ns(&self) -> u64 {
         (self.timestamp * 1_000_000_000.0).round() as u64
     }
 
     #[setter]
-    pub(crate) fn set_timestamp_ns(&mut self, value: u64) -> PyResult<()> {
+    pub fn set_timestamp_ns(&mut self, value: u64) -> PyResult<()> {
         self.timestamp = (value as f64) / 1_000_000_000.0;
         Ok(())
     }
 
-    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+    pub fn payload_to_string(&self) -> PyResult<String> {
         Ok(self.payload_raw.clone())
     }
 
-    pub(crate) fn to_string(&self) -> PyResult<String> {
+    pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
         Ok(self.to_string_with_payload(&self.payload_to_string()?))
     }

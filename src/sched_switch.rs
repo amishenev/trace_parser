@@ -105,6 +105,50 @@ impl TemplateEvent for TraceSchedSwitch {
 
 #[pymethods]
 impl TraceSchedSwitch {
+    #[new]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, prev_comm, prev_pid, prev_prio, prev_state, next_comm, next_pid, next_prio))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        thread_name: String,
+        tid: u32,
+        tgid: u32,
+        cpu: u32,
+        flags: String,
+        timestamp: f64,
+        event_name: String,
+        payload_raw: String,
+        prev_comm: String,
+        prev_pid: u32,
+        prev_prio: i32,
+        prev_state: String,
+        next_comm: String,
+        next_pid: u32,
+        next_prio: i32,
+    ) -> PyResult<Self> {
+        validate_timestamp(timestamp)?;
+        let base = Trace {
+            thread_name,
+            tid,
+            tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
+        };
+        Ok(Self {
+            base,
+            format_id: 0,
+            prev_comm,
+            prev_pid,
+            prev_prio,
+            prev_state,
+            next_comm,
+            next_pid,
+            next_prio,
+        })
+    }
+
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
         Self::quick_check(line)
@@ -118,11 +162,42 @@ impl TraceSchedSwitch {
         parse_template_event::<Self>(line)
     }
 
-    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "TraceSchedSwitch(prev_comm='{}', prev_pid={}, next_comm='{}', next_pid={})",
+            self.prev_comm, self.prev_pid, self.next_comm, self.next_pid
+        ))
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self.base == other.base
+            && self.format_id == other.format_id
+            && self.prev_comm == other.prev_comm
+            && self.prev_pid == other.prev_pid
+            && self.prev_prio == other.prev_prio
+            && self.prev_state == other.prev_state
+            && self.next_comm == other.next_comm
+            && self.next_pid == other.next_pid
+            && self.next_prio == other.next_prio
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        self.to_string()
+    }
+
+    fn __copy__(slf: PyRef<'_, Self>, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(slf.into_pyobject(py).map(|o| o.into_any().unbind())?)
+    }
+
+    fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(self.clone())
+    }
+
+    pub fn payload_to_string(&self) -> PyResult<String> {
         self.render_payload()
     }
 
-    pub(crate) fn to_string(&self) -> PyResult<String> {
+    pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
         Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
     }

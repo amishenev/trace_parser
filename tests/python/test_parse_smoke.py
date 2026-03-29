@@ -9,10 +9,6 @@ from trace_parser import (
     TraceSchedWakeup,
     parse_trace,
 )
-from trace_parser.frequency import TraceDevFrequency as TraceDevFrequencyModule
-from trace_parser.tracing_mark.receive_vsync import (
-    TraceReceiveVsync as TraceReceiveVsyncModule,
-)
 
 
 def test_trace_parse_smoke() -> None:
@@ -62,8 +58,6 @@ def test_dev_frequency_parse_smoke() -> None:
     event = TraceDevFrequency.parse(line)
     assert event is not None
     assert event.clk == "ddr_devfreq"
-    event_from_module = TraceDevFrequencyModule.parse(line)
-    assert event_from_module is not None
 
 
 def test_receive_vsync_parse_smoke() -> None:
@@ -73,8 +67,6 @@ def test_receive_vsync_parse_smoke() -> None:
     )
     event = TraceReceiveVsync.parse(line)
     assert event is not None
-    event_from_module = TraceReceiveVsyncModule.parse(line)
-    assert event_from_module is not None
 
 
 def test_factory_parse_smoke() -> None:

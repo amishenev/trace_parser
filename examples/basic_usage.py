@@ -9,7 +9,6 @@ from trace_parser import (
     TraceSchedWakeup,
     parse_trace,
 )
-from trace_parser.tracing_mark.receive_vsync import TraceReceiveVsync as TraceReceiveVsyncModule
 
 
 def main() -> None:

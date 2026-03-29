@@ -47,31 +47,31 @@ static DEV_FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
 });
 
 #[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TraceCpuFrequency {
     #[pyo3(get)]
-    pub(crate) base: Trace,
+    pub base: Trace,
     #[pyo3(get, set)]
-    pub(crate) format_id: u8,
+    pub format_id: u8,
     #[pyo3(get, set)]
-    pub(crate) state: u32,
+    pub state: u32,
     #[pyo3(get, set)]
-    pub(crate) cpu_id: u32,
+    pub cpu_id: u32,
 }
 
 #[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TraceDevFrequency {
     #[pyo3(get)]
-    pub(crate) base: Trace,
+    pub base: Trace,
     #[pyo3(get, set)]
-    pub(crate) format_id: u8,
+    pub format_id: u8,
     #[pyo3(get, set)]
-    pub(crate) clk: String,
+    pub clk: String,
     #[pyo3(get, set)]
-    pub(crate) state: u32,
+    pub state: u32,
     #[pyo3(get, set)]
-    pub(crate) cpu_id: u32,
+    pub cpu_id: u32,
 }
 
 impl EventType for TraceCpuFrequency {
@@ -154,6 +154,30 @@ impl TemplateEvent for TraceDevFrequency {
 
 #[pymethods]
 impl TraceCpuFrequency {
+    #[new]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, format_id, state, cpu_id))]
+    pub fn new(
+        thread_name: String,
+        tid: u32,
+        tgid: u32,
+        cpu: u32,
+        flags: String,
+        timestamp: f64,
+        event_name: String,
+        payload_raw: String,
+        format_id: u8,
+        state: u32,
+        cpu_id: u32,
+    ) -> PyResult<Self> {
+        validate_timestamp(timestamp)?;
+        Ok(Self {
+            base: Trace::new(thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw)?,
+            format_id,
+            state,
+            cpu_id,
+        })
+    }
+
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
         Self::quick_check(line)
@@ -167,18 +191,67 @@ impl TraceCpuFrequency {
         parse_template_event::<Self>(line)
     }
 
-    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+    pub fn payload_to_string(&self) -> PyResult<String> {
         self.render_payload()
     }
 
-    pub(crate) fn to_string(&self) -> PyResult<String> {
+    pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
         Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "TraceCpuFrequency(thread_name={:?}, tid={}, state={}, cpu_id={})",
+            self.base.thread_name, self.base.tid, self.state, self.cpu_id
+        ))
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        self.to_string()
+    }
+
+    fn __copy__(slf: PyRef<'_, Self>, py: Python<'_>) -> PyResult<Py<Self>> {
+        slf.clone().into_pyobject(py).map(|o| o.unbind())
+    }
+
+    fn __deepcopy__(&self, py: Python<'_>, _memo: &Bound<'_, PyAny>) -> PyResult<Py<Self>> {
+        self.clone().into_pyobject(py).map(|o| o.unbind())
     }
 }
 
 #[pymethods]
 impl TraceDevFrequency {
+    #[new]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, format_id, clk, state, cpu_id))]
+    pub fn new(
+        thread_name: String,
+        tid: u32,
+        tgid: u32,
+        cpu: u32,
+        flags: String,
+        timestamp: f64,
+        event_name: String,
+        payload_raw: String,
+        format_id: u8,
+        clk: String,
+        state: u32,
+        cpu_id: u32,
+    ) -> PyResult<Self> {
+        validate_timestamp(timestamp)?;
+        Ok(Self {
+            base: Trace::new(thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw)?,
+            format_id,
+            clk,
+            state,
+            cpu_id,
+        })
+    }
+
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
         Self::quick_check(line)
@@ -192,13 +265,36 @@ impl TraceDevFrequency {
         parse_template_event::<Self>(line)
     }
 
-    pub(crate) fn payload_to_string(&self) -> PyResult<String> {
+    pub fn payload_to_string(&self) -> PyResult<String> {
         self.render_payload()
     }
 
-    pub(crate) fn to_string(&self) -> PyResult<String> {
+    pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.base.timestamp)?;
         Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "TraceDevFrequency(thread_name={:?}, tid={}, clk={:?}, state={}, cpu_id={})",
+            self.base.thread_name, self.base.tid, self.clk, self.state, self.cpu_id
+        ))
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        self.to_string()
+    }
+
+    fn __copy__(slf: PyRef<'_, Self>, py: Python<'_>) -> PyResult<Py<Self>> {
+        slf.clone().into_pyobject(py).map(|o| o.unbind())
+    }
+
+    fn __deepcopy__(&self, py: Python<'_>, _memo: &Bound<'_, PyAny>) -> PyResult<Py<Self>> {
+        self.clone().into_pyobject(py).map(|o| o.unbind())
     }
 }
 
