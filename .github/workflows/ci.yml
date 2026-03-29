@@ -45,14 +45,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Cache uv
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
-
       - name: Create virtual environment
         run: uv venv .venv -p ${{ matrix.python-version }}
 
@@ -95,14 +87,6 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
-
-      - name: Cache uv
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('.python-version', 'pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
 
       - name: Create virtual environment
         run: uv venv .venv -p 3.15
