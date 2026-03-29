@@ -1,5 +1,7 @@
 """Test that type stubs are working correctly."""
 
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -60,6 +62,44 @@ def test_all_exports_are_tuple():
     # Проверяем что __all__ объявлен как tuple (круглые скобки)
     assert "__all__ = (" in py_content, "__all__ should be a tuple in __init__.py"
     assert "__all__ = (" in pyi_content, "__all__ should be a tuple in __init__.pyi"
+
+
+def test_mypy_type_checking():
+    """Verify mypy can type-check imports from trace_parser."""
+    # Создаём тестовый файл
+    test_code = '''
+from trace_parser import Trace, TraceSchedSwitch, parse_trace
+
+# Проверка что классы имеют правильные типы
+def process_trace(t: Trace) -> str:
+    return t.thread_name
+
+def process_sched(s: TraceSchedSwitch) -> str:
+    return s.prev_comm  # TraceSchedSwitch имеет prev_comm, не timestamp
+
+# Проверка что parse_trace возвращает правильный тип
+event = parse_trace("some-line")
+if event is not None:
+    name: str = event.thread_name  # Trace имеет thread_name
+'''
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        f.write(test_code)
+        temp_file = Path(f.name)
+    
+    try:
+        # Запускаем mypy в режиме strict
+        result = subprocess.run(
+            [sys.executable, '-m', 'mypy', '--strict', str(temp_file)],
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent.parent
+        )
+        
+        # mypy должен пройти без ошибок
+        assert result.returncode == 0, f"mypy failed:\n{result.stdout}\n{result.stderr}"
+    finally:
+        temp_file.unlink()
 
 
 def test_copy_and_deepcopy():
