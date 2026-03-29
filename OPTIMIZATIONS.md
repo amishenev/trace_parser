@@ -75,31 +75,47 @@ template.format_iter(values.iter())
 
 **Проблема:** Нет возможности парсить файлы >1GB без загрузки в память.
 
-**Решение:** Async streaming iterator:
+**Решение:** Python уже умеет читать по строке — не нужно делать Rust итератор.
 
+**Вместо этого:**
 ```python
-from trace_parser import parse_trace_stream
-
-async for event in parse_trace_stream("large_trace.txt"):
-    process(event)
+# Python уже streaming
+with open("trace.txt") as f:
+    for line in f:
+        event = parse_trace(line)
 ```
 
-**Rust реализация:**
+**Что стоит сделать в Rust:**
+- `parse_trace_file()` функция для массового парсинга с фильтрацией
+- Меньше FFI вызовов (1 вместо миллионов)
+
+---
+
+### 1.4 SIMD оптимизации
+
+**memchr** — SIMD поиск подстроки (вместо `line.find(": ")`)
+**lexical-core** — SIMD парсинг чисел (вместо `str.parse()`)
+
+**Пример использования:**
 ```rust
-use tokio::io::{AsyncBufReadExt, BufReader};
+use memchr::memmem;
+use lexical_core::parse;
 
-pub struct TraceStream<R> {
-    reader: BufReader<R>,
+fn extract_event_name(line: &str) -> Option<&str> {
+    let pos = memmem::find(line.as_bytes(), b": ")? + 2;
+    // ...
 }
 
-impl<R: AsyncRead> TraceStream<R> {
-    pub async fn next(&mut self) -> PyResult<Option<TraceEvent>> {
-        // read line, parse, return
-    }
-}
+// В парсинге чисел:
+tid: parse(captures.name("tid")?.as_str().as_bytes()).ok()?,
 ```
 
-**Зависимости:** `tokio`, `pyo3-asyncio` или `pythonize`
+**Ожидаемая выгода:** ~30-50% быстрее парсинг каждой строки
+
+**TODO: Обновить README.md** — добавить секцию "Performance" с:
+- Описанием SIMD оптимизаций (memchr, lexical-core)
+- Примером `parse_trace_file()` для массового парсинга
+- Бенчмарками до/после
 
 ---
 
@@ -280,12 +296,13 @@ agg = TraceAggregator()
 
 ### Краткосрочная (1-2 недели)
 - [x] Dispatch таблица для `parse_trace()` (#1.1)
-- [ ] Кэширование в CI (#3.2)
-- [ ] Интеграционные тесты (#3.3)
+- [x] HashMap → Array в `render_payload()` (#1.2)
+- [x] Кэширование в CI (#3.2)
+- [ ] SIMD оптимизации (#1.4)
+- [ ] `parse_trace_file()` для массового парсинга (#1.3)
 
 ### Среднесрочная (1-2 месяца)
 - [ ] Proc-macro для событий (#2.1)
-- [ ] Streaming API (#1.3)
 - [ ] Flattened access (#2.3)
 
 ### Долгосрочная (3-6 месяцев)
