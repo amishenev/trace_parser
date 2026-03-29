@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use regex::Captures;
@@ -78,12 +76,12 @@ impl TemplateEvent for TraceSchedProcessExit {
 
     fn render_payload(&self) -> PyResult<String> {
         let template = Self::formats().template(0).unwrap();
-        let values = HashMap::from([
-            ("comm", TemplateValue::Str(&self.comm)),
-            ("pid", TemplateValue::U32(self.pid)),
-            ("prio", TemplateValue::I32(self.prio)),
-            ("group_dead", TemplateValue::BoolInt(self.group_dead)),
-        ]);
+        let values: [(&str, Option<TemplateValue>); 4] = [
+            ("comm", Some(TemplateValue::Str(&self.comm))),
+            ("pid", Some(TemplateValue::U32(self.pid))),
+            ("prio", Some(TemplateValue::I32(self.prio))),
+            ("group_dead", Some(TemplateValue::BoolInt(self.group_dead))),
+        ];
         Ok(template
             .format(&values)
             .expect("sched_process_exit template must render"))

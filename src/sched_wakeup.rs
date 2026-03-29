@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use regex::Captures;
@@ -126,16 +124,16 @@ impl TemplateEvent for TraceSchedWakeup {
     fn render_payload(&self) -> PyResult<String> {
         let template = Self::formats().template(self.format_id).unwrap();
         let target_cpu = format!("{:03}", self.target_cpu);
-        let mut values = HashMap::from([
-            ("comm", TemplateValue::Str(&self.comm)),
-            ("pid", TemplateValue::U32(self.pid)),
-            ("prio", TemplateValue::I32(self.prio)),
-            ("target_cpu", TemplateValue::Str(&target_cpu)),
-        ]);
 
-        if let Some(reason) = self.reason {
-            values.insert("reason", TemplateValue::U32(reason));
-        }
+        // Собираем values в массив — без аллокации HashMap
+        // reason опционален, поэтому используем Option и фильтруем None
+        let values: [(&str, Option<TemplateValue>); 5] = [
+            ("comm", Some(TemplateValue::Str(&self.comm))),
+            ("pid", Some(TemplateValue::U32(self.pid))),
+            ("prio", Some(TemplateValue::I32(self.prio))),
+            ("target_cpu", Some(TemplateValue::Str(&target_cpu))),
+            ("reason", self.reason.map(TemplateValue::U32)),
+        ];
 
         Ok(template
             .format(&values)
@@ -172,12 +170,12 @@ impl TemplateEvent for TraceSchedWakeupNew {
     fn render_payload(&self) -> PyResult<String> {
         let template = Self::formats().template(0).unwrap();
         let target_cpu = format!("{:03}", self.target_cpu);
-        let values = HashMap::from([
-            ("comm", TemplateValue::Str(&self.comm)),
-            ("pid", TemplateValue::U32(self.pid)),
-            ("prio", TemplateValue::I32(self.prio)),
-            ("target_cpu", TemplateValue::Str(&target_cpu)),
-        ]);
+        let values: [(&str, Option<TemplateValue>); 4] = [
+            ("comm", Some(TemplateValue::Str(&self.comm))),
+            ("pid", Some(TemplateValue::U32(self.pid))),
+            ("prio", Some(TemplateValue::I32(self.prio))),
+            ("target_cpu", Some(TemplateValue::Str(&target_cpu))),
+        ];
         Ok(template
             .format(&values)
             .expect("sched_wakeup_new template must render"))

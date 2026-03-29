@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use regex::Captures;
@@ -102,10 +100,10 @@ impl TemplateEvent for TraceCpuFrequency {
 
     fn render_payload(&self) -> PyResult<String> {
         let template = Self::formats().template(0).unwrap();
-        let values = HashMap::from([
-            ("state", TemplateValue::U32(self.state)),
-            ("cpu_id", TemplateValue::U32(self.cpu_id)),
-        ]);
+        let values: [(&str, Option<TemplateValue>); 2] = [
+            ("state", Some(TemplateValue::U32(self.state))),
+            ("cpu_id", Some(TemplateValue::U32(self.cpu_id))),
+        ];
         Ok(template
             .format(&values)
             .expect("cpu_frequency template must render"))
@@ -143,11 +141,11 @@ impl TemplateEvent for TraceDevFrequency {
 
     fn render_payload(&self) -> PyResult<String> {
         let template = Self::formats().template(0).unwrap();
-        let values = HashMap::from([
-            ("clk", TemplateValue::Str(&self.clk)),
-            ("state", TemplateValue::U32(self.state)),
-            ("cpu_id", TemplateValue::U32(self.cpu_id)),
-        ]);
+        let values: [(&str, Option<TemplateValue>); 3] = [
+            ("clk", Some(TemplateValue::Str(&self.clk))),
+            ("state", Some(TemplateValue::U32(self.state))),
+            ("cpu_id", Some(TemplateValue::U32(self.cpu_id))),
+        ];
         Ok(template
             .format(&values)
             .expect("clock_set_rate template must render"))

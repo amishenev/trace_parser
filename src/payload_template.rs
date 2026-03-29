@@ -161,22 +161,21 @@ impl PayloadTemplate {
         self.regex.captures(input)
     }
 
-    pub fn format(&self, values: &HashMap<&str, TemplateValue<'_>>) -> Option<String> {
+    pub fn format(&self, values: &[(&str, Option<TemplateValue>)]) -> Option<String> {
         let mut rendered = String::new();
 
         for segment in &self.segments {
             match segment {
                 TemplateSegment::Literal(text) => rendered.push_str(text),
                 TemplateSegment::Field(name) => {
-                    let value = values.get(name.as_str());
-                    if let Some(value) = value {
+                    // Линейный поиск по массиву вместо HashMap::get()
+                    // Для небольшого числа полей (<10) это быстрее из-за отсутствия аллокации
+                    if let Some((_, Some(value))) = values.iter().find(|(k, _)| k == name) {
                         push_value(&mut rendered, value);
                     }
                 }
                 TemplateSegment::IgnoredField => {}
-                // `{ws}` is canonicalized to a single space on output.
                 TemplateSegment::Whitespace => rendered.push(' '),
-                // `{?ws}` accepts optional whitespace during parsing and disappears on output.
                 TemplateSegment::OptionalWhitespace => {}
             }
         }
@@ -197,8 +196,6 @@ fn push_value(output: &mut String, value: &TemplateValue<'_>) {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 
     #[test]
@@ -210,10 +207,10 @@ mod tests {
         assert!(template.is_match("a=x   b=42"));
 
         let rendered = template
-            .format(&HashMap::from([
-                ("left", TemplateValue::Str("x")),
-                ("right", TemplateValue::U32(42)),
-            ]))
+            .format(&[
+                ("left", Some(TemplateValue::Str("x"))),
+                ("right", Some(TemplateValue::U32(42))),
+            ])
             .expect("template must render");
 
         assert_eq!(rendered, "a=x b=42");
@@ -229,10 +226,10 @@ mod tests {
         assert!(template.is_match("a=x   b=42"));
 
         let rendered = template
-            .format(&HashMap::from([
-                ("left", TemplateValue::Str("x")),
-                ("right", TemplateValue::U32(42)),
-            ]))
+            .format(&[
+                ("left", Some(TemplateValue::Str("x"))),
+                ("right", Some(TemplateValue::U32(42))),
+            ])
             .expect("template must render");
 
         assert_eq!(rendered, "a=xb=42");
@@ -252,7 +249,7 @@ mod tests {
         assert!(template.is_match("ReceiveVsync 42"));
 
         let rendered = template
-            .format(&HashMap::from([("frame", TemplateValue::U32(42))]))
+            .format(&[("frame", Some(TemplateValue::U32(42)))])
             .expect("template must render");
 
         assert_eq!(rendered, "ReceiveVsync 42");

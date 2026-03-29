@@ -1,6 +1,5 @@
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
-use std::collections::HashMap;
 
 use crate::common::validate_timestamp;
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
@@ -47,7 +46,7 @@ impl TraceReceiveVsync {
     }
 
     pub(crate) fn payload_to_string(&self) -> PyResult<String> {
-        let payload_values = HashMap::from([("frame_number", TemplateValue::U32(self.frame_number))]);
+        let payload_values = [("frame_number", Some(TemplateValue::U32(self.frame_number)))];
         Ok(TEMPLATE
             .format(&payload_values)
             .expect("receive vsync template must render"))
@@ -56,10 +55,10 @@ impl TraceReceiveVsync {
     pub(crate) fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.begin.base.timestamp)?;
         let payload = self.payload_to_string()?;
-        let begin_values = HashMap::from([
-            ("trace_mark_tgid", TemplateValue::U32(self.begin.trace_mark_tgid)),
-            ("payload", TemplateValue::Str(&payload)),
-        ]);
+        let begin_values = [
+            ("trace_mark_tgid", Some(TemplateValue::U32(self.begin.trace_mark_tgid))),
+            ("payload", Some(TemplateValue::Str(&payload))),
+        ];
 
         Ok(self.begin.base.to_string_with_payload(
             &BEGIN_TEMPLATE

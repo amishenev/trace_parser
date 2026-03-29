@@ -1,7 +1,6 @@
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use regex::Captures;
-use std::collections::HashMap;
 
 use crate::common::{
     cap_parse, cap_str, parse_template_event, validate_timestamp, BaseTraceParts, EventType,
@@ -128,10 +127,10 @@ impl TemplateEvent for TraceMarkBegin {
 
     fn render_payload(&self) -> PyResult<String> {
         let template = Self::formats().template(0).unwrap();
-        let values = HashMap::from([
-            ("trace_mark_tgid", TemplateValue::U32(self.trace_mark_tgid)),
-            ("payload", TemplateValue::Str(&self.payload)),
-        ]);
+        let values: [(&str, Option<TemplateValue>); 2] = [
+            ("trace_mark_tgid", Some(TemplateValue::U32(self.trace_mark_tgid))),
+            ("payload", Some(TemplateValue::Str(&self.payload))),
+        ];
         Ok(template
             .format(&values)
             .expect("trace mark begin template must render"))
@@ -168,10 +167,10 @@ impl TemplateEvent for TraceMarkEnd {
 
     fn render_payload(&self) -> PyResult<String> {
         let template = Self::formats().template(0).unwrap();
-        let values = HashMap::from([
-            ("trace_mark_tgid", TemplateValue::U32(self.trace_mark_tgid)),
-            ("payload", TemplateValue::Str(&self.payload)),
-        ]);
+        let values: [(&str, Option<TemplateValue>); 2] = [
+            ("trace_mark_tgid", Some(TemplateValue::U32(self.trace_mark_tgid))),
+            ("payload", Some(TemplateValue::Str(&self.payload))),
+        ];
         Ok(template
             .format(&values)
             .expect("trace mark end template must render"))

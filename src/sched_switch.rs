@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use regex::Captures;
@@ -90,15 +88,15 @@ impl TemplateEvent for TraceSchedSwitch {
 
     fn render_payload(&self) -> PyResult<String> {
         let template = Self::formats().template(0).unwrap();
-        let values = HashMap::from([
-            ("prev_comm", TemplateValue::Str(&self.prev_comm)),
-            ("prev_pid", TemplateValue::U32(self.prev_pid)),
-            ("prev_prio", TemplateValue::I32(self.prev_prio)),
-            ("prev_state", TemplateValue::Str(&self.prev_state)),
-            ("next_comm", TemplateValue::Str(&self.next_comm)),
-            ("next_pid", TemplateValue::U32(self.next_pid)),
-            ("next_prio", TemplateValue::I32(self.next_prio)),
-        ]);
+        let values: [(&str, Option<TemplateValue>); 7] = [
+            ("prev_comm", Some(TemplateValue::Str(&self.prev_comm))),
+            ("prev_pid", Some(TemplateValue::U32(self.prev_pid))),
+            ("prev_prio", Some(TemplateValue::I32(self.prev_prio))),
+            ("prev_state", Some(TemplateValue::Str(&self.prev_state))),
+            ("next_comm", Some(TemplateValue::Str(&self.next_comm))),
+            ("next_pid", Some(TemplateValue::U32(self.next_pid))),
+            ("next_prio", Some(TemplateValue::I32(self.next_prio))),
+        ];
         Ok(template
             .format(&values)
             .expect("sched_switch payload template must render"))
