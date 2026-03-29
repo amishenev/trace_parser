@@ -37,22 +37,16 @@ jobs:
         run: uv venv .venv -p ${{ matrix.python-version }}
 
       - name: Install Python tools
-        run: |
-          source .venv/bin/activate
-          uv pip install maturin pytest
+        run: uv pip install maturin pytest
 
       - name: Run Rust tests
         run: cargo test -q
 
       - name: Build editable Python package
-        run: |
-          source .venv/bin/activate
-          maturin develop
+        run: uv run maturin develop
 
       - name: Run Python smoke tests
-        run: |
-          source .venv/bin/activate
-          pytest -q tests/python
+        run: uv run pytest -q tests/python
 
   test-dev-python:
     name: Test (ubuntu-latest, Python 3.15-dev)
@@ -75,19 +69,13 @@ jobs:
         run: uv venv .venv -p 3.15
 
       - name: Install Python tools
-        run: |
-          source .venv/bin/activate
-          uv pip install maturin pytest
+        run: uv pip install maturin pytest
 
       - name: Run Rust tests
         run: cargo test -q
 
       - name: Build editable Python package
-        run: |
-          source .venv/bin/activate
-          maturin develop
+        run: uv run maturin develop
 
       - name: Run Python smoke tests
-        run: |
-          source .venv/bin/activate
-          pytest -q tests/python
+        run: uv run pytest -q tests/python
