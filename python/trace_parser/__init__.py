@@ -11,6 +11,7 @@ from ._native import (
     TraceSchedWakeupNew,
     TracingMark,
     parse_trace,
+    parse_trace_file,
     version,
 )
 
@@ -27,6 +28,7 @@ __all__ = [
     "TraceSchedWakeupNew",
     "TracingMark",
     "parse_trace",
+    "parse_trace_file",
     "version",
 ]
 

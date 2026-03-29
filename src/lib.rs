@@ -17,6 +17,8 @@ pub use trace::Trace;
 pub use tracing_mark::{TraceMarkBegin, TraceMarkEnd, TraceReceiveVsync, TracingMark};
 
 use pyo3::prelude::*;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 
 /// Хелпер для парсинга и создания Python объекта из Rust события
 fn parse_and_wrap<T: IntoPy<PyObject>>(py: Python<'_>, line: &str, parser: fn(&str) -> Option<T>) -> Option<PyObject> {
@@ -71,6 +73,49 @@ fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+/// Parse an entire trace file efficiently.
+///
+/// This function reads and parses a trace file line-by-line in Rust,
+/// which is much faster than calling parse_trace() for each line in Python.
+///
+/// Args:
+///     path: Path to the trace file
+///     filter_event: Optional event name to filter by (e.g., "sched_switch")
+///
+/// Returns:
+///     List of parsed trace events
+#[pyfunction(signature = (path, filter_event=None))]
+fn parse_trace_file(
+    py: Python<'_>,
+    path: &str,
+    filter_event: Option<&str>,
+) -> PyResult<Vec<PyObject>> {
+    let file = File::open(path).map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("Failed to open file: {}", e))
+    })?;
+    let reader = BufReader::new(file);
+    let mut results = Vec::new();
+
+    for line_result in reader.lines() {
+        let line = line_result.map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("Failed to read line: {}", e))
+        })?;
+
+        // Quick filter by event_name
+        if let Some(event_name) = filter_event {
+            if !line.contains(event_name) {
+                continue;
+            }
+        }
+
+        if let Some(event) = parse_trace(py, &line)? {
+            results.push(event);
+        }
+    }
+
+    Ok(results)
+}
+
 #[pymodule]
 fn _native(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Trace>()?;
@@ -85,6 +130,7 @@ fn _native(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<TraceMarkEnd>()?;
     module.add_class::<TraceReceiveVsync>()?;
     module.add_function(wrap_pyfunction!(parse_trace, module)?)?;
+    module.add_function(wrap_pyfunction!(parse_trace_file, module)?)?;
     module.add_function(wrap_pyfunction!(version, module)?)?;
     Ok(())
 }

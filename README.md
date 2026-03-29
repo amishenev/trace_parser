@@ -185,6 +185,22 @@ git push origin v0.1.0
 - improve Python-side ergonomics for common base fields
 - expand Python smoke coverage and release artifacts
 
+## Performance
+
+For bulk file parsing, use `parse_trace_file()` which is faster than line-by-line parsing:
+
+```python
+from trace_parser import parse_trace_file
+
+# Parse entire file
+events = parse_trace_file("trace.txt")
+
+# Parse with event filtering (faster than filtering in Python)
+events = parse_trace_file("trace.txt", filter_event="sched_switch")
+```
+
+This function reads and parses the file in Rust, avoiding the overhead of calling `parse_trace()` for each line from Python.
+
 ## Multiple format support
 
 `trace_parser` supports multiple payload formats per event type through `FormatRegistry`.
