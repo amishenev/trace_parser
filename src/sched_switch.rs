@@ -8,7 +8,7 @@ use crate::common::{
 };
 use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
-use crate::trace::Trace;
+use crate::trace::extract_base_fields;
 
 static TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
@@ -35,26 +35,40 @@ static FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
 });
 
 #[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TraceSchedSwitch {
+    #[pyo3(get, set)]
+    pub thread_name: String,
+    #[pyo3(get, set)]
+    pub tid: u32,
+    #[pyo3(get, set)]
+    pub tgid: u32,
+    #[pyo3(get, set)]
+    pub cpu: u32,
+    #[pyo3(get, set)]
+    pub flags: String,
+    #[pyo3(get, set)]
+    pub timestamp: f64,
     #[pyo3(get)]
-    pub(crate) base: Trace,
+    pub event_name: String,
     #[pyo3(get, set)]
-    pub(crate) format_id: u8,
+    pub payload_raw: String,
     #[pyo3(get, set)]
-    pub(crate) prev_comm: String,
+    pub format_id: u8,
     #[pyo3(get, set)]
-    pub(crate) prev_pid: u32,
+    pub prev_comm: String,
     #[pyo3(get, set)]
-    pub(crate) prev_prio: i32,
+    pub prev_pid: u32,
     #[pyo3(get, set)]
-    pub(crate) prev_state: String,
+    pub prev_prio: i32,
     #[pyo3(get, set)]
-    pub(crate) next_comm: String,
+    pub prev_state: String,
     #[pyo3(get, set)]
-    pub(crate) next_pid: u32,
+    pub next_comm: String,
     #[pyo3(get, set)]
-    pub(crate) next_prio: i32,
+    pub next_pid: u32,
+    #[pyo3(get, set)]
+    pub next_prio: i32,
 }
 
 impl EventType for TraceSchedSwitch {
@@ -73,8 +87,18 @@ impl TemplateEvent for TraceSchedSwitch {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) =
+            extract_base_fields(&parts);
+        
         Some(Self {
-            base: Trace::from_parts(parts),
+            thread_name,
+            tid,
+            tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
             format_id: 0,
             prev_comm: cap_str(captures, "prev_comm")?,
             prev_pid: cap_parse(captures, "prev_pid")?,
@@ -126,7 +150,7 @@ impl TraceSchedSwitch {
         next_prio: i32,
     ) -> PyResult<Self> {
         validate_timestamp(timestamp)?;
-        let base = Trace {
+        Ok(Self {
             thread_name,
             tid,
             tgid,
@@ -135,9 +159,6 @@ impl TraceSchedSwitch {
             timestamp,
             event_name,
             payload_raw,
-        };
-        Ok(Self {
-            base,
             format_id: 0,
             prev_comm,
             prev_pid,
@@ -170,7 +191,14 @@ impl TraceSchedSwitch {
     }
 
     fn __eq__(&self, other: &Self) -> bool {
-        self.base == other.base
+        self.thread_name == other.thread_name
+            && self.tid == other.tid
+            && self.tgid == other.tgid
+            && self.cpu == other.cpu
+            && self.flags == other.flags
+            && self.timestamp == other.timestamp
+            && self.event_name == other.event_name
+            && self.payload_raw == other.payload_raw
             && self.format_id == other.format_id
             && self.prev_comm == other.prev_comm
             && self.prev_pid == other.prev_pid
@@ -198,14 +226,51 @@ impl TraceSchedSwitch {
     }
 
     pub fn to_string(&self) -> PyResult<String> {
-        validate_timestamp(self.base.timestamp)?;
-        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
+        validate_timestamp(self.timestamp)?;
+        Ok(self.to_string_with_payload(&self.payload_to_string()?))
+    }
+
+    fn to_string_with_payload(&self, payload: &str) -> String {
+        format!(
+            "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
+            self.thread_name,
+            self.tid,
+            self.tgid,
+            self.cpu,
+            self.flags,
+            self.timestamp,
+            self.event_name,
+            payload
+        )
+    }
+
+    #[getter]
+    pub fn timestamp_ms(&self) -> f64 {
+        self.timestamp * 1_000.0
+    }
+
+    #[setter]
+    pub fn set_timestamp_ms(&mut self, value: f64) -> PyResult<()> {
+        validate_timestamp(value / 1_000.0)?;
+        self.timestamp = value / 1_000.0;
+        Ok(())
+    }
+
+    #[getter]
+    pub fn timestamp_ns(&self) -> u64 {
+        (self.timestamp * 1_000_000_000.0).round() as u64
+    }
+
+    #[setter]
+    pub fn set_timestamp_ns(&mut self, value: u64) -> PyResult<()> {
+        self.timestamp = (value as f64) / 1_000_000_000.0;
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{Trace, TraceSchedSwitch};
+    use crate::TraceSchedSwitch;
 
     #[test]
     fn sched_switch_can_be_parsed_matches_only_sched_switch() {
@@ -220,7 +285,7 @@ mod tests {
     fn sched_switch_parse_extracts_payload_fields() {
         let line = "bash-1977   (  12) [000] .... 12345.678901: sched_switch: prev_comm=bash prev_pid=1977 prev_prio=120 prev_state=S ==> next_comm=worker next_pid=123 next_prio=120";
         let trace = TraceSchedSwitch::parse(line).expect("sched_switch must parse");
-        assert_eq!(trace.base.thread_name, "bash");
+        assert_eq!(trace.thread_name, "bash");
         assert_eq!(trace.prev_comm, "bash");
         assert_eq!(trace.prev_pid, 1977);
         assert_eq!(trace.prev_prio, 120);
@@ -241,7 +306,7 @@ mod tests {
     #[test]
     fn timestamp_setters_update_canonical_output() {
         let line = "bash-1977   (  12) [000] .... 12345.678901: sched_switch: prev_comm=bash prev_pid=1977 prev_prio=120 prev_state=S ==> next_comm=worker next_pid=123 next_prio=120";
-        let mut trace = Trace::parse(line).expect("trace must parse");
+        let mut trace = TraceSchedSwitch::parse(line).expect("sched_switch must parse");
         trace
             .set_timestamp_ms(1_500.25)
             .expect("timestamp_ms setter must work");

@@ -20,6 +20,8 @@ def test_trace_parse_smoke() -> None:
     trace = Trace.parse(line)
     assert trace is not None
     assert trace.event_name == "sched_switch"
+    assert trace.thread_name == "bash"
+    assert trace.timestamp == 12345.678901
 
 
 def test_sched_switch_parse_smoke() -> None:

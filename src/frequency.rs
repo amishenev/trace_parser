@@ -8,7 +8,7 @@ use crate::common::{
 };
 use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
-use crate::trace::Trace;
+use crate::trace::extract_base_fields;
 
 static CPU_TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
@@ -50,7 +50,21 @@ static DEV_FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TraceCpuFrequency {
     #[pyo3(get)]
-    pub base: Trace,
+    pub thread_name: String,
+    #[pyo3(get, set)]
+    pub tid: u32,
+    #[pyo3(get, set)]
+    pub tgid: u32,
+    #[pyo3(get, set)]
+    pub cpu: u32,
+    #[pyo3(get, set)]
+    pub flags: String,
+    #[pyo3(get, set)]
+    pub timestamp: f64,
+    #[pyo3(get)]
+    pub event_name: String,
+    #[pyo3(get, set)]
+    pub payload_raw: String,
     #[pyo3(get, set)]
     pub format_id: u8,
     #[pyo3(get, set)]
@@ -63,7 +77,21 @@ pub struct TraceCpuFrequency {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TraceDevFrequency {
     #[pyo3(get)]
-    pub base: Trace,
+    pub thread_name: String,
+    #[pyo3(get, set)]
+    pub tid: u32,
+    #[pyo3(get, set)]
+    pub tgid: u32,
+    #[pyo3(get, set)]
+    pub cpu: u32,
+    #[pyo3(get, set)]
+    pub flags: String,
+    #[pyo3(get, set)]
+    pub timestamp: f64,
+    #[pyo3(get)]
+    pub event_name: String,
+    #[pyo3(get, set)]
+    pub payload_raw: String,
     #[pyo3(get, set)]
     pub format_id: u8,
     #[pyo3(get, set)]
@@ -90,8 +118,16 @@ impl TemplateEvent for TraceCpuFrequency {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) = extract_base_fields(&parts);
         Some(Self {
-            base: Trace::from_parts(parts),
+            thread_name,
+            tid,
+            tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
             format_id: 0,
             state: cap_parse(captures, "state")?,
             cpu_id: cap_parse(captures, "cpu_id")?,
@@ -130,8 +166,16 @@ impl TemplateEvent for TraceDevFrequency {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) = extract_base_fields(&parts);
         Some(Self {
-            base: Trace::from_parts(parts),
+            thread_name,
+            tid,
+            tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
             format_id: 0,
             clk: cap_str(captures, "clk")?,
             state: cap_parse(captures, "state")?,
@@ -171,7 +215,14 @@ impl TraceCpuFrequency {
     ) -> PyResult<Self> {
         validate_timestamp(timestamp)?;
         Ok(Self {
-            base: Trace::new(thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw)?,
+            thread_name,
+            tid,
+            tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
             format_id,
             state,
             cpu_id,
@@ -196,14 +247,24 @@ impl TraceCpuFrequency {
     }
 
     pub fn to_string(&self) -> PyResult<String> {
-        validate_timestamp(self.base.timestamp)?;
-        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
+        validate_timestamp(self.timestamp)?;
+        Ok(format!(
+            "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
+            self.thread_name,
+            self.tid,
+            self.tgid,
+            self.cpu,
+            self.flags,
+            self.timestamp,
+            self.event_name,
+            &self.payload_to_string()?
+        ))
     }
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
             "TraceCpuFrequency(thread_name={:?}, tid={}, state={}, cpu_id={})",
-            self.base.thread_name, self.base.tid, self.state, self.cpu_id
+            self.thread_name, self.tid, self.state, self.cpu_id
         ))
     }
 
@@ -221,6 +282,28 @@ impl TraceCpuFrequency {
 
     fn __deepcopy__(&self, py: Python<'_>, _memo: &Bound<'_, PyAny>) -> PyResult<Py<Self>> {
         self.clone().into_pyobject(py).map(|o| o.unbind())
+    }
+
+    #[getter]
+    pub fn timestamp_ms(&self) -> f64 {
+        self.timestamp * 1_000.0
+    }
+
+    #[setter]
+    pub fn set_timestamp_ms(&mut self, value: f64) -> PyResult<()> {
+        self.timestamp = validate_timestamp(value / 1_000.0)?;
+        Ok(())
+    }
+
+    #[getter]
+    pub fn timestamp_ns(&self) -> u64 {
+        (self.timestamp * 1_000_000_000.0).round() as u64
+    }
+
+    #[setter]
+    pub fn set_timestamp_ns(&mut self, value: u64) -> PyResult<()> {
+        self.timestamp = (value as f64) / 1_000_000_000.0;
+        Ok(())
     }
 }
 
@@ -244,7 +327,14 @@ impl TraceDevFrequency {
     ) -> PyResult<Self> {
         validate_timestamp(timestamp)?;
         Ok(Self {
-            base: Trace::new(thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw)?,
+            thread_name,
+            tid,
+            tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
             format_id,
             clk,
             state,
@@ -270,14 +360,24 @@ impl TraceDevFrequency {
     }
 
     pub fn to_string(&self) -> PyResult<String> {
-        validate_timestamp(self.base.timestamp)?;
-        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
+        validate_timestamp(self.timestamp)?;
+        Ok(format!(
+            "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
+            self.thread_name,
+            self.tid,
+            self.tgid,
+            self.cpu,
+            self.flags,
+            self.timestamp,
+            self.event_name,
+            &self.payload_to_string()?
+        ))
     }
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
             "TraceDevFrequency(thread_name={:?}, tid={}, clk={:?}, state={}, cpu_id={})",
-            self.base.thread_name, self.base.tid, self.clk, self.state, self.cpu_id
+            self.thread_name, self.tid, self.clk, self.state, self.cpu_id
         ))
     }
 
@@ -296,6 +396,28 @@ impl TraceDevFrequency {
     fn __deepcopy__(&self, py: Python<'_>, _memo: &Bound<'_, PyAny>) -> PyResult<Py<Self>> {
         self.clone().into_pyobject(py).map(|o| o.unbind())
     }
+
+    #[getter]
+    pub fn timestamp_ms(&self) -> f64 {
+        self.timestamp * 1_000.0
+    }
+
+    #[setter]
+    pub fn set_timestamp_ms(&mut self, value: f64) -> PyResult<()> {
+        self.timestamp = validate_timestamp(value / 1_000.0)?;
+        Ok(())
+    }
+
+    #[getter]
+    pub fn timestamp_ns(&self) -> u64 {
+        (self.timestamp * 1_000_000_000.0).round() as u64
+    }
+
+    #[setter]
+    pub fn set_timestamp_ns(&mut self, value: u64) -> PyResult<()> {
+        self.timestamp = (value as f64) / 1_000_000_000.0;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -306,6 +428,13 @@ mod tests {
     fn cpu_frequency_parses() {
         let line = "swapper-0 (0) [000] .... 12345.678900: cpu_frequency: state=933000000 cpu_id=0";
         let trace = TraceCpuFrequency::parse(line).expect("cpu_frequency must parse");
+        assert_eq!(trace.thread_name, "swapper");
+        assert_eq!(trace.tid, 0);
+        assert_eq!(trace.tgid, 0);
+        assert_eq!(trace.cpu, 0);
+        assert_eq!(trace.flags, "....");
+        assert!((trace.timestamp - 12345.678900).abs() < 1e-9);
+        assert_eq!(trace.event_name, "cpu_frequency");
         assert_eq!(trace.state, 933000000);
         assert_eq!(trace.cpu_id, 0);
     }
@@ -314,6 +443,13 @@ mod tests {
     fn dev_frequency_parses() {
         let line = "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=ddr_devfreq state=933000000 cpu_id=0";
         let trace = TraceDevFrequency::parse(line).expect("clock_set_rate must parse");
+        assert_eq!(trace.thread_name, "swapper");
+        assert_eq!(trace.tid, 0);
+        assert_eq!(trace.tgid, 0);
+        assert_eq!(trace.cpu, 0);
+        assert_eq!(trace.flags, "....");
+        assert!((trace.timestamp - 12345.678900).abs() < 1e-9);
+        assert_eq!(trace.event_name, "clock_set_rate");
         assert_eq!(trace.clk, "ddr_devfreq");
         assert_eq!(trace.state, 933000000);
         assert_eq!(trace.cpu_id, 0);

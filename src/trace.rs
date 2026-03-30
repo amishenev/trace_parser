@@ -75,6 +75,24 @@ impl Trace {
     }
 }
 
+/// Helper для извлечения base полей из BaseTraceParts
+/// Возвращает кортеж: (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw)
+#[inline]
+pub fn extract_base_fields(parts: &BaseTraceParts) -> (
+    String, u32, u32, u32, String, f64, String, String,
+) {
+    (
+        parts.thread_name.clone(),
+        parts.tid,
+        parts.tgid,
+        parts.cpu,
+        parts.flags.clone(),
+        parts.timestamp,
+        parts.event_name.clone(),
+        parts.payload_raw.clone(),
+    )
+}
+
 #[pymethods]
 impl Trace {
     #[new]

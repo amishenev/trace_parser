@@ -8,7 +8,7 @@ use crate::common::{
 };
 use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
-use crate::trace::Trace;
+use crate::trace::extract_base_fields;
 
 static TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
@@ -34,8 +34,22 @@ static FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
 #[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct TraceSchedProcessExit {
+    #[pyo3(get, set)]
+    pub thread_name: String,
+    #[pyo3(get, set)]
+    pub tid: u32,
+    #[pyo3(get, set)]
+    pub tgid: u32,
+    #[pyo3(get, set)]
+    pub cpu: u32,
+    #[pyo3(get, set)]
+    pub flags: String,
+    #[pyo3(get, set)]
+    pub timestamp: f64,
     #[pyo3(get)]
-    pub base: Trace,
+    pub event_name: String,
+    #[pyo3(get, set)]
+    pub payload_raw: String,
     #[pyo3(get, set)]
     pub format_id: u8,
     #[pyo3(get, set)]
@@ -64,8 +78,17 @@ impl TemplateEvent for TraceSchedProcessExit {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) =
+            extract_base_fields(&parts);
         Some(Self {
-            base: Trace::from_parts(parts),
+            thread_name,
+            tid,
+            tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
             format_id: 0,
             comm: cap_str(captures, "comm")?,
             pid: cap_parse(captures, "pid")?,
@@ -107,17 +130,16 @@ impl TraceSchedProcessExit {
         group_dead: bool,
         format_id: u8,
     ) -> PyResult<Self> {
+        validate_timestamp(timestamp)?;
         Ok(Self {
-            base: Trace::new(
-                thread_name,
-                tid,
-                tgid,
-                cpu,
-                flags,
-                timestamp,
-                event_name,
-                payload_raw,
-            )?,
+            thread_name,
+            tid,
+            tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
             format_id,
             comm,
             pid,
@@ -144,14 +166,24 @@ impl TraceSchedProcessExit {
     }
 
     pub fn to_string(&self) -> PyResult<String> {
-        validate_timestamp(self.base.timestamp)?;
-        Ok(self.base.to_string_with_payload(&self.payload_to_string()?))
+        validate_timestamp(self.timestamp)?;
+        Ok(format!(
+            "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
+            self.thread_name,
+            self.tid,
+            self.tgid,
+            self.cpu,
+            self.flags,
+            self.timestamp,
+            self.event_name,
+            self.payload_to_string()?
+        ))
     }
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
             "TraceSchedProcessExit(comm={:?}, pid={}, prio={}, group_dead={}, timestamp={})",
-            self.comm, self.pid, self.prio, self.group_dead, self.base.timestamp
+            self.comm, self.pid, self.prio, self.group_dead, self.timestamp
         ))
     }
 
@@ -170,6 +202,28 @@ impl TraceSchedProcessExit {
     fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> PyResult<Py<Self>> {
         Ok(self.clone().into_pyobject(unsafe { Python::assume_attached() })?.unbind())
     }
+
+    #[getter]
+    pub fn timestamp_ms(&self) -> f64 {
+        self.timestamp * 1_000.0
+    }
+
+    #[setter]
+    pub fn set_timestamp_ms(&mut self, value: f64) -> PyResult<()> {
+        self.timestamp = validate_timestamp(value / 1_000.0)?;
+        Ok(())
+    }
+
+    #[getter]
+    pub fn timestamp_ns(&self) -> u64 {
+        (self.timestamp * 1_000_000_000.0).round() as u64
+    }
+
+    #[setter]
+    pub fn set_timestamp_ns(&mut self, value: u64) -> PyResult<()> {
+        self.timestamp = (value as f64) / 1_000_000_000.0;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -184,6 +238,10 @@ mod tests {
         assert_eq!(trace.pid, 1977);
         assert_eq!(trace.prio, 120);
         assert!(trace.group_dead);
+        assert_eq!(trace.thread_name, "bash");
+        assert_eq!(trace.tid, 1977);
+        assert_eq!(trace.tgid, 12);
+        assert_eq!(trace.cpu, 0);
         assert_eq!(
             trace.payload_to_string().expect("payload_to_string must work"),
             "comm=bash pid=1977 prio=120 group_dead=1"

@@ -26,7 +26,7 @@ def main() -> None:
 
     switch = TraceSchedSwitch.parse(lines[0])
     if switch is not None:
-        print("switch", switch.prev_comm, switch.next_comm, switch.base.timestamp)
+        print("switch", switch.prev_comm, switch.next_comm, switch.timestamp)
 
     wakeup = TraceSchedWakeup.parse(lines[1])
     if wakeup is not None:
