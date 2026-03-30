@@ -227,36 +227,6 @@ impl TraceReceiveVsync {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::TraceReceiveVsync;
-
-    #[test]
-    fn receive_vsync_parses_specific_begin_payload() {
-        let line =
-            "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|ReceiveVsync 42";
-        let mark = TraceReceiveVsync::parse(line).expect("receive vsync begin mark must parse");
-        assert_eq!(mark.trace_mark_tgid, 10);
-        assert_eq!(mark.frame_number, 42);
-        assert_eq!(
-            mark.payload_to_string()
-                .expect("payload_to_string must work"),
-            "ReceiveVsync 42"
-        );
-        assert_eq!(
-            mark.to_string().expect("to_string must work"),
-            "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|ReceiveVsync 42"
-        );
-    }
-
-    #[test]
-    fn receive_vsync_ignores_service_prefix() {
-        let line = "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|[ExtraInfo]ReceiveVsync 42";
-        let mark = TraceReceiveVsync::parse(line).expect("receive vsync begin mark must parse");
-        assert_eq!(mark.frame_number, 42);
-    }
-}
-
 impl EventType for TraceReceiveVsync {
     const EVENT_NAME: &'static str = "tracing_mark_write";
 }
@@ -286,5 +256,35 @@ impl TemplateEvent for TraceReceiveVsync {
 
     fn render_payload(&self) -> PyResult<String> {
         self.payload_to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::TraceReceiveVsync;
+
+    #[test]
+    fn receive_vsync_parses_specific_begin_payload() {
+        let line =
+            "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|ReceiveVsync 42";
+        let mark = TraceReceiveVsync::parse(line).expect("receive vsync begin mark must parse");
+        assert_eq!(mark.trace_mark_tgid, 10);
+        assert_eq!(mark.frame_number, 42);
+        assert_eq!(
+            mark.payload_to_string()
+                .expect("payload_to_string must work"),
+            "ReceiveVsync 42"
+        );
+        assert_eq!(
+            mark.to_string().expect("to_string must work"),
+            "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|ReceiveVsync 42"
+        );
+    }
+
+    #[test]
+    fn receive_vsync_ignores_service_prefix() {
+        let line = "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|[ExtraInfo]ReceiveVsync 42";
+        let mark = TraceReceiveVsync::parse(line).expect("receive vsync begin mark must parse");
+        assert_eq!(mark.frame_number, 42);
     }
 }

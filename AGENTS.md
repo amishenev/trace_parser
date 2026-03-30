@@ -543,6 +543,12 @@ Use:
 cargo test -q
 ```
 
+Run Clippy (required in CI):
+
+```bash
+cargo clippy --all-targets -- -D warnings
+```
+
 Also use when touching Python/package behavior:
 
 ```bash

@@ -81,6 +81,12 @@ cargo test -q
 pytest -q tests/python
 ```
 
+Run Clippy:
+
+```bash
+cargo clippy --all-targets -- -D warnings
+```
+
 ## Example
 
 ```python
@@ -94,7 +100,7 @@ switch_line = (
 
 switch = TraceSchedSwitch.parse(switch_line)
 assert switch is not None
-print(switch.base.timestamp)
+print(switch.timestamp)
 print(switch.prev_comm, switch.next_comm)
 
 freq_line = (

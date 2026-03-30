@@ -83,6 +83,9 @@ cargo test -q
 
 # Python smoke тесты
 pytest -q tests/python
+
+# Clippy (требуется в CI)
+cargo clippy --all-targets -- -D warnings
 ```
 
 ### Пример использования

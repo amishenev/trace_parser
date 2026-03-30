@@ -192,6 +192,7 @@ impl TemplateEvent for TraceDevFrequency {
 impl TraceCpuFrequency {
     #[new]
     #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, state, cpu_id))]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         thread_name: String,
         thread_tid: u32,
@@ -308,6 +309,7 @@ impl TraceCpuFrequency {
 impl TraceDevFrequency {
     #[new]
     #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, clk, state, cpu_id))]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         thread_name: String,
         thread_tid: u32,

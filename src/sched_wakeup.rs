@@ -259,6 +259,7 @@ impl TemplateEvent for TraceSchedWakeupNew {
 impl TraceSchedWakeup {
     #[new]
     #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, comm, pid, prio, target_cpu, reason=None))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         thread_name: String,
         thread_tid: u32,
@@ -362,6 +363,7 @@ impl TraceSchedWakeup {
 impl TraceSchedWakeupNew {
     #[new]
     #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, comm, pid, prio, target_cpu))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         thread_name: String,
         thread_tid: u32,

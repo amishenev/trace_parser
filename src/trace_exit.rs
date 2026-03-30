@@ -103,6 +103,7 @@ impl TemplateEvent for TraceExit {
 impl TraceExit {
     #[new]
     #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, pid, comm, tgid))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         thread_name: String,
         thread_tid: u32,

@@ -109,10 +109,10 @@ fn parse_trace_file(
         })?;
 
         // Quick filter by event_name
-        if let Some(event_name) = filter_event {
-            if !line.contains(event_name) {
-                continue;
-            }
+        if let Some(event_name) = filter_event
+            && !line.contains(event_name)
+        {
+            continue;
         }
 
         if let Some(event) = parse_trace(py, &line)? {

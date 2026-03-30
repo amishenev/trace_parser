@@ -111,6 +111,7 @@ impl TemplateEvent for TraceSchedProcessExit {
 impl TraceSchedProcessExit {
     #[new]
     #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, comm, pid, prio, group_dead))]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         thread_name: String,
         thread_tid: u32,

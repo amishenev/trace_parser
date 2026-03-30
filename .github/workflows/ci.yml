@@ -54,6 +54,9 @@ jobs:
       - name: Run Rust tests
         run: cargo test -q
 
+      - name: Run cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+
       - name: Build editable Python package
         run: uv run maturin develop
 
@@ -96,6 +99,9 @@ jobs:
 
       - name: Run Rust tests
         run: cargo test -q
+
+      - name: Run cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Build editable Python package
         run: uv run maturin develop

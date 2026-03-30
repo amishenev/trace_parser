@@ -24,6 +24,7 @@ pub struct Trace {
 }
 
 impl Trace {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         thread_name: String,
         thread_tid: u32,
@@ -95,6 +96,7 @@ pub fn extract_base_fields(parts: &BaseTraceParts) -> (
 
 /// Форматирует базовую часть trace строки
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn format_trace_header(
     thread_name: &str,
     thread_tid: u32,
@@ -115,6 +117,7 @@ pub fn format_trace_header(
 impl Trace {
     #[new]
     #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, payload_raw))]
+    #[allow(clippy::too_many_arguments)]
     fn py_new(
         thread_name: String,
         thread_tid: u32,
@@ -202,7 +205,7 @@ impl Trace {
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        Ok(self.to_string_with_payload(&self.payload()))
+        Ok(self.to_string_with_payload(self.payload()))
     }
 }
 

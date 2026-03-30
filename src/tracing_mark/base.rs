@@ -230,6 +230,7 @@ impl TemplateEvent for TraceMarkEnd {
 impl TracingMark {
     #[new]
     #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, payload_raw))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         thread_name: String,
         thread_tid: u32,
