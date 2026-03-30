@@ -8,9 +8,9 @@ pub struct Trace {
     #[pyo3(get, set)]
     pub(crate) thread_name: String,
     #[pyo3(get, set)]
-    pub(crate) tid: u32,
+    pub(crate) thread_tid: u32,
     #[pyo3(get, set)]
-    pub(crate) tgid: u32,
+    pub(crate) thread_tgid: u32,
     #[pyo3(get, set)]
     pub(crate) cpu: u32,
     #[pyo3(get, set)]
@@ -26,8 +26,8 @@ pub struct Trace {
 impl Trace {
     pub fn new(
         thread_name: String,
-        tid: u32,
-        tgid: u32,
+        thread_tid: u32,
+        thread_tgid: u32,
         cpu: u32,
         flags: String,
         timestamp: f64,
@@ -37,8 +37,8 @@ impl Trace {
         validate_timestamp(timestamp)?;
         Ok(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -50,8 +50,8 @@ impl Trace {
     pub fn from_parts(parts: BaseTraceParts) -> Self {
         Self {
             thread_name: parts.thread_name,
-            tid: parts.tid,
-            tgid: parts.tgid,
+            thread_tid: parts.thread_tid,
+            thread_tgid: parts.thread_tgid,
             cpu: parts.cpu,
             flags: parts.flags,
             timestamp: parts.timestamp,
@@ -64,8 +64,8 @@ impl Trace {
         format!(
             "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
             self.thread_name,
-            self.tid,
-            self.tgid,
+            self.thread_tid,
+            self.thread_tgid,
             self.cpu,
             self.flags,
             self.timestamp,
@@ -76,15 +76,15 @@ impl Trace {
 }
 
 /// Helper для извлечения base полей из BaseTraceParts
-/// Возвращает кортеж: (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw)
+/// Возвращает кортеж: (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, payload_raw)
 #[inline]
 pub fn extract_base_fields(parts: &BaseTraceParts) -> (
     String, u32, u32, u32, String, f64, String, String,
 ) {
     (
         parts.thread_name.clone(),
-        parts.tid,
-        parts.tgid,
+        parts.thread_tid,
+        parts.thread_tgid,
         parts.cpu,
         parts.flags.clone(),
         parts.timestamp,
@@ -97,8 +97,8 @@ pub fn extract_base_fields(parts: &BaseTraceParts) -> (
 #[inline]
 pub fn format_trace_header(
     thread_name: &str,
-    tid: u32,
-    tgid: u32,
+    thread_tid: u32,
+    thread_tgid: u32,
     cpu: u32,
     flags: &str,
     timestamp: f64,
@@ -107,25 +107,25 @@ pub fn format_trace_header(
 ) -> String {
     format!(
         "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
-        thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload
+        thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, payload
     )
 }
 
 #[pymethods]
 impl Trace {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw))]
+    #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, payload_raw))]
     fn py_new(
         thread_name: String,
-        tid: u32,
-        tgid: u32,
+        thread_tid: u32,
+        thread_tgid: u32,
         cpu: u32,
         flags: String,
         timestamp: f64,
         event_name: String,
         payload_raw: String,
     ) -> PyResult<Self> {
-        Self::new(thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw)
+        Self::new(thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, payload_raw)
     }
 
     #[staticmethod]
@@ -140,15 +140,15 @@ impl Trace {
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
-            "Trace(thread_name='{}', tid={}, timestamp={:.6}, event_name='{}')",
-            self.thread_name, self.tid, self.timestamp, self.event_name
+            "Trace(thread_name='{}', thread_tid={}, timestamp={:.6}, event_name='{}')",
+            self.thread_name, self.thread_tid, self.timestamp, self.event_name
         ))
     }
 
     fn __eq__(&self, other: &Self) -> bool {
         self.thread_name == other.thread_name
-            && self.tid == other.tid
-            && self.tgid == other.tgid
+            && self.thread_tid == other.thread_tid
+            && self.thread_tgid == other.thread_tgid
             && self.cpu == other.cpu
             && self.flags == other.flags
             && self.timestamp == other.timestamp
@@ -215,8 +215,8 @@ mod tests {
         let line = "bash-1977   (  12) [000] .... 12345.678901: sched_switch: prev_comm=bash prev_pid=1977 ==> next_comm=worker next_pid=123";
         let trace = Trace::parse(line).expect("trace must parse");
         assert_eq!(trace.thread_name, "bash");
-        assert_eq!(trace.tid, 1977);
-        assert_eq!(trace.tgid, 12);
+        assert_eq!(trace.thread_tid, 1977);
+        assert_eq!(trace.thread_tgid, 12);
         assert_eq!(trace.cpu, 0);
         assert_eq!(trace.flags, "....");
         assert!((trace.timestamp - 12345.678901).abs() < 1e-9);
@@ -230,7 +230,7 @@ mod tests {
         let line = "my-thread-name-42 (  12) [010] d..1 12345.678901: tracing_mark_write: B|10|some_custom_message";
         let trace = Trace::parse(line).expect("trace must parse");
         assert_eq!(trace.thread_name, "my-thread-name");
-        assert_eq!(trace.tid, 42);
+        assert_eq!(trace.thread_tid, 42);
         assert_eq!(trace.cpu, 10);
         assert_eq!(trace.event_name, "tracing_mark_write");
         assert_eq!(trace.payload_raw, "B|10|some_custom_message");

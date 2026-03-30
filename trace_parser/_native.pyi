@@ -2,14 +2,14 @@
 
 class Trace:
     thread_name: str
-    tid: int
-    tgid: int
+    thread_thread_tid: int
+    thread_thread_tgid: int
     cpu: int
     flags: str
     timestamp: float
     event_name: str
     payload_raw: str
-    def __init__(self, thread_name: str, tid: int, tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str) -> None: ...
+    def __init__(self, thread_name: str, thread_thread_tid: int, thread_thread_tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
@@ -36,8 +36,8 @@ class Trace:
 
 class TraceSchedSwitch:
     thread_name: str
-    tid: int
-    tgid: int
+    thread_thread_tid: int
+    thread_thread_tgid: int
     cpu: int
     flags: str
     timestamp: float
@@ -50,7 +50,7 @@ class TraceSchedSwitch:
     next_comm: str
     next_pid: int
     next_prio: int
-    def __init__(self, thread_name: str, tid: int, tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, prev_comm: str, prev_pid: int, prev_prio: int, prev_state: str, next_comm: str, next_pid: int, next_prio: int) -> None: ...
+    def __init__(self, thread_name: str, thread_thread_tid: int, thread_thread_tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, prev_comm: str, prev_pid: int, prev_prio: int, prev_state: str, next_comm: str, next_pid: int, next_prio: int) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
@@ -69,8 +69,8 @@ class TraceSchedSwitch:
 
 class TraceSchedWakeup:
     thread_name: str
-    tid: int
-    tgid: int
+    thread_thread_tid: int
+    thread_thread_tgid: int
     cpu: int
     flags: str
     timestamp: float
@@ -81,7 +81,7 @@ class TraceSchedWakeup:
     prio: int
     target_cpu: int
     reason: int | None
-    def __init__(self, thread_name: str, tid: int, tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, comm: str, pid: int, prio: int, target_cpu: int, reason: int | None) -> None: ...
+    def __init__(self, thread_name: str, thread_thread_tid: int, thread_thread_tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, comm: str, pid: int, prio: int, target_cpu: int, reason: int | None) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
@@ -100,8 +100,8 @@ class TraceSchedWakeup:
 
 class TraceSchedWakeupNew:
     thread_name: str
-    tid: int
-    tgid: int
+    thread_thread_tid: int
+    thread_thread_tgid: int
     cpu: int
     flags: str
     timestamp: float
@@ -111,7 +111,7 @@ class TraceSchedWakeupNew:
     pid: int
     prio: int
     target_cpu: int
-    def __init__(self, thread_name: str, tid: int, tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, comm: str, pid: int, prio: int, target_cpu: int) -> None: ...
+    def __init__(self, thread_name: str, thread_thread_tid: int, thread_thread_tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, comm: str, pid: int, prio: int, target_cpu: int) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
@@ -130,8 +130,8 @@ class TraceSchedWakeupNew:
 
 class TraceSchedProcessExit:
     thread_name: str
-    tid: int
-    tgid: int
+    thread_thread_tid: int
+    thread_thread_tgid: int
     cpu: int
     flags: str
     timestamp: float
@@ -141,7 +141,7 @@ class TraceSchedProcessExit:
     pid: int
     prio: int
     group_dead: bool
-    def __init__(self, thread_name: str, tid: int, tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, comm: str, pid: int, prio: int, group_dead: bool) -> None: ...
+    def __init__(self, thread_name: str, thread_thread_tid: int, thread_thread_tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, comm: str, pid: int, prio: int, group_dead: bool) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
@@ -160,16 +160,16 @@ class TraceSchedProcessExit:
 
 class TraceExit:
     thread_name: str
-    tid: int
-    tgid: int
+    thread_thread_tid: int
+    thread_thread_tgid: int
     cpu: int
     flags: str
     timestamp: float
     event_name: str
     pid: int
     comm: str
-    exit_tgid: int
-    def __init__(self, thread_name: str, tid: int, tgid: int, cpu: int, flags: str, timestamp: float, pid: int, comm: str, exit_tgid: int) -> None: ...
+    exit_thread_thread_tgid: int
+    def __init__(self, thread_name: str, thread_thread_tid: int, thread_thread_tgid: int, cpu: int, flags: str, timestamp: float, pid: int, comm: str, exit_thread_thread_tgid: int) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
@@ -187,8 +187,8 @@ class TraceExit:
 
 class TraceCpuFrequency:
     thread_name: str
-    tid: int
-    tgid: int
+    thread_thread_tid: int
+    thread_thread_tgid: int
     cpu: int
     flags: str
     timestamp: float
@@ -196,7 +196,7 @@ class TraceCpuFrequency:
     payload_raw: str
     state: int
     cpu_id: int
-    def __init__(self, thread_name: str, tid: int, tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, state: int, cpu_id: int) -> None: ...
+    def __init__(self, thread_name: str, thread_thread_tid: int, thread_thread_tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, state: int, cpu_id: int) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
@@ -215,8 +215,8 @@ class TraceCpuFrequency:
 
 class TraceDevFrequency:
     thread_name: str
-    tid: int
-    tgid: int
+    thread_thread_tid: int
+    thread_thread_tgid: int
     cpu: int
     flags: str
     timestamp: float
@@ -225,7 +225,7 @@ class TraceDevFrequency:
     clk: str
     state: int
     cpu_id: int
-    def __init__(self, thread_name: str, tid: int, tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, clk: str, state: int, cpu_id: int) -> None: ...
+    def __init__(self, thread_name: str, thread_thread_tid: int, thread_thread_tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, clk: str, state: int, cpu_id: int) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
@@ -244,14 +244,14 @@ class TraceDevFrequency:
 
 class TracingMark:
     thread_name: str
-    tid: int
-    tgid: int
+    thread_thread_tid: int
+    thread_thread_tgid: int
     cpu: int
     flags: str
     timestamp: float
     event_name: str
     payload_raw: str
-    def __init__(self, thread_name: str, tid: int, tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str) -> None: ...
+    def __init__(self, thread_name: str, thread_thread_tid: int, thread_thread_tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
@@ -270,16 +270,16 @@ class TracingMark:
 
 class TraceMarkBegin:
     thread_name: str
-    tid: int
-    tgid: int
+    thread_thread_tid: int
+    thread_thread_tgid: int
     cpu: int
     flags: str
     timestamp: float
     event_name: str
     payload_raw: str
-    trace_mark_tgid: int
+    trace_mark_thread_thread_tgid: int
     message: str
-    def __init__(self, thread_name: str, tid: int, tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, trace_mark_tgid: int, message: str) -> None: ...
+    def __init__(self, thread_name: str, thread_thread_tid: int, thread_thread_tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, trace_mark_thread_thread_tgid: int, message: str) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
@@ -297,16 +297,16 @@ class TraceMarkBegin:
 
 class TraceMarkEnd:
     thread_name: str
-    tid: int
-    tgid: int
+    thread_thread_tid: int
+    thread_thread_tgid: int
     cpu: int
     flags: str
     timestamp: float
     event_name: str
     payload_raw: str
-    trace_mark_tgid: int
+    trace_mark_thread_thread_tgid: int
     message: str
-    def __init__(self, thread_name: str, tid: int, tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, trace_mark_tgid: int, message: str) -> None: ...
+    def __init__(self, thread_name: str, thread_thread_tid: int, thread_thread_tgid: int, cpu: int, flags: str, timestamp: float, event_name: str, payload_raw: str, trace_mark_thread_thread_tgid: int, message: str) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
@@ -324,16 +324,16 @@ class TraceMarkEnd:
 
 class TraceReceiveVsync:
     thread_name: str
-    tid: int
-    tgid: int
+    thread_thread_tid: int
+    thread_thread_tgid: int
     cpu: int
     flags: str
     timestamp: float
     event_name: str
-    trace_mark_tgid: int
+    trace_mark_thread_thread_tgid: int
     message: str
     frame_number: int
-    def __init__(self, thread_name: str, tid: int, tgid: int, cpu: int, flags: str, timestamp: float, trace_mark_tgid: int, message: str, frame_number: int) -> None: ...
+    def __init__(self, thread_name: str, thread_thread_tid: int, thread_thread_tgid: int, cpu: int, flags: str, timestamp: float, trace_mark_thread_thread_tgid: int, message: str, frame_number: int) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod

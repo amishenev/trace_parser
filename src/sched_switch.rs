@@ -40,9 +40,9 @@ pub struct TraceSchedSwitch {
     #[pyo3(get, set)]
     pub thread_name: String,
     #[pyo3(get, set)]
-    pub tid: u32,
+    pub thread_tid: u32,
     #[pyo3(get, set)]
-    pub tgid: u32,
+    pub thread_tgid: u32,
     #[pyo3(get, set)]
     pub cpu: u32,
     #[pyo3(get, set)]
@@ -84,13 +84,13 @@ impl TemplateEvent for TraceSchedSwitch {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _) =
+        let (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, _) =
             extract_base_fields(&parts);
 
         Some(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -126,12 +126,12 @@ impl TemplateEvent for TraceSchedSwitch {
 #[pymethods]
 impl TraceSchedSwitch {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, prev_comm, prev_pid, prev_prio, prev_state, next_comm, next_pid, next_prio))]
+    #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, prev_comm, prev_pid, prev_prio, prev_state, next_comm, next_pid, next_prio))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         thread_name: String,
-        tid: u32,
-        tgid: u32,
+        thread_tid: u32,
+        thread_tgid: u32,
         cpu: u32,
         flags: String,
         timestamp: f64,
@@ -146,8 +146,8 @@ impl TraceSchedSwitch {
         validate_timestamp(timestamp)?;
         Ok(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -185,8 +185,8 @@ impl TraceSchedSwitch {
 
     fn __eq__(&self, other: &Self) -> bool {
         self.thread_name == other.thread_name
-            && self.tid == other.tid
-            && self.tgid == other.tgid
+            && self.thread_tid == other.thread_tid
+            && self.thread_tgid == other.thread_tgid
             && self.cpu == other.cpu
             && self.flags == other.flags
             && self.timestamp == other.timestamp
@@ -227,7 +227,7 @@ impl TraceSchedSwitch {
         validate_timestamp(self.timestamp)?;
         let payload = self.payload()?;
         Ok(format_trace_header(
-            &self.thread_name, self.tid, self.tgid, self.cpu,
+            &self.thread_name, self.thread_tid, self.thread_tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
             &payload
         ))
@@ -275,6 +275,11 @@ mod tests {
         let line = "bash-1977   (  12) [000] .... 12345.678901: sched_switch: prev_comm=bash prev_pid=1977 prev_prio=120 prev_state=S ==> next_comm=worker next_pid=123 next_prio=120";
         let trace = TraceSchedSwitch::parse(line).expect("sched_switch must parse");
         assert_eq!(trace.thread_name, "bash");
+        assert_eq!(trace.thread_tid, 1977);
+        assert_eq!(trace.thread_tgid, 12);
+        assert_eq!(trace.cpu, 0);
+        assert_eq!(trace.flags, "....");
+        assert!((trace.timestamp - 12345.678901).abs() < 1e-9);
         assert_eq!(trace.prev_comm, "bash");
         assert_eq!(trace.prev_pid, 1977);
         assert_eq!(trace.prev_prio, 120);

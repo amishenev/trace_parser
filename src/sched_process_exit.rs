@@ -37,9 +37,9 @@ pub struct TraceSchedProcessExit {
     #[pyo3(get, set)]
     pub thread_name: String,
     #[pyo3(get, set)]
-    pub tid: u32,
+    pub thread_tid: u32,
     #[pyo3(get, set)]
-    pub tgid: u32,
+    pub thread_tgid: u32,
     #[pyo3(get, set)]
     pub cpu: u32,
     #[pyo3(get, set)]
@@ -75,12 +75,12 @@ impl TemplateEvent for TraceSchedProcessExit {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _) =
+        let (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, _) =
             extract_base_fields(&parts);
         Some(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -110,11 +110,11 @@ impl TemplateEvent for TraceSchedProcessExit {
 #[pymethods]
 impl TraceSchedProcessExit {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, comm, pid, prio, group_dead))]
+    #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, comm, pid, prio, group_dead))]
     pub fn new(
         thread_name: String,
-        tid: u32,
-        tgid: u32,
+        thread_tid: u32,
+        thread_tgid: u32,
         cpu: u32,
         flags: String,
         timestamp: f64,
@@ -126,8 +126,8 @@ impl TraceSchedProcessExit {
         validate_timestamp(timestamp)?;
         Ok(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -167,7 +167,7 @@ impl TraceSchedProcessExit {
         validate_timestamp(self.timestamp)?;
         let payload = self.payload()?;
         Ok(format_trace_header(
-            &self.thread_name, self.tid, self.tgid, self.cpu,
+            &self.thread_name, self.thread_tid, self.thread_tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
             &payload
         ))
@@ -232,8 +232,8 @@ mod tests {
         assert_eq!(trace.prio, 120);
         assert!(trace.group_dead);
         assert_eq!(trace.thread_name, "bash");
-        assert_eq!(trace.tid, 1977);
-        assert_eq!(trace.tgid, 12);
+        assert_eq!(trace.thread_tid, 1977);
+        assert_eq!(trace.thread_tgid, 12);
         assert_eq!(trace.cpu, 0);
         assert_eq!(
             trace.payload().expect("payload must work"),

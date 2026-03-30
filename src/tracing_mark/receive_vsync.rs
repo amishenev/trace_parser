@@ -32,9 +32,9 @@ pub struct TraceReceiveVsync {
     #[pyo3(get, set)]
     pub thread_name: String,
     #[pyo3(get, set)]
-    pub tid: u32,
+    pub thread_tid: u32,
     #[pyo3(get, set)]
-    pub tgid: u32,
+    pub thread_tgid: u32,
     #[pyo3(get, set)]
     pub cpu: u32,
     #[pyo3(get, set)]
@@ -54,12 +54,12 @@ pub struct TraceReceiveVsync {
 #[pymethods]
 impl TraceReceiveVsync {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, trace_mark_tgid, message, frame_number))]
+    #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, trace_mark_tgid, message, frame_number))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         thread_name: String,
-        tid: u32,
-        tgid: u32,
+        thread_tid: u32,
+        thread_tgid: u32,
         cpu: u32,
         flags: String,
         timestamp: f64,
@@ -71,8 +71,8 @@ impl TraceReceiveVsync {
         validate_timestamp(timestamp)?;
         Ok(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -85,15 +85,15 @@ impl TraceReceiveVsync {
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
-            "TraceReceiveVsync(thread_name='{}', tid={}, timestamp={:.6}, event_name='{}', frame_number={})",
-            self.thread_name, self.tid, self.timestamp, self.event_name, self.frame_number
+            "TraceReceiveVsync(thread_name='{}', thread_tid={}, timestamp={:.6}, event_name='{}', frame_number={})",
+            self.thread_name, self.thread_tid, self.timestamp, self.event_name, self.frame_number
         ))
     }
 
     fn __eq__(&self, other: &Self) -> bool {
         self.thread_name == other.thread_name
-            && self.tid == other.tid
-            && self.tgid == other.tgid
+            && self.thread_tid == other.thread_tid
+            && self.thread_tgid == other.thread_tgid
             && self.cpu == other.cpu
             && self.flags == other.flags
             && self.timestamp == other.timestamp
@@ -153,7 +153,7 @@ impl TraceReceiveVsync {
             return None;
         }
         let parts = BaseTraceParts::parse(line)?;
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _payload_raw) =
+        let (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, _payload_raw) =
             extract_base_fields(&parts);
 
         let begin_captures = BEGIN_TEMPLATE.captures(&parts.payload_raw)?;
@@ -166,8 +166,8 @@ impl TraceReceiveVsync {
 
         Some(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -216,8 +216,8 @@ impl TraceReceiveVsync {
 
         Ok(format_trace_header(
             &self.thread_name,
-            self.tid,
-            self.tgid,
+            self.thread_tid,
+            self.thread_tgid,
             self.cpu,
             &self.flags,
             self.timestamp,

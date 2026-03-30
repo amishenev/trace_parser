@@ -17,8 +17,8 @@ pub(crate) static BASE_TRACE_RE: LazyLock<Regex> = LazyLock::new(|| {
 #[derive(Clone)]
 pub struct BaseTraceParts {
     pub thread_name: String,
-    pub tid: u32,
-    pub tgid: u32,
+    pub thread_tid: u32,
+    pub thread_tgid: u32,
     pub cpu: u32,
     pub flags: String,
     pub timestamp: f64,
@@ -31,8 +31,8 @@ impl BaseTraceParts {
         let captures = BASE_TRACE_RE.captures(line)?;
         Some(Self {
             thread_name: captures.name("thread_name")?.as_str().to_owned(),
-            tid: parse(captures.name("tid")?.as_str().as_bytes()).ok()?,
-            tgid: parse(captures.name("tgid")?.as_str().as_bytes()).ok()?,
+            thread_tid: parse(captures.name("tid")?.as_str().as_bytes()).ok()?,
+            thread_tgid: parse(captures.name("tgid")?.as_str().as_bytes()).ok()?,
             cpu: parse(captures.name("cpu")?.as_str().as_bytes()).ok()?,
             flags: captures.name("flags")?.as_str().to_owned(),
             timestamp: parse(captures.name("timestamp")?.as_str().as_bytes()).ok()?,

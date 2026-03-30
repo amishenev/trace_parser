@@ -64,9 +64,9 @@ pub struct TracingMark {
     #[pyo3(get, set)]
     pub thread_name: String,
     #[pyo3(get, set)]
-    pub tid: u32,
+    pub thread_tid: u32,
     #[pyo3(get, set)]
-    pub tgid: u32,
+    pub thread_tgid: u32,
     #[pyo3(get, set)]
     pub cpu: u32,
     #[pyo3(get, set)]
@@ -84,9 +84,9 @@ pub struct TraceMarkBegin {
     #[pyo3(get, set)]
     pub thread_name: String,
     #[pyo3(get, set)]
-    pub tid: u32,
+    pub thread_tid: u32,
     #[pyo3(get, set)]
-    pub tgid: u32,
+    pub thread_tgid: u32,
     #[pyo3(get, set)]
     pub cpu: u32,
     #[pyo3(get, set)]
@@ -108,9 +108,9 @@ pub struct TraceMarkEnd {
     #[pyo3(get, set)]
     pub thread_name: String,
     #[pyo3(get, set)]
-    pub tid: u32,
+    pub thread_tid: u32,
     #[pyo3(get, set)]
-    pub tgid: u32,
+    pub thread_tgid: u32,
     #[pyo3(get, set)]
     pub cpu: u32,
     #[pyo3(get, set)]
@@ -152,11 +152,11 @@ impl TemplateEvent for TraceMarkBegin {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _payload_raw) = extract_base_fields(&parts);
+        let (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, _payload_raw) = extract_base_fields(&parts);
         Some(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -199,11 +199,11 @@ impl TemplateEvent for TraceMarkEnd {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _payload_raw) = extract_base_fields(&parts);
+        let (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, _payload_raw) = extract_base_fields(&parts);
         Some(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -229,11 +229,11 @@ impl TemplateEvent for TraceMarkEnd {
 #[pymethods]
 impl TracingMark {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw))]
+    #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, payload_raw))]
     fn new(
         thread_name: String,
-        tid: u32,
-        tgid: u32,
+        thread_tid: u32,
+        thread_tgid: u32,
         cpu: u32,
         flags: String,
         timestamp: f64,
@@ -243,8 +243,8 @@ impl TracingMark {
         validate_timestamp(timestamp)?;
         Ok(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -255,15 +255,15 @@ impl TracingMark {
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
-            "TracingMark(thread_name='{}', tid={}, timestamp={:.6}, event_name='{}')",
-            self.thread_name, self.tid, self.timestamp, self.event_name
+            "TracingMark(thread_name='{}', thread_tid={}, timestamp={:.6}, event_name='{}')",
+            self.thread_name, self.thread_tid, self.timestamp, self.event_name
         ))
     }
 
     fn __eq__(&self, other: &Self) -> bool {
         self.thread_name == other.thread_name
-            && self.tid == other.tid
-            && self.tgid == other.tgid
+            && self.thread_tid == other.thread_tid
+            && self.thread_tgid == other.thread_tgid
             && self.cpu == other.cpu
             && self.flags == other.flags
             && self.timestamp == other.timestamp
@@ -294,11 +294,11 @@ impl TracingMark {
             return None;
         }
         let parts = parse_event::<Self>(line)?;
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) = extract_base_fields(&parts);
+        let (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, payload_raw) = extract_base_fields(&parts);
         Some(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -320,7 +320,7 @@ impl TracingMark {
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
         Ok(format_trace_header(
-            &self.thread_name, self.tid, self.tgid, self.cpu,
+            &self.thread_name, self.thread_tid, self.thread_tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
             self.payload()
         ))
@@ -330,12 +330,12 @@ impl TracingMark {
 #[pymethods]
 impl TraceMarkBegin {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, trace_mark_tgid, message))]
+    #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, trace_mark_tgid, message))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         thread_name: String,
-        tid: u32,
-        tgid: u32,
+        thread_tid: u32,
+        thread_tgid: u32,
         cpu: u32,
         flags: String,
         timestamp: f64,
@@ -346,8 +346,8 @@ impl TraceMarkBegin {
         validate_timestamp(timestamp)?;
         Ok(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -360,15 +360,15 @@ impl TraceMarkBegin {
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
-            "TraceMarkBegin(thread_name='{}', tid={}, timestamp={:.6}, event_name='{}', trace_mark_tgid={}, message='{}')",
-            self.thread_name, self.tid, self.timestamp, self.event_name, self.trace_mark_tgid, self.message
+            "TraceMarkBegin(thread_name='{}', thread_tid={}, timestamp={:.6}, event_name='{}', trace_mark_tgid={}, message='{}')",
+            self.thread_name, self.thread_tid, self.timestamp, self.event_name, self.trace_mark_tgid, self.message
         ))
     }
 
     fn __eq__(&self, other: &Self) -> bool {
         self.thread_name == other.thread_name
-            && self.tid == other.tid
-            && self.tgid == other.tgid
+            && self.thread_tid == other.thread_tid
+            && self.thread_tgid == other.thread_tgid
             && self.cpu == other.cpu
             && self.flags == other.flags
             && self.timestamp == other.timestamp
@@ -425,7 +425,7 @@ impl TraceMarkBegin {
         validate_timestamp(self.timestamp)?;
         let payload = self.payload();
         Ok(format_trace_header(
-            &self.thread_name, self.tid, self.tgid, self.cpu,
+            &self.thread_name, self.thread_tid, self.thread_tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
             &payload
         ))
@@ -435,12 +435,12 @@ impl TraceMarkBegin {
 #[pymethods]
 impl TraceMarkEnd {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, trace_mark_tgid, message))]
+    #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, trace_mark_tgid, message))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         thread_name: String,
-        tid: u32,
-        tgid: u32,
+        thread_tid: u32,
+        thread_tgid: u32,
         cpu: u32,
         flags: String,
         timestamp: f64,
@@ -451,8 +451,8 @@ impl TraceMarkEnd {
         validate_timestamp(timestamp)?;
         Ok(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -465,15 +465,15 @@ impl TraceMarkEnd {
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
-            "TraceMarkEnd(thread_name='{}', tid={}, timestamp={:.6}, event_name='{}', trace_mark_tgid={}, message='{}')",
-            self.thread_name, self.tid, self.timestamp, self.event_name, self.trace_mark_tgid, self.message
+            "TraceMarkEnd(thread_name='{}', thread_tid={}, timestamp={:.6}, event_name='{}', trace_mark_tgid={}, message='{}')",
+            self.thread_name, self.thread_tid, self.timestamp, self.event_name, self.trace_mark_tgid, self.message
         ))
     }
 
     fn __eq__(&self, other: &Self) -> bool {
         self.thread_name == other.thread_name
-            && self.tid == other.tid
-            && self.tgid == other.tgid
+            && self.thread_tid == other.thread_tid
+            && self.thread_tgid == other.thread_tgid
             && self.cpu == other.cpu
             && self.flags == other.flags
             && self.timestamp == other.timestamp
@@ -530,7 +530,7 @@ impl TraceMarkEnd {
         validate_timestamp(self.timestamp)?;
         let payload = self.payload();
         Ok(format_trace_header(
-            &self.thread_name, self.tid, self.tgid, self.cpu,
+            &self.thread_name, self.thread_tid, self.thread_tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
             &payload
         ))

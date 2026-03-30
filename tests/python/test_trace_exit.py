@@ -10,7 +10,7 @@ def test_trace_exit_exit1_parse():
     assert exit_event is not None
     assert exit_event.pid == 123
     assert exit_event.comm == "test"
-    assert exit_event.exit_tgid == 100
+    assert exit_event.thread_tgid == 100
 
 
 def test_trace_exit_exit2_parse():
@@ -20,7 +20,7 @@ def test_trace_exit_exit2_parse():
     assert exit_event is not None
     assert exit_event.pid == 456
     assert exit_event.comm == "foo"
-    assert exit_event.exit_tgid == 200
+    assert exit_event.thread_tgid == 200
 
 
 def test_trace_exit_to_string():

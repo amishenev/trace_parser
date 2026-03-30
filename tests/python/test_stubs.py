@@ -110,8 +110,8 @@ def test_copy_and_deepcopy():
     # Создаём тестовый объект
     trace = Trace(
         thread_name="bash",
-        tid=1234,
-        tgid=1234,
+        thread_tid=1234,
+        thread_tgid=1234,
         cpu=0,
         flags="....",
         timestamp=12345.678901,
@@ -136,8 +136,8 @@ def test_repr_and_str():
     
     trace = Trace(
         thread_name="bash",
-        tid=1234,
-        tgid=1234,
+        thread_tid=1234,
+        thread_tgid=1234,
         cpu=0,
         flags="....",
         timestamp=12345.678901,
@@ -162,8 +162,8 @@ def test_equality():
     
     trace1 = Trace(
         thread_name="bash",
-        tid=1234,
-        tgid=1234,
+        thread_tid=1234,
+        thread_tgid=1234,
         cpu=0,
         flags="....",
         timestamp=12345.678901,
@@ -173,8 +173,8 @@ def test_equality():
     
     trace2 = Trace(
         thread_name="bash",
-        tid=1234,
-        tgid=1234,
+        thread_tid=1234,
+        thread_tgid=1234,
         cpu=0,
         flags="....",
         timestamp=12345.678901,
@@ -184,8 +184,8 @@ def test_equality():
     
     trace3 = Trace(
         thread_name="bash",
-        tid=1234,
-        tgid=1234,
+        thread_tid=1234,
+        thread_tgid=1234,
         cpu=0,
         flags="....",
         timestamp=12345.678901,

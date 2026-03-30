@@ -31,9 +31,9 @@ pub struct TraceExit {
     #[pyo3(get, set)]
     pub thread_name: String,
     #[pyo3(get, set)]
-    pub tid: u32,
+    pub thread_tid: u32,
     #[pyo3(get, set)]
-    pub tgid: u32,
+    pub thread_tgid: u32,
     #[pyo3(get, set)]
     pub cpu: u32,
     #[pyo3(get, set)]
@@ -48,7 +48,7 @@ pub struct TraceExit {
     #[pyo3(get, set)]
     pub comm: String,
     #[pyo3(get, set)]
-    pub exit_tgid: u32,
+    pub tgid: u32,
 }
 
 impl EventType for TraceExit {
@@ -72,11 +72,11 @@ impl TemplateEvent for TraceExit {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _payload_raw) = extract_base_fields(&parts);
+        let (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, _payload_raw) = extract_base_fields(&parts);
         Some(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -84,7 +84,7 @@ impl TemplateEvent for TraceExit {
             format_id: 0,
             pid: parse(captures.name("pid")?.as_str().as_bytes()).ok()?,
             comm: captures.name("comm")?.as_str().to_string(),
-            exit_tgid: parse(captures.name("tgid")?.as_str().as_bytes()).ok()?,
+            tgid: parse(captures.name("tgid")?.as_str().as_bytes()).ok()?,
         })
     }
 
@@ -93,7 +93,7 @@ impl TemplateEvent for TraceExit {
         let values: [(&str, Option<TemplateValue>); 3] = [
             ("pid", Some(TemplateValue::U32(self.pid))),
             ("comm", Some(TemplateValue::Str(&self.comm))),
-            ("tgid", Some(TemplateValue::U32(self.exit_tgid))),
+            ("tgid", Some(TemplateValue::U32(self.tgid))),
         ];
         Ok(template.format(&values).expect("exit template must render"))
     }
@@ -102,23 +102,23 @@ impl TemplateEvent for TraceExit {
 #[pymethods]
 impl TraceExit {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, pid, comm, exit_tgid))]
+    #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, pid, comm, tgid))]
     fn new(
         thread_name: String,
-        tid: u32,
-        tgid: u32,
+        thread_tid: u32,
+        thread_tgid: u32,
         cpu: u32,
         flags: String,
         timestamp: f64,
         pid: u32,
         comm: String,
-        exit_tgid: u32,
+        tgid: u32,
     ) -> PyResult<Self> {
         validate_timestamp(timestamp)?;
         Ok(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -126,7 +126,7 @@ impl TraceExit {
             format_id: 0,
             pid,
             comm,
-            exit_tgid,
+            tgid,
         })
     }
 
@@ -149,7 +149,7 @@ impl TraceExit {
 
     fn __eq__(&self, other: &Self) -> bool {
         self.thread_name == other.thread_name
-            && self.tid == other.tid
+            && self.thread_tid == other.thread_tid
             && self.tgid == other.tgid
             && self.cpu == other.cpu
             && self.flags == other.flags
@@ -157,7 +157,7 @@ impl TraceExit {
             && self.event_name == other.event_name
             && self.pid == other.pid
             && self.comm == other.comm
-            && self.exit_tgid == other.exit_tgid
+            && self.tgid == other.tgid
     }
 
     fn __str__(&self) -> PyResult<String> {
@@ -189,7 +189,7 @@ impl TraceExit {
         validate_timestamp(self.timestamp)?;
         let payload = self.payload()?;
         Ok(format_trace_header(
-            &self.thread_name, self.tid, self.tgid, self.cpu,
+            &self.thread_name, self.thread_tid, self.tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
             &payload
         ))
@@ -219,7 +219,7 @@ mod tests {
         let exit = TraceExit::parse(line).expect("exit1 must parse");
         assert_eq!(exit.pid, 123);
         assert_eq!(exit.comm, "test");
-        assert_eq!(exit.exit_tgid, 100);
+        assert_eq!(exit.tgid, 100);
     }
 
     #[test]
@@ -228,7 +228,7 @@ mod tests {
         let exit = TraceExit::parse(line).expect("exit2 must parse");
         assert_eq!(exit.pid, 456);
         assert_eq!(exit.comm, "foo");
-        assert_eq!(exit.exit_tgid, 200);
+        assert_eq!(exit.tgid, 200);
     }
 
     #[test]

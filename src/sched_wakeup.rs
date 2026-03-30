@@ -54,9 +54,9 @@ pub struct TraceSchedWakeup {
     #[pyo3(get, set)]
     pub thread_name: String,
     #[pyo3(get, set)]
-    pub tid: u32,
+    pub thread_tid: u32,
     #[pyo3(get, set)]
-    pub tgid: u32,
+    pub thread_tgid: u32,
     #[pyo3(get, set)]
     pub cpu: u32,
     #[pyo3(get, set)]
@@ -81,8 +81,8 @@ pub struct TraceSchedWakeup {
 impl PartialEq for TraceSchedWakeup {
     fn eq(&self, other: &Self) -> bool {
         self.thread_name == other.thread_name
-            && self.tid == other.tid
-            && self.tgid == other.tgid
+            && self.thread_tid == other.thread_tid
+            && self.thread_tgid == other.thread_tgid
             && self.cpu == other.cpu
             && self.flags == other.flags
             && self.timestamp == other.timestamp
@@ -101,9 +101,9 @@ pub struct TraceSchedWakeupNew {
     #[pyo3(get, set)]
     pub thread_name: String,
     #[pyo3(get, set)]
-    pub tid: u32,
+    pub thread_tid: u32,
     #[pyo3(get, set)]
-    pub tgid: u32,
+    pub thread_tgid: u32,
     #[pyo3(get, set)]
     pub cpu: u32,
     #[pyo3(get, set)]
@@ -112,7 +112,6 @@ pub struct TraceSchedWakeupNew {
     pub timestamp: f64,
     #[pyo3(get)]
     pub event_name: String,
-    #[allow(dead_code)]
     format_id: u8,
     #[pyo3(get, set)]
     pub comm: String,
@@ -127,8 +126,8 @@ pub struct TraceSchedWakeupNew {
 impl PartialEq for TraceSchedWakeupNew {
     fn eq(&self, other: &Self) -> bool {
         self.thread_name == other.thread_name
-            && self.tid == other.tid
-            && self.tgid == other.tgid
+            && self.thread_tid == other.thread_tid
+            && self.thread_tgid == other.thread_tgid
             && self.cpu == other.cpu
             && self.flags == other.flags
             && self.timestamp == other.timestamp
@@ -166,13 +165,13 @@ impl TemplateEvent for TraceSchedWakeup {
             None
         };
 
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _) =
+        let (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, _) =
             extract_base_fields(&parts);
 
         Some(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -222,13 +221,13 @@ impl TemplateEvent for TraceSchedWakeupNew {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _) =
+        let (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, _) =
             extract_base_fields(&parts);
 
         Some(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -259,11 +258,11 @@ impl TemplateEvent for TraceSchedWakeupNew {
 #[pymethods]
 impl TraceSchedWakeup {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, comm, pid, prio, target_cpu, reason=None))]
+    #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, comm, pid, prio, target_cpu, reason=None))]
     fn new(
         thread_name: String,
-        tid: u32,
-        tgid: u32,
+        thread_tid: u32,
+        thread_tgid: u32,
         cpu: u32,
         flags: String,
         timestamp: f64,
@@ -276,8 +275,8 @@ impl TraceSchedWakeup {
         validate_timestamp(timestamp)?;
         Ok(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -300,8 +299,8 @@ impl TraceSchedWakeup {
 
     fn __eq__(&self, other: &Self) -> bool {
         self.thread_name == other.thread_name
-            && self.tid == other.tid
-            && self.tgid == other.tgid
+            && self.thread_tid == other.thread_tid
+            && self.thread_tgid == other.thread_tgid
             && self.cpu == other.cpu
             && self.flags == other.flags
             && self.timestamp == other.timestamp
@@ -352,7 +351,7 @@ impl TraceSchedWakeup {
         validate_timestamp(self.timestamp)?;
         let payload = self.payload()?;
         Ok(format_trace_header(
-            &self.thread_name, self.tid, self.tgid, self.cpu,
+            &self.thread_name, self.thread_tid, self.thread_tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
             &payload
         ))
@@ -362,11 +361,11 @@ impl TraceSchedWakeup {
 #[pymethods]
 impl TraceSchedWakeupNew {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, comm, pid, prio, target_cpu))]
+    #[pyo3(signature = (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, comm, pid, prio, target_cpu))]
     fn new(
         thread_name: String,
-        tid: u32,
-        tgid: u32,
+        thread_tid: u32,
+        thread_tgid: u32,
         cpu: u32,
         flags: String,
         timestamp: f64,
@@ -378,8 +377,8 @@ impl TraceSchedWakeupNew {
         validate_timestamp(timestamp)?;
         Ok(Self {
             thread_name,
-            tid,
-            tgid,
+            thread_tid,
+            thread_tgid,
             cpu,
             flags,
             timestamp,
@@ -401,8 +400,8 @@ impl TraceSchedWakeupNew {
 
     fn __eq__(&self, other: &Self) -> bool {
         self.thread_name == other.thread_name
-            && self.tid == other.tid
-            && self.tgid == other.tgid
+            && self.thread_tid == other.thread_tid
+            && self.thread_tgid == other.thread_tgid
             && self.cpu == other.cpu
             && self.flags == other.flags
             && self.timestamp == other.timestamp
@@ -452,7 +451,7 @@ impl TraceSchedWakeupNew {
         validate_timestamp(self.timestamp)?;
         let payload = self.payload()?;
         Ok(format_trace_header(
-            &self.thread_name, self.tid, self.tgid, self.cpu,
+            &self.thread_name, self.thread_tid, self.thread_tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
             &payload
         ))
@@ -468,8 +467,8 @@ mod tests {
         let line = "kworker-123 ( 123) [000] .... 12345.679001: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=000";
         let trace = TraceSchedWakeup::parse(line).expect("sched_wakeup must parse");
         assert_eq!(trace.thread_name, "kworker");
-        assert_eq!(trace.tid, 123);
-        assert_eq!(trace.tgid, 123);
+        assert_eq!(trace.thread_tid, 123);
+        assert_eq!(trace.thread_tgid, 123);
         assert_eq!(trace.cpu, 0);
         assert_eq!(trace.flags, "....");
         assert!((trace.timestamp - 12345.679001).abs() < 1e-9);
@@ -497,8 +496,8 @@ mod tests {
         let line = "kworker-123 ( 123) [000] .... 12345.679001: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=000 reason=3";
         let trace = TraceSchedWakeup::parse(line).expect("sched_wakeup must parse");
         assert_eq!(trace.thread_name, "kworker");
-        assert_eq!(trace.tid, 123);
-        assert_eq!(trace.tgid, 123);
+        assert_eq!(trace.thread_tid, 123);
+        assert_eq!(trace.thread_tgid, 123);
         assert_eq!(trace.cpu, 0);
         assert_eq!(trace.flags, "....");
         assert!((trace.timestamp - 12345.679001).abs() < 1e-9);
@@ -546,8 +545,8 @@ mod tests {
         let line = "kworker-123 ( 123) [000] .... 12345.679001: sched_wakeup_new: comm=bash pid=1977 prio=120 target_cpu=000";
         let trace = TraceSchedWakeupNew::parse(line).expect("sched_wakeup_new must parse");
         assert_eq!(trace.thread_name, "kworker");
-        assert_eq!(trace.tid, 123);
-        assert_eq!(trace.tgid, 123);
+        assert_eq!(trace.thread_tid, 123);
+        assert_eq!(trace.thread_tgid, 123);
         assert_eq!(trace.cpu, 0);
         assert_eq!(trace.flags, "....");
         assert!((trace.timestamp - 12345.679001).abs() < 1e-9);
