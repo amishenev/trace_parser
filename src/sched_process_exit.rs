@@ -31,7 +31,7 @@ static FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
     ])
 });
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct TraceSchedProcessExit {
     #[pyo3(get)]

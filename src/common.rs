@@ -15,19 +15,19 @@ pub(crate) static BASE_TRACE_RE: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 #[derive(Clone)]
-pub(crate) struct BaseTraceParts {
-    pub(crate) thread_name: String,
-    pub(crate) tid: u32,
-    pub(crate) tgid: u32,
-    pub(crate) cpu: u32,
-    pub(crate) flags: String,
-    pub(crate) timestamp: f64,
-    pub(crate) event_name: String,
-    pub(crate) payload_raw: String,
+pub struct BaseTraceParts {
+    pub thread_name: String,
+    pub tid: u32,
+    pub tgid: u32,
+    pub cpu: u32,
+    pub flags: String,
+    pub timestamp: f64,
+    pub event_name: String,
+    pub payload_raw: String,
 }
 
 impl BaseTraceParts {
-    pub(crate) fn parse(line: &str) -> Option<Self> {
+    pub fn parse(line: &str) -> Option<Self> {
         let captures = BASE_TRACE_RE.captures(line)?;
         Some(Self {
             thread_name: captures.name("thread_name")?.as_str().to_owned(),
@@ -42,7 +42,7 @@ impl BaseTraceParts {
     }
 }
 
-pub(crate) fn parse_base_parts(line: &str) -> Option<BaseTraceParts> {
+pub fn parse_base_parts(line: &str) -> Option<BaseTraceParts> {
     BaseTraceParts::parse(line)
 }
 
@@ -105,6 +105,7 @@ pub(crate) fn contains_event_name(line: &str, event_name: &str) -> bool {
     false
 }
 
+#[allow(dead_code)]
 pub(crate) fn contains_all(line: &str, needles: &[&str]) -> bool {
     needles.iter().all(|needle| line.contains(needle))
 }

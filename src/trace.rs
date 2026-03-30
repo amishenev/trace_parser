@@ -17,7 +17,7 @@ pub struct Trace {
     pub(crate) flags: String,
     #[pyo3(get, set)]
     pub(crate) timestamp: f64,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     pub(crate) event_name: String,
     #[pyo3(get, set)]
     pub(crate) payload_raw: String,
