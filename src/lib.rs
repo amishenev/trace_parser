@@ -6,6 +6,7 @@ mod sched_process_exit;
 mod sched_switch;
 mod sched_wakeup;
 mod trace;
+mod trace_exit;
 mod tracing_mark;
 
 pub use format_registry::{FormatRegistry, FormatSpec};
@@ -14,11 +15,11 @@ pub use sched_process_exit::TraceSchedProcessExit;
 pub use sched_switch::TraceSchedSwitch;
 pub use sched_wakeup::{TraceSchedWakeup, TraceSchedWakeupNew};
 pub use trace::Trace;
+pub use trace_exit::TraceExit;
 pub use tracing_mark::{TraceMarkBegin, TraceMarkEnd, TraceReceiveVsync, TracingMark};
 
 use pyo3::prelude::*;
 use pyo3::BoundObject;
-use memchr::memmem;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
@@ -44,14 +45,7 @@ fn parse_tracing_mark(py: Python<'_>, line: &str) -> Option<Py<PyAny>> {
         .or_else(|| parse_and_wrap(py, line, TracingMark::parse))
 }
 
-/// Извлечь event_name из строки трассировки
-fn extract_event_name(line: &str) -> Option<&str> {
-    // Используем SIMD поиск через memchr
-    let colon_pos = memmem::find(line.as_bytes(), b": ")? + 2;
-    let rest = &line[colon_pos..];
-    let end_pos = memmem::find(rest.as_bytes(), b": ")?;
-    Some(rest[..end_pos].trim())
-}
+use crate::common::extract_event_name;
 
 #[pyfunction]
 fn parse_trace(py: Python<'_>, line: &str) -> PyResult<Option<Py<PyAny>>> {
@@ -72,6 +66,7 @@ fn parse_trace(py: Python<'_>, line: &str) -> PyResult<Option<Py<PyAny>>> {
         "sched_wakeup" => parse_and_wrap(py, line, TraceSchedWakeup::parse),
         "sched_wakeup_new" => parse_and_wrap(py, line, TraceSchedWakeupNew::parse),
         "sched_process_exit" => parse_and_wrap(py, line, TraceSchedProcessExit::parse),
+        "exit1" | "exit2" => parse_and_wrap(py, line, TraceExit::parse),
 
         // Неизвестное событие — fallback на базовый Trace
         _ => parse_and_wrap(py, line, Trace::parse),
@@ -137,6 +132,7 @@ fn _native(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<TraceSchedWakeup>()?;
     module.add_class::<TraceSchedWakeupNew>()?;
     module.add_class::<TraceSchedProcessExit>()?;
+    module.add_class::<TraceExit>()?;
     module.add_class::<TracingMark>()?;
     module.add_class::<TraceMarkBegin>()?;
     module.add_class::<TraceMarkEnd>()?;

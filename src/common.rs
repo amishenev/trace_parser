@@ -46,13 +46,31 @@ pub fn parse_base_parts(line: &str) -> Option<BaseTraceParts> {
     BaseTraceParts::parse(line)
 }
 
+/// Извлечь event_name из строки трассировки
+pub fn extract_event_name(line: &str) -> Option<&str> {
+    // Используем SIMD поиск через memchr
+    let colon_pos = memmem::find(line.as_bytes(), b": ")? + 2;
+    let rest = &line[colon_pos..];
+    let end_pos = memmem::find(rest.as_bytes(), b": ")?;
+    Some(rest[..end_pos].trim())
+}
+
 pub(crate) trait EventType {
     const EVENT_NAME: &'static str;
+    const EVENT_ALIASES: &'static [&'static str] = &[];
+    
+    fn matches_event_name(name: &str) -> bool {
+        name == Self::EVENT_NAME || Self::EVENT_ALIASES.contains(&name)
+    }
 }
 
 pub(crate) trait FastMatch: EventType {
     fn quick_check(line: &str) -> bool {
-        contains_event_name(line, Self::EVENT_NAME) && Self::payload_quick_check(line)
+        if let Some(event_name) = extract_event_name(line) {
+            Self::matches_event_name(event_name) && Self::payload_quick_check(line)
+        } else {
+            false
+        }
     }
 
     fn payload_quick_check(_line: &str) -> bool {
@@ -81,28 +99,6 @@ pub(crate) trait TemplateEvent: EventType {
 
     /// Рендер полей в payload с учётом формата
     fn render_payload(&self) -> PyResult<String>;
-}
-
-pub(crate) fn contains_event_name(line: &str, event_name: &str) -> bool {
-    let needle = event_name.as_bytes();
-    let bytes = line.as_bytes();
-    let mut start = 0;
-
-    while start + needle.len() <= bytes.len() {
-        let Some(offset) = memmem::find(&bytes[start..], needle) else {
-            return false;
-        };
-        let index = start + offset;
-        let before_ok = index >= 2 && &bytes[index - 2..index] == b": ";
-        let after_index = index + needle.len();
-        let after_ok = after_index + 2 <= bytes.len() && &bytes[after_index..after_index + 2] == b": ";
-        if before_ok && after_ok {
-            return true;
-        }
-        start = index + 1;
-    }
-
-    false
 }
 
 #[allow(dead_code)]

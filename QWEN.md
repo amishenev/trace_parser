@@ -25,6 +25,7 @@
 | `TraceSchedWakeup` | Пробуждение процесса |
 | `TraceSchedWakeupNew` | Пробуждение нового процесса |
 | `TraceSchedProcessExit` | Завершение процесса |
+| `TraceExit` | Завершение процесса (exit1, exit2) |
 | `TraceCpuFrequency` | Изменение частоты CPU |
 | `TraceDevFrequency` | Изменение частоты устройства (ddr_devfreq, l3c_devfreq) |
 | `TracingMark` | Базовый класс для tracing_mark_write |
@@ -324,7 +325,7 @@ PayloadTemplate::new(
 
 Для оптимизации используется двухуровневая проверка:
 
-1. `FastMatch::quick_check` — быстрая проверка по `event_name`
+1. `FastMatch::quick_check` — быстрая проверка через `extract_event_name()` (SIMD memchr)
 2. Полноценный regex-парсинг только после успешной быстрой проверки
 
 ## Конвенции разработки

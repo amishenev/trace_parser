@@ -242,7 +242,7 @@ impl TemplateEvent for TraceSchedWakeupNew {
     }
 
     fn render_payload(&self) -> PyResult<String> {
-        let template = Self::formats().template(0).unwrap();
+        let template = Self::formats().template(self.format_id).unwrap();
         let target_cpu = format!("{:03}", self.target_cpu);
         let values: [(&str, Option<TemplateValue>); 4] = [
             ("comm", Some(TemplateValue::Str(&self.comm))),

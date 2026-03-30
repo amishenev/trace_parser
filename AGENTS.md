@@ -218,17 +218,17 @@ Important constraint for future work:
 
 ### Fast-match heuristics
 
-- `FastMatch::quick_check` now defaults to an `event_name` match (`contains_event_name(line, Self::EVENT_NAME)`); override `payload_quick_check` only when payload clues matter.
-- `contains_all(line, [...])` and `contains_any(line, [...])` helpers exist for future multi-format heuristics.
-- `TraceDevFrequency` overrides `payload_quick_check` to require `clk=ddr_devfreq` or `clk=l3c_devfreq`.
-- Shared helpers `contains_begin_marker` / `contains_end_marker` back `TraceMarkBegin`, `TraceMarkEnd`, and `TraceReceiveVsync`.
-- The heavy regex work is now gated by cheap fast checks, and `parse_trace()` routes a line to a single parser after these heuristics pass.
-- `benches/can_be_parsed.rs` captures the cost of each check path; rerun it whenever you touch the heuristic to judge regression risk.
+- `FastMatch::quick_check` uses `extract_event_name()` (SIMD via memchr) for event name extraction
+- `contains_all(line, [...])` and `contains_any(line, [...])` helpers exist for future multi-format heuristics
+- `TraceDevFrequency` overrides `payload_quick_check` to require `clk=ddr_devfreq` or `clk=l3c_devfreq`
+- Shared helpers `contains_begin_marker` / `contains_end_marker` back `TraceMarkBegin`, `TraceMarkEnd`, and `TraceReceiveVsync`
+- The heavy regex work is now gated by cheap fast checks, and `parse_trace()` routes a line to a single parser after these heuristics pass
+- `benches/can_be_parsed.rs` captures the cost of each check path; rerun it whenever you touch the heuristic to judge regression risk
 - Current design intent:
   - for ordinary non-`tracing_mark` events, `event_name` is usually enough for `quick_check`
   - payload-specific `payload_quick_check` should be used sparingly, mostly where false positives would be common or there is subtype routing
   - `tracing_mark` subtypes are the main place where payload quick checks matter
-- `contains_all(...)` may be unused at times, but keep it because it is intended for future multi-format event matching.
+- `contains_all(...)` may be unused at times, but keep it because it is intended for future multi-format event matching
 
 ## Payload templates
 
