@@ -4,7 +4,7 @@
 
 `trace_parser` — это библиотека на **Rust + PyO3** для парсинга больших текстовых логов `ftrace` / `tracefs`.
 
-**Основная цель:** быстрый парсинг заголовков трассировки в Rust с поддержкой типизированных событий поверх универсального базового класса `Trace`.
+**Основная цель:** быстрый парсинг заголовков трассировки в Rust с поддержкой типизированных событий с плоской структурой полей.
 
 ### Ключевые возможности
 
@@ -14,6 +14,7 @@
 - Поддержка форматов полезной нагрузки для конкретных событий
 - Семантический round-trip через `to_string()` / `from_string()`
 - Поддержка service groups (принимаются при парсинге, но опускаются/нормализуются при выводе)
+- Плоская структура полей — базовые поля доступны напрямую на каждом событии
 
 ### Поддерживаемые события
 
@@ -94,13 +95,17 @@ event = parse_trace(line)
 # Прямой парсинг
 switch = TraceSchedSwitch.parse(line)
 if switch:
-    print(switch.base.timestamp)
+    print(switch.timestamp)
     print(switch.prev_comm, switch.next_comm)
 
 # Частотные события
 freq = TraceDevFrequency.parse(line)
 if freq:
     print(freq.clk, freq.state)
+
+# Доступ к payload и template
+print(switch.payload)      # Отрендеренный payload
+print(switch.template)     # Строка шаблона
 ```
 
 ## Архитектура проекта
@@ -139,13 +144,20 @@ trace_parser/
 
 ### Архитектурные принципы
 
-#### Композиция вместо наследования
+#### Плоская структура полей
 
-Типизированные классы используют композицию:
+Все базовые поля (`thread_name`, `tid`, `tgid`, `cpu`, `flags`, `timestamp`, `event_name`, `payload_raw`) объявлены напрямую в каждом типизированном классе:
 
 ```rust
 pub struct TraceSchedSwitch {
-    pub base: Trace,           // Базовые поля через вложенность
+    pub thread_name: String,
+    pub tid: u32,
+    pub tgid: u32,
+    pub cpu: u32,
+    pub flags: String,
+    pub timestamp: f64,
+    pub event_name: String,
+    pub payload_raw: String,
     pub prev_comm: String,
     pub prev_pid: u32,
     // ...
@@ -153,8 +165,53 @@ pub struct TraceSchedSwitch {
 ```
 
 **Доступ к полям в Python:**
-- `sched_switch.base.timestamp`
+- `sched_switch.timestamp` (прямой доступ)
 - `sched_switch.prev_comm`
+
+**Хелпер для извлечения базовых полей:**
+```rust
+// В src/trace.rs
+fn extract_base_fields(captures: &Captures) -> Option<BaseFields>
+```
+
+#### Унифицированный payload/template API
+
+Все события предоставляют:
+
+- `payload` — getter для отрендеренной полезной нагрузки
+- `template` — getter для строки шаблона
+
+**Для простых событий** (`sched_*`, `frequency`):
+- `payload()` возвращает `render_payload()` через шаблон
+- `template()` возвращает строку шаблона
+
+**Для `TracingMark`:**
+- `payload` возвращает `&self.payload_raw`
+- `template()` возвращает `"{payload}"`
+
+**Для `TraceMarkBegin`/`TraceMarkEnd`/`TraceReceiveVsync`:**
+- `payload` возвращает форматированную строку с `B|` или `E|` префиксом
+- `message` getter для доступа к сообщению без префикса
+
+#### format_trace_header helper
+
+Общий хелпер для форматирования заголовка трассировки:
+
+```rust
+fn format_trace_header(
+    thread_name: &str,
+    tid: u32,
+    tgid: u32,
+    cpu: u32,
+    flags: &str,
+    timestamp: f64,
+) -> String
+```
+
+**Формат вывода:**
+```text
+TASK-TID (TGID) [CPU] FLAGS TIMESTAMP:
+```
 
 #### PyO3 0.28 + Bound API
 
@@ -315,6 +372,8 @@ ci: expand Python version matrix
 4. Добавить Python пример в `examples/`
 5. Добавить smoke тест в `tests/python/`
 
+**Важно:** При изменении публичного API (добавление/удаление полей, свойств, методов, изменение структуры классов) обязательно проверяйте соответствие type stubs (`.pyi` файлов) новой версии API. Стабы должны быть синхронизированы с Rust реализацией.
+
 ## CI/CD
 
 ### GitHub Actions
@@ -417,13 +476,18 @@ TracingMark (базовый)
 
 ## Отложенные улучшения
 
-### Python ergonomics
+### Решённые улучшения
 
-Текущий доступ: `vsync.begin.mark.base.timestamp`
+**Плоская структура полей** — реализована в последних изменениях:
 
-Желаемый доступ: `vsync.timestamp`
+- Все базовые поля объявлены напрямую в каждом классе
+- Прямой доступ: `event.timestamp` вместо `event.base.timestamp`
+- `TraceReceiveVsync`: было 4 уровня вложенности, стал 1 уровень
+- Быстрее доступ, меньше накладных расходов
 
-**Решение отложено** до выбора единого механизма proxy-полей для всех событий.
+### Отложенные улучшения
+
+Нет текущих отложенных улучшений.
 
 ## Ссылки
 

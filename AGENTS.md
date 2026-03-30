@@ -464,6 +464,8 @@ Required updates:
 
 This is not optional.
 
+**Important:** When changing the public API (adding/removing fields, properties, methods, changing class structure), always verify that type stubs (`.pyi` files) are updated to match the new API. Stubs must be kept in sync with the Rust implementation.
+
 For every new public typed event:
 
 1. export the class from the Rust module and module entrypoint
