@@ -49,7 +49,7 @@ static FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
 });
 
 #[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct TraceSchedWakeup {
     #[pyo3(get, set)]
     pub thread_name: String,
@@ -65,10 +65,7 @@ pub struct TraceSchedWakeup {
     pub timestamp: f64,
     #[pyo3(get)]
     pub event_name: String,
-    #[pyo3(get, set)]
-    pub payload_raw: String,
-    #[pyo3(get, set)]
-    pub format_id: u8,
+    format_id: u8,
     #[pyo3(get, set)]
     pub comm: String,
     #[pyo3(get, set)]
@@ -81,8 +78,25 @@ pub struct TraceSchedWakeup {
     pub reason: Option<u32>,
 }
 
+impl PartialEq for TraceSchedWakeup {
+    fn eq(&self, other: &Self) -> bool {
+        self.thread_name == other.thread_name
+            && self.tid == other.tid
+            && self.tgid == other.tgid
+            && self.cpu == other.cpu
+            && self.flags == other.flags
+            && self.timestamp == other.timestamp
+            && self.event_name == other.event_name
+            && self.comm == other.comm
+            && self.pid == other.pid
+            && self.prio == other.prio
+            && self.target_cpu == other.target_cpu
+            && self.reason == other.reason
+    }
+}
+
 #[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct TraceSchedWakeupNew {
     #[pyo3(get, set)]
     pub thread_name: String,
@@ -98,10 +112,8 @@ pub struct TraceSchedWakeupNew {
     pub timestamp: f64,
     #[pyo3(get)]
     pub event_name: String,
-    #[pyo3(get, set)]
-    pub payload_raw: String,
-    #[pyo3(get, set)]
-    pub format_id: u8,
+    #[allow(dead_code)]
+    format_id: u8,
     #[pyo3(get, set)]
     pub comm: String,
     #[pyo3(get, set)]
@@ -110,6 +122,22 @@ pub struct TraceSchedWakeupNew {
     pub prio: i32,
     #[pyo3(get, set)]
     pub target_cpu: u32,
+}
+
+impl PartialEq for TraceSchedWakeupNew {
+    fn eq(&self, other: &Self) -> bool {
+        self.thread_name == other.thread_name
+            && self.tid == other.tid
+            && self.tgid == other.tgid
+            && self.cpu == other.cpu
+            && self.flags == other.flags
+            && self.timestamp == other.timestamp
+            && self.event_name == other.event_name
+            && self.comm == other.comm
+            && self.pid == other.pid
+            && self.prio == other.prio
+            && self.target_cpu == other.target_cpu
+    }
 }
 
 impl EventType for TraceSchedWakeup {
@@ -138,7 +166,7 @@ impl TemplateEvent for TraceSchedWakeup {
             None
         };
 
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) =
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _) =
             extract_base_fields(&parts);
 
         Some(Self {
@@ -149,7 +177,6 @@ impl TemplateEvent for TraceSchedWakeup {
             flags,
             timestamp,
             event_name,
-            payload_raw,
             format_id,
             comm: cap_str(captures, "comm")?,
             pid: cap_parse(captures, "pid")?,
@@ -195,7 +222,7 @@ impl TemplateEvent for TraceSchedWakeupNew {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) =
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _) =
             extract_base_fields(&parts);
 
         Some(Self {
@@ -206,7 +233,6 @@ impl TemplateEvent for TraceSchedWakeupNew {
             flags,
             timestamp,
             event_name,
-            payload_raw,
             format_id: 0,
             comm: cap_str(captures, "comm")?,
             pid: cap_parse(captures, "pid")?,
@@ -233,7 +259,7 @@ impl TemplateEvent for TraceSchedWakeupNew {
 #[pymethods]
 impl TraceSchedWakeup {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, format_id, comm, pid, prio, target_cpu, reason=None))]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, comm, pid, prio, target_cpu, reason=None))]
     fn new(
         thread_name: String,
         tid: u32,
@@ -241,9 +267,6 @@ impl TraceSchedWakeup {
         cpu: u32,
         flags: String,
         timestamp: f64,
-        event_name: String,
-        payload_raw: String,
-        format_id: u8,
         comm: String,
         pid: u32,
         prio: i32,
@@ -258,9 +281,8 @@ impl TraceSchedWakeup {
             cpu,
             flags,
             timestamp,
-            event_name,
-            payload_raw,
-            format_id,
+            event_name: Self::EVENT_NAME.to_string(),
+            format_id: if reason.is_some() { 1 } else { 0 },
             comm,
             pid,
             prio,
@@ -284,8 +306,6 @@ impl TraceSchedWakeup {
             && self.flags == other.flags
             && self.timestamp == other.timestamp
             && self.event_name == other.event_name
-            && self.payload_raw == other.payload_raw
-            && self.format_id == other.format_id
             && self.comm == other.comm
             && self.pid == other.pid
             && self.prio == other.prio
@@ -318,13 +338,19 @@ impl TraceSchedWakeup {
         parse_template_event::<Self>(line)
     }
 
-    pub fn payload_to_string(&self) -> PyResult<String> {
+    #[getter]
+    pub fn payload(&self) -> PyResult<String> {
         self.render_payload()
+    }
+
+    #[getter]
+    pub fn template(&self) -> &'static str {
+        Self::formats().template(self.format_id).unwrap().template_str()
     }
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        let payload = self.payload_to_string()?;
+        let payload = self.payload()?;
         Ok(format_trace_header(
             &self.thread_name, self.tid, self.tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
@@ -336,7 +362,7 @@ impl TraceSchedWakeup {
 #[pymethods]
 impl TraceSchedWakeupNew {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, format_id, comm, pid, prio, target_cpu))]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, comm, pid, prio, target_cpu))]
     fn new(
         thread_name: String,
         tid: u32,
@@ -344,9 +370,6 @@ impl TraceSchedWakeupNew {
         cpu: u32,
         flags: String,
         timestamp: f64,
-        event_name: String,
-        payload_raw: String,
-        format_id: u8,
         comm: String,
         pid: u32,
         prio: i32,
@@ -360,9 +383,8 @@ impl TraceSchedWakeupNew {
             cpu,
             flags,
             timestamp,
-            event_name,
-            payload_raw,
-            format_id,
+            event_name: Self::EVENT_NAME.to_string(),
+            format_id: 0,
             comm,
             pid,
             prio,
@@ -385,8 +407,6 @@ impl TraceSchedWakeupNew {
             && self.flags == other.flags
             && self.timestamp == other.timestamp
             && self.event_name == other.event_name
-            && self.payload_raw == other.payload_raw
-            && self.format_id == other.format_id
             && self.comm == other.comm
             && self.pid == other.pid
             && self.prio == other.prio
@@ -418,13 +438,19 @@ impl TraceSchedWakeupNew {
         parse_template_event::<Self>(line)
     }
 
-    pub fn payload_to_string(&self) -> PyResult<String> {
+    #[getter]
+    pub fn payload(&self) -> PyResult<String> {
         self.render_payload()
+    }
+
+    #[getter]
+    pub fn template(&self) -> &'static str {
+        Self::formats().template(0).unwrap().template_str()
     }
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        let payload = self.payload_to_string()?;
+        let payload = self.payload()?;
         Ok(format_trace_header(
             &self.thread_name, self.tid, self.tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
@@ -456,8 +482,8 @@ mod tests {
         assert_eq!(trace.format_id, 0);
         assert_eq!(
             trace
-                .payload_to_string()
-                .expect("payload_to_string must work"),
+                .payload()
+                .expect("payload must work"),
             "comm=bash pid=1977 prio=120 target_cpu=000"
         );
         assert_eq!(
@@ -485,8 +511,8 @@ mod tests {
         assert_eq!(trace.format_id, 1);
         assert_eq!(
             trace
-                .payload_to_string()
-                .expect("payload_to_string must work"),
+                .payload()
+                .expect("payload must work"),
             "comm=bash pid=1977 prio=120 target_cpu=000 reason=3"
         );
         assert_eq!(

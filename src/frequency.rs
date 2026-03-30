@@ -63,10 +63,7 @@ pub struct TraceCpuFrequency {
     pub timestamp: f64,
     #[pyo3(get)]
     pub event_name: String,
-    #[pyo3(get, set)]
-    pub payload_raw: String,
-    #[pyo3(get, set)]
-    pub format_id: u8,
+    format_id: u8,
     #[pyo3(get, set)]
     pub state: u32,
     #[pyo3(get, set)]
@@ -90,10 +87,7 @@ pub struct TraceDevFrequency {
     pub timestamp: f64,
     #[pyo3(get)]
     pub event_name: String,
-    #[pyo3(get, set)]
-    pub payload_raw: String,
-    #[pyo3(get, set)]
-    pub format_id: u8,
+    format_id: u8,
     #[pyo3(get, set)]
     pub clk: String,
     #[pyo3(get, set)]
@@ -118,7 +112,7 @@ impl TemplateEvent for TraceCpuFrequency {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) = extract_base_fields(&parts);
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _) = extract_base_fields(&parts);
         Some(Self {
             thread_name,
             tid,
@@ -127,7 +121,6 @@ impl TemplateEvent for TraceCpuFrequency {
             flags,
             timestamp,
             event_name,
-            payload_raw,
             format_id: 0,
             state: cap_parse(captures, "state")?,
             cpu_id: cap_parse(captures, "cpu_id")?,
@@ -166,7 +159,7 @@ impl TemplateEvent for TraceDevFrequency {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) = extract_base_fields(&parts);
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _) = extract_base_fields(&parts);
         Some(Self {
             thread_name,
             tid,
@@ -175,7 +168,6 @@ impl TemplateEvent for TraceDevFrequency {
             flags,
             timestamp,
             event_name,
-            payload_raw,
             format_id: 0,
             clk: cap_str(captures, "clk")?,
             state: cap_parse(captures, "state")?,
@@ -199,7 +191,7 @@ impl TemplateEvent for TraceDevFrequency {
 #[pymethods]
 impl TraceCpuFrequency {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, format_id, state, cpu_id))]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, state, cpu_id))]
     pub fn new(
         thread_name: String,
         tid: u32,
@@ -207,9 +199,6 @@ impl TraceCpuFrequency {
         cpu: u32,
         flags: String,
         timestamp: f64,
-        event_name: String,
-        payload_raw: String,
-        format_id: u8,
         state: u32,
         cpu_id: u32,
     ) -> PyResult<Self> {
@@ -221,9 +210,8 @@ impl TraceCpuFrequency {
             cpu,
             flags,
             timestamp,
-            event_name,
-            payload_raw,
-            format_id,
+            event_name: Self::EVENT_NAME.to_string(),
+            format_id: 0,
             state,
             cpu_id,
         })
@@ -242,13 +230,19 @@ impl TraceCpuFrequency {
         parse_template_event::<Self>(line)
     }
 
-    pub fn payload_to_string(&self) -> PyResult<String> {
+    #[getter]
+    pub fn payload(&self) -> PyResult<String> {
         self.render_payload()
+    }
+
+    #[getter]
+    pub fn template(&self) -> &'static str {
+        Self::formats().template(self.format_id).unwrap().template_str()
     }
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        let payload = self.payload_to_string()?;
+        let payload = self.payload()?;
         Ok(format_trace_header(
             &self.thread_name, self.tid, self.tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
@@ -264,7 +258,15 @@ impl TraceCpuFrequency {
     }
 
     fn __eq__(&self, other: &Self) -> bool {
-        self == other
+        self.thread_name == other.thread_name
+            && self.tid == other.tid
+            && self.tgid == other.tgid
+            && self.cpu == other.cpu
+            && self.flags == other.flags
+            && (self.timestamp - other.timestamp).abs() < 1e-9
+            && self.event_name == other.event_name
+            && self.state == other.state
+            && self.cpu_id == other.cpu_id
     }
 
     fn __str__(&self) -> PyResult<String> {
@@ -305,7 +307,7 @@ impl TraceCpuFrequency {
 #[pymethods]
 impl TraceDevFrequency {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, format_id, clk, state, cpu_id))]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, clk, state, cpu_id))]
     pub fn new(
         thread_name: String,
         tid: u32,
@@ -313,9 +315,6 @@ impl TraceDevFrequency {
         cpu: u32,
         flags: String,
         timestamp: f64,
-        event_name: String,
-        payload_raw: String,
-        format_id: u8,
         clk: String,
         state: u32,
         cpu_id: u32,
@@ -328,9 +327,8 @@ impl TraceDevFrequency {
             cpu,
             flags,
             timestamp,
-            event_name,
-            payload_raw,
-            format_id,
+            event_name: Self::EVENT_NAME.to_string(),
+            format_id: 0,
             clk,
             state,
             cpu_id,
@@ -350,13 +348,19 @@ impl TraceDevFrequency {
         parse_template_event::<Self>(line)
     }
 
-    pub fn payload_to_string(&self) -> PyResult<String> {
+    #[getter]
+    pub fn payload(&self) -> PyResult<String> {
         self.render_payload()
+    }
+
+    #[getter]
+    pub fn template(&self) -> &'static str {
+        Self::formats().template(self.format_id).unwrap().template_str()
     }
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        let payload = self.payload_to_string()?;
+        let payload = self.payload()?;
         Ok(format_trace_header(
             &self.thread_name, self.tid, self.tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
@@ -372,7 +376,16 @@ impl TraceDevFrequency {
     }
 
     fn __eq__(&self, other: &Self) -> bool {
-        self == other
+        self.thread_name == other.thread_name
+            && self.tid == other.tid
+            && self.tgid == other.tgid
+            && self.cpu == other.cpu
+            && self.flags == other.flags
+            && (self.timestamp - other.timestamp).abs() < 1e-9
+            && self.event_name == other.event_name
+            && self.clk == other.clk
+            && self.state == other.state
+            && self.cpu_id == other.cpu_id
     }
 
     fn __str__(&self) -> PyResult<String> {
@@ -430,6 +443,14 @@ mod tests {
     }
 
     #[test]
+    fn cpu_frequency_payload_and_template() {
+        let line = "swapper-0 (0) [000] .... 12345.678900: cpu_frequency: state=933000000 cpu_id=0";
+        let trace = TraceCpuFrequency::parse(line).expect("cpu_frequency must parse");
+        assert_eq!(trace.payload().unwrap(), "state=933000000 cpu_id=0");
+        assert_eq!(trace.template(), "state={state} cpu_id={cpu_id}");
+    }
+
+    #[test]
     fn dev_frequency_parses() {
         let line = "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=ddr_devfreq state=933000000 cpu_id=0";
         let trace = TraceDevFrequency::parse(line).expect("clock_set_rate must parse");
@@ -443,5 +464,29 @@ mod tests {
         assert_eq!(trace.clk, "ddr_devfreq");
         assert_eq!(trace.state, 933000000);
         assert_eq!(trace.cpu_id, 0);
+    }
+
+    #[test]
+    fn dev_frequency_payload_and_template() {
+        let line = "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=ddr_devfreq state=933000000 cpu_id=0";
+        let trace = TraceDevFrequency::parse(line).expect("clock_set_rate must parse");
+        assert_eq!(trace.payload().unwrap(), "clk=ddr_devfreq state=933000000 cpu_id=0");
+        assert_eq!(trace.template(), "clk={clk} state={state} cpu_id={cpu_id}");
+    }
+
+    #[test]
+    fn cpu_frequency_to_string() {
+        let line = "swapper-0 (0) [000] .... 12345.678900: cpu_frequency: state=933000000 cpu_id=0";
+        let trace = TraceCpuFrequency::parse(line).expect("cpu_frequency must parse");
+        let output = trace.to_string().unwrap();
+        assert_eq!(output, line);
+    }
+
+    #[test]
+    fn dev_frequency_to_string() {
+        let line = "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=ddr_devfreq state=933000000 cpu_id=0";
+        let trace = TraceDevFrequency::parse(line).expect("clock_set_rate must parse");
+        let output = trace.to_string().unwrap();
+        assert_eq!(output, line);
     }
 }

@@ -48,10 +48,7 @@ pub struct TraceSchedProcessExit {
     pub timestamp: f64,
     #[pyo3(get)]
     pub event_name: String,
-    #[pyo3(get, set)]
-    pub payload_raw: String,
-    #[pyo3(get, set)]
-    pub format_id: u8,
+    format_id: u8,
     #[pyo3(get, set)]
     pub comm: String,
     #[pyo3(get, set)]
@@ -78,7 +75,7 @@ impl TemplateEvent for TraceSchedProcessExit {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) =
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _) =
             extract_base_fields(&parts);
         Some(Self {
             thread_name,
@@ -88,7 +85,6 @@ impl TemplateEvent for TraceSchedProcessExit {
             flags,
             timestamp,
             event_name,
-            payload_raw,
             format_id: 0,
             comm: cap_str(captures, "comm")?,
             pid: cap_parse(captures, "pid")?,
@@ -114,7 +110,7 @@ impl TemplateEvent for TraceSchedProcessExit {
 #[pymethods]
 impl TraceSchedProcessExit {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, comm, pid, prio, group_dead, format_id))]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, comm, pid, prio, group_dead))]
     pub fn new(
         thread_name: String,
         tid: u32,
@@ -122,13 +118,10 @@ impl TraceSchedProcessExit {
         cpu: u32,
         flags: String,
         timestamp: f64,
-        event_name: String,
-        payload_raw: String,
         comm: String,
         pid: u32,
         prio: i32,
         group_dead: bool,
-        format_id: u8,
     ) -> PyResult<Self> {
         validate_timestamp(timestamp)?;
         Ok(Self {
@@ -138,9 +131,8 @@ impl TraceSchedProcessExit {
             cpu,
             flags,
             timestamp,
-            event_name,
-            payload_raw,
-            format_id,
+            event_name: Self::EVENT_NAME.to_string(),
+            format_id: 0,
             comm,
             pid,
             prio,
@@ -161,13 +153,19 @@ impl TraceSchedProcessExit {
         parse_template_event::<Self>(line)
     }
 
-    pub fn payload_to_string(&self) -> PyResult<String> {
+    #[getter]
+    pub fn payload(&self) -> PyResult<String> {
         self.render_payload()
+    }
+
+    #[staticmethod]
+    pub fn template() -> &'static str {
+        Self::formats().template(0).unwrap().template_str()
     }
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        let payload = self.payload_to_string()?;
+        let payload = self.payload()?;
         Ok(format_trace_header(
             &self.thread_name, self.tid, self.tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
@@ -238,7 +236,7 @@ mod tests {
         assert_eq!(trace.tgid, 12);
         assert_eq!(trace.cpu, 0);
         assert_eq!(
-            trace.payload_to_string().expect("payload_to_string must work"),
+            trace.payload().expect("payload must work"),
             "comm=bash pid=1977 prio=120 group_dead=1"
         );
         assert_eq!(

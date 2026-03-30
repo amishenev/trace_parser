@@ -5,6 +5,7 @@ use regex::Regex;
 pub struct PayloadTemplate {
     regex: Regex,
     segments: Vec<TemplateSegment>,
+    template_str: String,
 }
 
 enum TemplateSegment {
@@ -150,7 +151,12 @@ impl PayloadTemplate {
         Self {
             regex: Regex::new(&regex_pattern).expect("payload template regex must compile"),
             segments,
+            template_str: template.to_string(),
         }
+    }
+
+    pub fn template_str(&self) -> &str {
+        &self.template_str
     }
 
     pub fn is_match(&self, input: &str) -> bool {

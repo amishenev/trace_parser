@@ -51,10 +51,7 @@ pub struct TraceSchedSwitch {
     pub timestamp: f64,
     #[pyo3(get)]
     pub event_name: String,
-    #[pyo3(get, set)]
-    pub payload_raw: String,
-    #[pyo3(get, set)]
-    pub format_id: u8,
+    format_id: u8,
     #[pyo3(get, set)]
     pub prev_comm: String,
     #[pyo3(get, set)]
@@ -87,9 +84,9 @@ impl TemplateEvent for TraceSchedSwitch {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) =
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _) =
             extract_base_fields(&parts);
-        
+
         Some(Self {
             thread_name,
             tid,
@@ -98,7 +95,6 @@ impl TemplateEvent for TraceSchedSwitch {
             flags,
             timestamp,
             event_name,
-            payload_raw,
             format_id: 0,
             prev_comm: cap_str(captures, "prev_comm")?,
             prev_pid: cap_parse(captures, "prev_pid")?,
@@ -130,7 +126,7 @@ impl TemplateEvent for TraceSchedSwitch {
 #[pymethods]
 impl TraceSchedSwitch {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, prev_comm, prev_pid, prev_prio, prev_state, next_comm, next_pid, next_prio))]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, prev_comm, prev_pid, prev_prio, prev_state, next_comm, next_pid, next_prio))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         thread_name: String,
@@ -139,8 +135,6 @@ impl TraceSchedSwitch {
         cpu: u32,
         flags: String,
         timestamp: f64,
-        event_name: String,
-        payload_raw: String,
         prev_comm: String,
         prev_pid: u32,
         prev_prio: i32,
@@ -157,8 +151,7 @@ impl TraceSchedSwitch {
             cpu,
             flags,
             timestamp,
-            event_name,
-            payload_raw,
+            event_name: Self::EVENT_NAME.to_string(),
             format_id: 0,
             prev_comm,
             prev_pid,
@@ -198,7 +191,6 @@ impl TraceSchedSwitch {
             && self.flags == other.flags
             && self.timestamp == other.timestamp
             && self.event_name == other.event_name
-            && self.payload_raw == other.payload_raw
             && self.format_id == other.format_id
             && self.prev_comm == other.prev_comm
             && self.prev_pid == other.prev_pid
@@ -221,13 +213,19 @@ impl TraceSchedSwitch {
         Ok(self.clone())
     }
 
-    pub fn payload_to_string(&self) -> PyResult<String> {
+    #[getter]
+    pub fn payload(&self) -> PyResult<String> {
         self.render_payload()
+    }
+
+    #[getter]
+    pub fn template(&self) -> &'static str {
+        Self::formats().template(self.format_id).unwrap().template_str()
     }
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        let payload = self.payload_to_string()?;
+        let payload = self.payload()?;
         Ok(format_trace_header(
             &self.thread_name, self.tid, self.tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
@@ -285,7 +283,7 @@ mod tests {
         assert_eq!(trace.next_pid, 123);
         assert_eq!(trace.next_prio, 120);
         assert_eq!(
-            trace.payload_to_string().expect("payload_to_string must work"),
+            trace.payload().expect("payload must work"),
             "prev_comm=bash prev_pid=1977 prev_prio=120 prev_state=S ==> next_comm=worker next_pid=123 next_prio=120"
         );
         assert_eq!(

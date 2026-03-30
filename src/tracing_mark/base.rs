@@ -12,10 +12,10 @@ use crate::trace::{extract_base_fields, format_trace_header};
 
 pub(crate) static BEGIN_TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
-        "B|{trace_mark_tgid}|{payload}",
+        "B|{trace_mark_tgid}|{message}",
         &[
             ("trace_mark_tgid", FieldSpec::u32()),
-            ("payload", FieldSpec::custom(r".*")),
+            ("message", FieldSpec::custom(r".*")),
         ],
     )
 });
@@ -31,10 +31,10 @@ pub(crate) static BEGIN_FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
 
 pub(crate) static END_TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
-        "E|{trace_mark_tgid}|{payload}",
+        "E|{trace_mark_tgid}|{message}",
         &[
             ("trace_mark_tgid", FieldSpec::u32()),
-            ("payload", FieldSpec::custom(r".*")),
+            ("message", FieldSpec::custom(r".*")),
         ],
     )
 });
@@ -75,8 +75,7 @@ pub struct TracingMark {
     pub timestamp: f64,
     #[pyo3(get)]
     pub event_name: String,
-    #[pyo3(get, set)]
-    pub payload_raw: String,
+    payload_raw: String,
 }
 
 #[pyclass(from_py_object)]
@@ -96,14 +95,11 @@ pub struct TraceMarkBegin {
     pub timestamp: f64,
     #[pyo3(get)]
     pub event_name: String,
-    #[pyo3(get, set)]
-    pub payload_raw: String,
-    #[pyo3(get, set)]
-    pub format_id: u8,
+    format_id: u8,
     #[pyo3(get, set)]
     pub trace_mark_tgid: u32,
     #[pyo3(get, set)]
-    pub payload: String,
+    pub message: String,
 }
 
 #[pyclass(skip_from_py_object)]
@@ -123,14 +119,11 @@ pub struct TraceMarkEnd {
     pub timestamp: f64,
     #[pyo3(get)]
     pub event_name: String,
-    #[pyo3(get, set)]
-    pub payload_raw: String,
-    #[pyo3(get, set)]
-    pub format_id: u8,
+    format_id: u8,
     #[pyo3(get, set)]
     pub trace_mark_tgid: u32,
     #[pyo3(get, set)]
-    pub payload: String,
+    pub message: String,
 }
 
 impl EventType for TracingMark {
@@ -159,7 +152,7 @@ impl TemplateEvent for TraceMarkBegin {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) = extract_base_fields(&parts);
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _payload_raw) = extract_base_fields(&parts);
         Some(Self {
             thread_name,
             tid,
@@ -168,10 +161,9 @@ impl TemplateEvent for TraceMarkBegin {
             flags,
             timestamp,
             event_name,
-            payload_raw,
             format_id: 0,
             trace_mark_tgid: cap_parse(captures, "trace_mark_tgid")?,
-            payload: cap_str(captures, "payload")?,
+            message: cap_str(captures, "message")?,
         })
     }
 
@@ -179,7 +171,7 @@ impl TemplateEvent for TraceMarkBegin {
         let template = Self::formats().template(0).unwrap();
         let values: [(&str, Option<TemplateValue>); 2] = [
             ("trace_mark_tgid", Some(TemplateValue::U32(self.trace_mark_tgid))),
-            ("payload", Some(TemplateValue::Str(&self.payload))),
+            ("message", Some(TemplateValue::Str(&self.message))),
         ];
         Ok(template
             .format(&values)
@@ -207,7 +199,7 @@ impl TemplateEvent for TraceMarkEnd {
         captures: &Captures<'_>,
         _format_id: u8,
     ) -> Option<Self> {
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) = extract_base_fields(&parts);
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _payload_raw) = extract_base_fields(&parts);
         Some(Self {
             thread_name,
             tid,
@@ -216,10 +208,9 @@ impl TemplateEvent for TraceMarkEnd {
             flags,
             timestamp,
             event_name,
-            payload_raw,
             format_id: 0,
             trace_mark_tgid: cap_parse(captures, "trace_mark_tgid")?,
-            payload: cap_str(captures, "payload")?,
+            message: cap_str(captures, "message")?,
         })
     }
 
@@ -227,7 +218,7 @@ impl TemplateEvent for TraceMarkEnd {
         let template = Self::formats().template(0).unwrap();
         let values: [(&str, Option<TemplateValue>); 2] = [
             ("trace_mark_tgid", Some(TemplateValue::U32(self.trace_mark_tgid))),
-            ("payload", Some(TemplateValue::Str(&self.payload))),
+            ("message", Some(TemplateValue::Str(&self.message))),
         ];
         Ok(template
             .format(&values)
@@ -316,17 +307,22 @@ impl TracingMark {
         })
     }
 
-    pub fn payload_to_string(&self) -> PyResult<String> {
-        Ok(self.payload_raw.clone())
+    #[getter]
+    pub fn payload(&self) -> &str {
+        &self.payload_raw
+    }
+
+    #[getter]
+    pub fn template(&self) -> &'static str {
+        "{payload}"
     }
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        let payload = self.payload_to_string()?;
         Ok(format_trace_header(
             &self.thread_name, self.tid, self.tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
-            &payload
+            self.payload()
         ))
     }
 }
@@ -334,7 +330,7 @@ impl TracingMark {
 #[pymethods]
 impl TraceMarkBegin {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, format_id, trace_mark_tgid, payload))]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, trace_mark_tgid, message))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         thread_name: String,
@@ -344,10 +340,8 @@ impl TraceMarkBegin {
         flags: String,
         timestamp: f64,
         event_name: String,
-        payload_raw: String,
-        format_id: u8,
         trace_mark_tgid: u32,
-        payload: String,
+        message: String,
     ) -> PyResult<Self> {
         validate_timestamp(timestamp)?;
         Ok(Self {
@@ -358,17 +352,16 @@ impl TraceMarkBegin {
             flags,
             timestamp,
             event_name,
-            payload_raw,
-            format_id,
+            format_id: 0,
             trace_mark_tgid,
-            payload,
+            message,
         })
     }
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
-            "TraceMarkBegin(thread_name='{}', tid={}, timestamp={:.6}, event_name='{}', format_id={}, trace_mark_tgid={}, payload='{}')",
-            self.thread_name, self.tid, self.timestamp, self.event_name, self.format_id, self.trace_mark_tgid, self.payload
+            "TraceMarkBegin(thread_name='{}', tid={}, timestamp={:.6}, event_name='{}', trace_mark_tgid={}, message='{}')",
+            self.thread_name, self.tid, self.timestamp, self.event_name, self.trace_mark_tgid, self.message
         ))
     }
 
@@ -380,10 +373,8 @@ impl TraceMarkBegin {
             && self.flags == other.flags
             && self.timestamp == other.timestamp
             && self.event_name == other.event_name
-            && self.payload_raw == other.payload_raw
-            && self.format_id == other.format_id
             && self.trace_mark_tgid == other.trace_mark_tgid
-            && self.payload == other.payload
+            && self.message == other.message
     }
 
     fn __str__(&self) -> PyResult<String> {
@@ -411,13 +402,28 @@ impl TraceMarkBegin {
         parse_template_event::<Self>(line)
     }
 
+    #[getter]
+    pub fn payload(&self) -> String {
+        format!("B|{}|{}", self.trace_mark_tgid, self.message)
+    }
+
+    #[getter]
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    #[getter]
+    pub fn template(&self) -> &'static str {
+        Self::formats().template(0).unwrap().template_str()
+    }
+
     pub fn payload_to_string(&self) -> PyResult<String> {
         self.render_payload()
     }
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        let payload = self.payload_to_string()?;
+        let payload = self.payload();
         Ok(format_trace_header(
             &self.thread_name, self.tid, self.tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
@@ -429,7 +435,7 @@ impl TraceMarkBegin {
 #[pymethods]
 impl TraceMarkEnd {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, format_id, trace_mark_tgid, payload))]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, trace_mark_tgid, message))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         thread_name: String,
@@ -439,10 +445,8 @@ impl TraceMarkEnd {
         flags: String,
         timestamp: f64,
         event_name: String,
-        payload_raw: String,
-        format_id: u8,
         trace_mark_tgid: u32,
-        payload: String,
+        message: String,
     ) -> PyResult<Self> {
         validate_timestamp(timestamp)?;
         Ok(Self {
@@ -453,17 +457,16 @@ impl TraceMarkEnd {
             flags,
             timestamp,
             event_name,
-            payload_raw,
-            format_id,
+            format_id: 0,
             trace_mark_tgid,
-            payload,
+            message,
         })
     }
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
-            "TraceMarkEnd(thread_name='{}', tid={}, timestamp={:.6}, event_name='{}', format_id={}, trace_mark_tgid={}, payload='{}')",
-            self.thread_name, self.tid, self.timestamp, self.event_name, self.format_id, self.trace_mark_tgid, self.payload
+            "TraceMarkEnd(thread_name='{}', tid={}, timestamp={:.6}, event_name='{}', trace_mark_tgid={}, message='{}')",
+            self.thread_name, self.tid, self.timestamp, self.event_name, self.trace_mark_tgid, self.message
         ))
     }
 
@@ -475,10 +478,8 @@ impl TraceMarkEnd {
             && self.flags == other.flags
             && self.timestamp == other.timestamp
             && self.event_name == other.event_name
-            && self.payload_raw == other.payload_raw
-            && self.format_id == other.format_id
             && self.trace_mark_tgid == other.trace_mark_tgid
-            && self.payload == other.payload
+            && self.message == other.message
     }
 
     fn __str__(&self) -> PyResult<String> {
@@ -506,13 +507,28 @@ impl TraceMarkEnd {
         parse_template_event::<Self>(line)
     }
 
+    #[getter]
+    pub fn payload(&self) -> String {
+        format!("E|{}|{}", self.trace_mark_tgid, self.message)
+    }
+
+    #[getter]
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    #[getter]
+    pub fn template(&self) -> &'static str {
+        Self::formats().template(0).unwrap().template_str()
+    }
+
     pub fn payload_to_string(&self) -> PyResult<String> {
         self.render_payload()
     }
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        let payload = self.payload_to_string()?;
+        let payload = self.payload();
         Ok(format_trace_header(
             &self.thread_name, self.tid, self.tgid, self.cpu,
             &self.flags, self.timestamp, &self.event_name,
@@ -532,7 +548,7 @@ mod tests {
         assert_eq!(mark.event_name, "tracing_mark_write");
         assert_eq!(mark.payload_raw, "anything at all");
         assert_eq!(
-            mark.payload_to_string().expect("payload_to_string must work"),
+            mark.payload(),
             "anything at all"
         );
     }
@@ -543,7 +559,7 @@ mod tests {
             "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|some_custom_message";
         let mark = TraceMarkBegin::parse(line).expect("begin mark must parse");
         assert_eq!(mark.trace_mark_tgid, 10);
-        assert_eq!(mark.payload, "some_custom_message");
+        assert_eq!(mark.message, "some_custom_message");
         assert_eq!(
             mark.payload_to_string().expect("payload_to_string must work"),
             "B|10|some_custom_message"
@@ -559,6 +575,6 @@ mod tests {
         let line = "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: E|10|done";
         let mark = TraceMarkEnd::parse(line).expect("end mark must parse");
         assert_eq!(mark.trace_mark_tgid, 10);
-        assert_eq!(mark.payload, "done");
+        assert_eq!(mark.message, "done");
     }
 }

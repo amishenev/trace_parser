@@ -1,11 +1,13 @@
-use pyo3::prelude::*;
-use std::sync::LazyLock;
 use lexical_core::parse;
+use pyo3::prelude::*;
+use regex::Captures;
+use std::sync::LazyLock;
 
-use crate::common::{validate_timestamp, BaseTraceParts};
+use super::base::{BEGIN_TEMPLATE, contains_begin_marker};
+use crate::common::{BaseTraceParts, EventType, FastMatch, TemplateEvent, validate_timestamp};
+use crate::format_registry::FormatRegistry;
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
 use crate::trace::{extract_base_fields, format_trace_header};
-use super::base::{contains_begin_marker, BEGIN_TEMPLATE};
 
 static TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
@@ -15,6 +17,13 @@ static TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
             ("frame_number", FieldSpec::u32()),
         ],
     )
+});
+
+static FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
+    FormatRegistry::new(vec![crate::format_registry::FormatSpec {
+        kind: 0,
+        template: &TEMPLATE,
+    }])
 });
 
 #[pyclass(skip_from_py_object)]
@@ -35,11 +44,9 @@ pub struct TraceReceiveVsync {
     #[pyo3(get)]
     pub event_name: String,
     #[pyo3(get, set)]
-    pub payload_raw: String,
-    #[pyo3(get, set)]
     pub trace_mark_tgid: u32,
     #[pyo3(get, set)]
-    pub payload: String,
+    pub message: String,
     #[pyo3(get, set)]
     pub frame_number: u32,
 }
@@ -47,7 +54,7 @@ pub struct TraceReceiveVsync {
 #[pymethods]
 impl TraceReceiveVsync {
     #[new]
-    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw, trace_mark_tgid, payload, frame_number))]
+    #[pyo3(signature = (thread_name, tid, tgid, cpu, flags, timestamp, event_name, trace_mark_tgid, message, frame_number))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         thread_name: String,
@@ -57,9 +64,8 @@ impl TraceReceiveVsync {
         flags: String,
         timestamp: f64,
         event_name: String,
-        payload_raw: String,
         trace_mark_tgid: u32,
-        payload: String,
+        message: String,
         frame_number: u32,
     ) -> PyResult<Self> {
         validate_timestamp(timestamp)?;
@@ -71,9 +77,8 @@ impl TraceReceiveVsync {
             flags,
             timestamp,
             event_name,
-            payload_raw,
             trace_mark_tgid,
-            payload,
+            message,
             frame_number,
         })
     }
@@ -93,9 +98,8 @@ impl TraceReceiveVsync {
             && self.flags == other.flags
             && self.timestamp == other.timestamp
             && self.event_name == other.event_name
-            && self.payload_raw == other.payload_raw
             && self.trace_mark_tgid == other.trace_mark_tgid
-            && self.payload == other.payload
+            && self.message == other.message
             && self.frame_number == other.frame_number
     }
 
@@ -109,7 +113,10 @@ impl TraceReceiveVsync {
 
     fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> PyResult<Py<Self>> {
         unsafe {
-            Ok(self.clone().into_pyobject(Python::assume_attached())?.unbind())
+            Ok(self
+                .clone()
+                .into_pyobject(Python::assume_attached())?
+                .unbind())
         }
     }
 
@@ -146,15 +153,17 @@ impl TraceReceiveVsync {
             return None;
         }
         let parts = BaseTraceParts::parse(line)?;
-        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload_raw) = extract_base_fields(&parts);
-        
+        let (thread_name, tid, tgid, cpu, flags, timestamp, event_name, _payload_raw) =
+            extract_base_fields(&parts);
+
         let begin_captures = BEGIN_TEMPLATE.captures(&parts.payload_raw)?;
-        let trace_mark_tgid: u32 = parse(begin_captures.name("trace_mark_tgid")?.as_str().as_bytes()).ok()?;
-        let payload = begin_captures.name("payload")?.as_str().to_string();
-        
-        let captures = TEMPLATE.captures(&payload)?;
+        let trace_mark_tgid: u32 =
+            parse(begin_captures.name("trace_mark_tgid")?.as_str().as_bytes()).ok()?;
+        let message = begin_captures.name("message")?.as_str().to_string();
+
+        let captures = TEMPLATE.captures(&message)?;
         let frame_number = parse(captures.name("frame_number")?.as_str().as_bytes()).ok()?;
-        
+
         Some(Self {
             thread_name,
             tid,
@@ -163,11 +172,25 @@ impl TraceReceiveVsync {
             flags,
             timestamp,
             event_name,
-            payload_raw,
             trace_mark_tgid,
-            payload,
+            message,
             frame_number,
         })
+    }
+
+    #[getter]
+    pub fn payload(&self) -> String {
+        format!("B|{}|{}", self.trace_mark_tgid, self.message)
+    }
+
+    #[getter]
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    #[getter]
+    pub fn template(&self) -> &'static str {
+        Self::formats().template(0).unwrap().template_str()
     }
 
     pub fn payload_to_string(&self) -> PyResult<String> {
@@ -181,13 +204,16 @@ impl TraceReceiveVsync {
         validate_timestamp(self.timestamp)?;
         let inner_message = self.payload_to_string()?;
         let begin_values = [
-            ("trace_mark_tgid", Some(TemplateValue::U32(self.trace_mark_tgid))),
-            ("payload", Some(TemplateValue::Str(&inner_message))),
+            (
+                "trace_mark_tgid",
+                Some(TemplateValue::U32(self.trace_mark_tgid)),
+            ),
+            ("message", Some(TemplateValue::Str(&inner_message))),
         ];
         let full_payload = BEGIN_TEMPLATE
             .format(&begin_values)
             .expect("trace mark begin template must render");
-        
+
         Ok(format_trace_header(
             &self.thread_name,
             self.tid,
@@ -209,12 +235,12 @@ mod tests {
     fn receive_vsync_parses_specific_begin_payload() {
         let line =
             "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|ReceiveVsync 42";
-        let mark = TraceReceiveVsync::parse(line)
-            .expect("receive vsync begin mark must parse");
+        let mark = TraceReceiveVsync::parse(line).expect("receive vsync begin mark must parse");
         assert_eq!(mark.trace_mark_tgid, 10);
         assert_eq!(mark.frame_number, 42);
         assert_eq!(
-            mark.payload_to_string().expect("payload_to_string must work"),
+            mark.payload_to_string()
+                .expect("payload_to_string must work"),
             "ReceiveVsync 42"
         );
         assert_eq!(
@@ -225,10 +251,40 @@ mod tests {
 
     #[test]
     fn receive_vsync_ignores_service_prefix() {
-        let line =
-            "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|[ExtraInfo]ReceiveVsync 42";
-        let mark = TraceReceiveVsync::parse(line)
-            .expect("receive vsync begin mark must parse");
+        let line = "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|[ExtraInfo]ReceiveVsync 42";
+        let mark = TraceReceiveVsync::parse(line).expect("receive vsync begin mark must parse");
         assert_eq!(mark.frame_number, 42);
+    }
+}
+
+impl EventType for TraceReceiveVsync {
+    const EVENT_NAME: &'static str = "tracing_mark_write";
+}
+
+impl FastMatch for TraceReceiveVsync {
+    fn payload_quick_check(line: &str) -> bool {
+        contains_begin_marker(line) && line.contains("ReceiveVsync ")
+    }
+}
+
+impl TemplateEvent for TraceReceiveVsync {
+    fn formats() -> &'static FormatRegistry {
+        &FORMATS
+    }
+
+    fn detect_format(_payload: &str) -> u8 {
+        0
+    }
+
+    fn parse_payload(
+        parts: BaseTraceParts,
+        _captures: &Captures<'_>,
+        _format_id: u8,
+    ) -> Option<Self> {
+        Self::parse(parts.payload_raw.as_str())
+    }
+
+    fn render_payload(&self) -> PyResult<String> {
+        self.payload_to_string()
     }
 }
