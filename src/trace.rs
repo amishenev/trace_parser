@@ -93,6 +93,24 @@ pub fn extract_base_fields(parts: &BaseTraceParts) -> (
     )
 }
 
+/// Форматирует базовую часть trace строки
+#[inline]
+pub fn format_trace_header(
+    thread_name: &str,
+    tid: u32,
+    tgid: u32,
+    cpu: u32,
+    flags: &str,
+    timestamp: f64,
+    event_name: &str,
+    payload: &str,
+) -> String {
+    format!(
+        "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
+        thread_name, tid, tgid, cpu, flags, timestamp, event_name, payload
+    )
+}
+
 #[pymethods]
 impl Trace {
     #[new]

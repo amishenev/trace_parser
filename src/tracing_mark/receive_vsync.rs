@@ -4,7 +4,7 @@ use lexical_core::parse;
 
 use crate::common::{validate_timestamp, BaseTraceParts};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
-use crate::trace::extract_base_fields;
+use crate::trace::{extract_base_fields, format_trace_header};
 use super::base::{contains_begin_marker, BEGIN_TEMPLATE};
 
 static TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
@@ -179,25 +179,24 @@ impl TraceReceiveVsync {
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        let inner_payload = self.payload_to_string()?;
+        let inner_message = self.payload_to_string()?;
         let begin_values = [
             ("trace_mark_tgid", Some(TemplateValue::U32(self.trace_mark_tgid))),
-            ("payload", Some(TemplateValue::Str(&inner_payload))),
+            ("payload", Some(TemplateValue::Str(&inner_message))),
         ];
         let full_payload = BEGIN_TEMPLATE
             .format(&begin_values)
             .expect("trace mark begin template must render");
-
-        Ok(format!(
-            "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
-            self.thread_name,
+        
+        Ok(format_trace_header(
+            &self.thread_name,
             self.tid,
             self.tgid,
             self.cpu,
-            self.flags,
+            &self.flags,
             self.timestamp,
-            self.event_name,
-            full_payload,
+            &self.event_name,
+            &full_payload,
         ))
     }
 }

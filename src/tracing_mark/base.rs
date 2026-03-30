@@ -8,7 +8,7 @@ use crate::common::{
 };
 use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
-use crate::trace::extract_base_fields;
+use crate::trace::{extract_base_fields, format_trace_header};
 
 pub(crate) static BEGIN_TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
@@ -322,16 +322,11 @@ impl TracingMark {
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        Ok(format!(
-            "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
-            self.thread_name,
-            self.tid,
-            self.tgid,
-            self.cpu,
-            self.flags,
-            self.timestamp,
-            self.event_name,
-            self.payload_raw
+        let payload = self.payload_to_string()?;
+        Ok(format_trace_header(
+            &self.thread_name, self.tid, self.tgid, self.cpu,
+            &self.flags, self.timestamp, &self.event_name,
+            &payload
         ))
     }
 }
@@ -422,16 +417,11 @@ impl TraceMarkBegin {
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        Ok(format!(
-            "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
-            self.thread_name,
-            self.tid,
-            self.tgid,
-            self.cpu,
-            self.flags,
-            self.timestamp,
-            self.event_name,
-            self.payload_to_string()?
+        let payload = self.payload_to_string()?;
+        Ok(format_trace_header(
+            &self.thread_name, self.tid, self.tgid, self.cpu,
+            &self.flags, self.timestamp, &self.event_name,
+            &payload
         ))
     }
 }
@@ -522,16 +512,11 @@ impl TraceMarkEnd {
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        Ok(format!(
-            "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
-            self.thread_name,
-            self.tid,
-            self.tgid,
-            self.cpu,
-            self.flags,
-            self.timestamp,
-            self.event_name,
-            self.payload_to_string()?
+        let payload = self.payload_to_string()?;
+        Ok(format_trace_header(
+            &self.thread_name, self.tid, self.tgid, self.cpu,
+            &self.flags, self.timestamp, &self.event_name,
+            &payload
         ))
     }
 }

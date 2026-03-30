@@ -8,7 +8,7 @@ use crate::common::{
 };
 use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
-use crate::trace::extract_base_fields;
+use crate::trace::{extract_base_fields, format_trace_header};
 
 static TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
     PayloadTemplate::new(
@@ -227,21 +227,12 @@ impl TraceSchedSwitch {
 
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
-        Ok(self.to_string_with_payload(&self.payload_to_string()?))
-    }
-
-    fn to_string_with_payload(&self, payload: &str) -> String {
-        format!(
-            "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
-            self.thread_name,
-            self.tid,
-            self.tgid,
-            self.cpu,
-            self.flags,
-            self.timestamp,
-            self.event_name,
-            payload
-        )
+        let payload = self.payload_to_string()?;
+        Ok(format_trace_header(
+            &self.thread_name, self.tid, self.tgid, self.cpu,
+            &self.flags, self.timestamp, &self.event_name,
+            &payload
+        ))
     }
 
     #[getter]
