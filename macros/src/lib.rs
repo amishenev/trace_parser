@@ -18,7 +18,15 @@ mod attrs;
 mod generator;
 mod pymethods;
 
+use attrs::{
+    find_trace_event_attr, find_trace_markers_attr, find_define_template_attrs,
+    find_field_attr,
+};
+use generator::{generate_event_type_impl, generate_fast_match_impl, generate_template_event_impl};
+use pymethods::generate_pymethods_block;
 use proc_macro::TokenStream;
+use quote::quote;
+use syn::{parse_macro_input, DeriveInput, Fields};
 
 /// Derive macro for regular trace events.
 ///
@@ -35,7 +43,51 @@ use proc_macro::TokenStream;
 /// ```
 #[proc_macro_derive(TraceEvent, attributes(trace_event, trace_markers, define_template, field))]
 pub fn derive_trace_event(input: TokenStream) -> TokenStream {
-    unimplemented!("TODO: implement TraceEvent derive macro")
+    let input = parse_macro_input!(input as DeriveInput);
+    
+    // Parse attributes
+    let event_attr = match find_trace_event_attr(&input.attrs) {
+        Some(attr) => attr,
+        None => return syn::Error::new(input.ident.span(), "missing #[trace_event] attribute")
+            .to_compile_error().into(),
+    };
+    
+    let markers_attr = find_trace_markers_attr(&input.attrs);
+    let templates = find_define_template_attrs(&input.attrs);
+    
+    // Parse fields - only named fields with identifiers
+    let fields = match &input.data {
+        syn::Data::Struct(data) => {
+            match &data.fields {
+                Fields::Named(fields) => {
+                    fields.named.iter()
+                        .filter_map(|f| {
+                            f.ident.as_ref().and_then(|ident| {
+                                find_field_attr(&f.attrs).map(|attr| (ident.clone(), attr))
+                            })
+                        })
+                        .collect::<Vec<_>>()
+                }
+                _ => Vec::new(),
+            }
+        }
+        _ => Vec::new(),
+    };
+    
+    // Generate code
+    let event_type_impl = generate_event_type_impl(&input.ident, &event_attr);
+    let fast_match_impl = generate_fast_match_impl(&input.ident, markers_attr.as_ref());
+    let template_event_impl = generate_template_event_impl(&input.ident, &templates, &fields);
+    let pymethods = generate_pymethods_block(&input.ident, &fields);
+    
+    let expanded = quote! {
+        #event_type_impl
+        #fast_match_impl
+        #template_event_impl
+        #pymethods
+    };
+    
+    expanded.into()
 }
 
 /// Derive macro for tracing_mark_write subtypes.

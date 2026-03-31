@@ -54,7 +54,7 @@ pub fn generate_fast_match_impl(
 pub fn generate_template_event_impl(
     struct_name: &Ident,
     templates: &[DefineTemplateAttr],
-    fields: &[(&Ident, &FieldAttr)],
+    fields: &[(Ident, FieldAttr)],
 ) -> TokenStream {
     if templates.is_empty() {
         return quote! {};

@@ -5,29 +5,24 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
 
-/// Generate `#[pymethods]` block for the struct
-pub fn generate_pymethods(
+/// Generate the complete `#[pymethods]` block for the struct
+pub fn generate_pymethods_block(
     struct_name: &Ident,
-    fields: &[(&Ident, &FieldAttr)],
-    is_tracing_mark: bool,
+    fields: &[(Ident, FieldAttr)],
 ) -> TokenStream {
-    let new_fn = generate_new(struct_name, fields);
-    let repr_fn = generate_repr(struct_name, fields);
+    let new_fn = generate_new(fields);
+    let repr_fn = generate_repr(struct_name);
     let eq_fn = generate_eq(struct_name, fields);
-    let str_fn = generate_str(struct_name);
-    let can_be_parsed_fn = generate_can_be_parsed(struct_name);
+    let str_fn = generate_str();
+    let can_be_parsed_fn = generate_can_be_parsed();
     let parse_fn = generate_parse(struct_name);
-    let to_string_fn = generate_to_string(struct_name);
+    let to_string_fn = generate_to_string();
     let copy_fn = generate_copy(struct_name);
     let deepcopy_fn = generate_deepcopy(struct_name);
     
     // Generate field getters/setters for Python API
     // Filters out private fields (not exposed to Python)
     let field_accessors = fields.iter().filter(|(_, attr)| !attr.private).map(|(field_name, field_attr)| {
-        let field_name_str = field_attr.name.as_ref()
-            .map(|s| s.clone())
-            .unwrap_or_else(|| field_name.to_string());
-        
         if field_attr.optional {
             // Optional field: Python gets Option<T>, can be None
             if field_attr.readonly {
@@ -125,8 +120,8 @@ pub fn generate_pymethods(
 }
 
 /// Generate `#[new]` constructor
-fn generate_new(struct_name: &Ident, fields: &[(&Ident, &FieldAttr)]) -> TokenStream {
-    let field_names: Vec<&Ident> = fields.iter().map(|(name, _)| *name).collect();
+fn generate_new(fields: &[(Ident, FieldAttr)]) -> TokenStream {
+    let field_names: Vec<&Ident> = fields.iter().map(|(name, _)| name).collect();
     
     let field_params: Vec<TokenStream> = fields.iter().map(|(field_name, field_attr)| {
         let ty = match field_attr.ty.as_str() {
@@ -176,14 +171,7 @@ fn generate_new(struct_name: &Ident, fields: &[(&Ident, &FieldAttr)]) -> TokenSt
 }
 
 /// Generate `__repr__` method
-fn generate_repr(struct_name: &Ident, fields: &[(&Ident, &FieldAttr)]) -> TokenStream {
-    let field_debugs: Vec<TokenStream> = fields.iter().map(|(field_name, _)| {
-        let field_name_str = field_name.to_string();
-        quote! {
-            .field(#field_name_str, &self.#field_name)
-        }
-    }).collect();
-
+fn generate_repr(struct_name: &Ident) -> TokenStream {
     let struct_name_str = struct_name.to_string();
     
     quote! {
@@ -194,7 +182,7 @@ fn generate_repr(struct_name: &Ident, fields: &[(&Ident, &FieldAttr)]) -> TokenS
 }
 
 /// Generate `__eq__` method
-fn generate_eq(struct_name: &Ident, fields: &[(&Ident, &FieldAttr)]) -> TokenStream {
+fn generate_eq(struct_name: &Ident, fields: &[(Ident, FieldAttr)]) -> TokenStream {
     let field_comparisons: Vec<TokenStream> = fields.iter().map(|(field_name, _)| {
         quote! { self.#field_name == other.#field_name }
     }).collect();
@@ -207,7 +195,7 @@ fn generate_eq(struct_name: &Ident, fields: &[(&Ident, &FieldAttr)]) -> TokenStr
 }
 
 /// Generate `__str__` method (delegates to to_string)
-fn generate_str(struct_name: &Ident) -> TokenStream {
+fn generate_str() -> TokenStream {
     quote! {
         fn __str__(&self) -> ::pyo3::PyResult<::std::string::String> {
             self.to_string()
@@ -216,7 +204,7 @@ fn generate_str(struct_name: &Ident) -> TokenStream {
 }
 
 /// Generate `can_be_parsed` static method
-fn generate_can_be_parsed(struct_name: &Ident) -> TokenStream {
+fn generate_can_be_parsed() -> TokenStream {
     quote! {
         #[staticmethod]
         fn can_be_parsed(line: &str) -> bool {
@@ -239,7 +227,7 @@ fn generate_parse(struct_name: &Ident) -> TokenStream {
 }
 
 /// Generate `to_string` method
-fn generate_to_string(struct_name: &Ident) -> TokenStream {
+fn generate_to_string() -> TokenStream {
     quote! {
         fn to_string(&self) -> ::pyo3::PyResult<::std::string::String> {
             ::trace_parser::trace::validate_timestamp(self.timestamp)?;
