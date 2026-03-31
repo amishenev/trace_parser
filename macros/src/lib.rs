@@ -14,7 +14,12 @@
 //! - `#[define_template("...")]` - payload template (can be multiple)
 //! - `#[field(ty = "...", name = "...", optional)]` - field attributes
 
+#[cfg(test)]
+pub mod attrs;
+
+#[cfg(not(test))]
 mod attrs;
+
 mod generator;
 mod pymethods;
 
