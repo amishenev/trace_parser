@@ -14,6 +14,8 @@
 //! - `#[define_template("...")]` - payload template (can be multiple)
 //! - `#[field(ty = "...", name = "...", optional)]` - field attributes
 
+mod attrs;
+
 use proc_macro::TokenStream;
 
 /// Derive macro for regular trace events.
