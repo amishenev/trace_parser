@@ -1,5 +1,6 @@
 # trace_parser
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/7892576b8b5a494398bb4e93ee49d9fa)](https://app.codacy.com/gh/amishenev/trace_parser?utm_source=github.com&utm_medium=referral&utm_content=amishenev/trace_parser&utm_campaign=Badge_Grade)
 [![CI](https://github.com/amishenev/trace_parser/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/amishenev/trace_parser/actions/workflows/ci.yml)
 [![Release](https://github.com/amishenev/trace_parser/actions/workflows/release.yml/badge.svg)](https://github.com/amishenev/trace_parser/actions/workflows/release.yml)
 [![Codacy Coverage](https://app.codacy.com/project/badge/Coverage/amishenev/trace_parser)](https://app.codacy.com/gh/amishenev/trace_parser/dashboard)
