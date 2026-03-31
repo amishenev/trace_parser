@@ -65,12 +65,21 @@ impl Parse for DefineTemplateAttr {
     }
 }
 
-/// Parsed `#[field(ty = "...", name = "...", optional)]` attribute
+/// Parsed `#[field(ty = "...", name = "...", optional, readonly, private)]` attribute
+///
+/// Field attributes control how struct fields are exposed to Python:
+/// - `ty`: Type for payload parsing (string, u32, i32, f64, bool_int)
+/// - `name`: Custom name in payload template (defaults to field name)
+/// - `optional`: Field is Option<T>, can be None in Python
+/// - `readonly`: Field has getter only, no setter (e.g., event_name)
+/// - `private`: Field is not exposed to Python (internal use only)
 #[derive(Debug, Clone)]
 pub struct FieldAttr {
     pub ty: String,
     pub name: Option<String>,
     pub optional: bool,
+    pub readonly: bool,
+    pub private: bool,
 }
 
 impl Parse for FieldAttr {
@@ -78,13 +87,22 @@ impl Parse for FieldAttr {
         let mut ty = None;
         let mut name = None;
         let mut optional = false;
+        let mut readonly = false;
+        let mut private = false;
 
         // Parse comma-separated key-value pairs
         while !input.is_empty() {
             let key: Ident = input.parse()?;
 
-            if key == "optional" {
-                optional = true;
+            if key == "optional" || key == "readonly" || key == "private" {
+                // Boolean flags
+                if key == "optional" {
+                    optional = true;
+                } else if key == "readonly" {
+                    readonly = true;
+                } else if key == "private" {
+                    private = true;
+                }
             } else {
                 input.parse::<Token![=]>()?;
                 let value: LitStr = input.parse()?;
@@ -104,7 +122,7 @@ impl Parse for FieldAttr {
 
         let ty = ty.ok_or_else(|| syn::Error::new(input.span(), "missing 'ty' attribute"))?;
 
-        Ok(Self { ty, name, optional })
+        Ok(Self { ty, name, optional, readonly, private })
     }
 }
 

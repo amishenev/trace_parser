@@ -16,6 +16,7 @@
 
 mod attrs;
 mod generator;
+mod pymethods;
 
 use proc_macro::TokenStream;
 
