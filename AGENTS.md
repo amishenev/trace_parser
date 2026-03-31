@@ -574,4 +574,14 @@ Recent benchmark reference points for `sched_switch` on this machine:
   - `TraceSchedSwitch::can_be_parsed` about `111 ns/op`
   - `TraceSchedSwitch::parse().is_some()` about `147 ns/op`
 
+## Codacy Coverage
+
+To enable coverage reporting on Codacy:
+
+1. Go to https://app.codacy.com and add the repository
+2. Get the Project Token from Settings → Coverage
+3. Add GitHub Secret `CODACY_PROJECT_TOKEN` with the token value
+
+Coverage is automatically uploaded from CI workflow.
+
 Treat these only as rough regression anchors, not hard targets.
