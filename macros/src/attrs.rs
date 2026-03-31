@@ -154,3 +154,93 @@ pub fn find_field_attr(attrs: &[Attribute]) -> Option<FieldAttr> {
         .find(|attr| attr.path().is_ident("field"))
         .and_then(|attr| attr.parse_args().ok())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quote::quote;
+
+    #[test]
+    fn test_trace_event_attr_basic() {
+        let tokens = quote! { name = "sched_switch" };
+        let attr: TraceEventAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.name, "sched_switch");
+        assert!(attr.aliases.is_empty());
+    }
+
+    #[test]
+    fn test_trace_event_attr_with_aliases() {
+        let tokens = quote! { name = "sched_switch", aliases = ["sched_sw", "switch"] };
+        let attr: TraceEventAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.name, "sched_switch");
+        assert_eq!(attr.aliases, vec!["sched_sw", "switch"]);
+    }
+
+    #[test]
+    fn test_trace_markers_attr() {
+        let tokens = quote! { "B|", "ReceiveVsync" };
+        let attr: TraceMarkersAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.0, vec!["B|", "ReceiveVsync"]);
+    }
+
+    #[test]
+    fn test_define_template_attr() {
+        let tokens = quote! { "prev_comm={prev_comm} prev_pid={prev_pid}" };
+        let attr: DefineTemplateAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.0, "prev_comm={prev_comm} prev_pid={prev_pid}");
+    }
+
+    #[test]
+    fn test_field_attr_basic() {
+        let tokens = quote! { ty = "string" };
+        let attr: FieldAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.ty, "string");
+        assert!(attr.name.is_none());
+        assert!(!attr.optional);
+        assert!(!attr.readonly);
+        assert!(!attr.private);
+    }
+
+    #[test]
+    fn test_field_attr_with_name() {
+        let tokens = quote! { ty = "u32", name = "state" };
+        let attr: FieldAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.ty, "u32");
+        assert_eq!(attr.name, Some("state".to_string()));
+    }
+
+    #[test]
+    fn test_field_attr_optional() {
+        let tokens = quote! { ty = "u32", optional };
+        let attr: FieldAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.ty, "u32");
+        assert!(attr.optional);
+    }
+
+    #[test]
+    fn test_field_attr_readonly() {
+        let tokens = quote! { ty = "string", readonly };
+        let attr: FieldAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.ty, "string");
+        assert!(attr.readonly);
+    }
+
+    #[test]
+    fn test_field_attr_private() {
+        let tokens = quote! { ty = "u8", private };
+        let attr: FieldAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.ty, "u8");
+        assert!(attr.private);
+    }
+
+    #[test]
+    fn test_field_attr_all_flags() {
+        let tokens = quote! { ty = "u32", name = "state", optional, readonly, private };
+        let attr: FieldAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.ty, "u32");
+        assert_eq!(attr.name, Some("state".to_string()));
+        assert!(attr.optional);
+        assert!(attr.readonly);
+        assert!(attr.private);
+    }
+}
