@@ -38,5 +38,11 @@ jobs:
           path: coverage-html/
           retention-days: 7
 
+      - name: Upload coverage to Codacy
+        uses: codacy/codacy-coverage-reporter-action@v1
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          coverage-reports: lcov.info
+
       - name: Print coverage summary
         run: cargo llvm-cov

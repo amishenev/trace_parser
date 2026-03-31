@@ -396,6 +396,18 @@ ci: expand Python version matrix
 **Commitlint:**
 - Проверка формата commit messages
 
+**Coverage (coverage.yml):**
+- Генерация отчёта покрытия через cargo-llvm-cov
+- Загрузка HTML артефакта
+- Отправка отчёта в Codacy
+
+### Настройка Codacy
+
+1. Зарегистрироваться на https://app.codacy.com
+2. Добавить репозиторий
+3. Получить Project Token в Settings → Coverage
+4. Добавить GitHub Secret `CODACY_PROJECT_TOKEN`
+
 ### Пример релиза
 
 ```bash

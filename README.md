@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/amishenev/trace_parser/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/amishenev/trace_parser/actions/workflows/ci.yml)
 [![Release](https://github.com/amishenev/trace_parser/actions/workflows/release.yml/badge.svg)](https://github.com/amishenev/trace_parser/actions/workflows/release.yml)
+[![Codacy Coverage](https://app.codacy.com/project/badge/Coverage/amishenev/trace_parser)](https://app.codacy.com/gh/amishenev/trace_parser/dashboard)
 
 `trace_parser` is a `Rust + PyO3` library for parsing large text `ftrace` / `tracefs` logs.
 
