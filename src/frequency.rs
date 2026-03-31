@@ -8,6 +8,7 @@ use crate::common::{
 };
 use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
+use crate::register_parser;
 use crate::trace::{extract_base_fields, format_trace_header};
 
 static CPU_TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
@@ -492,3 +493,7 @@ mod tests {
         assert_eq!(output, line);
     }
 }
+
+// Register parsers at compile time
+register_parser!("cpu_frequency", TraceCpuFrequency);
+register_parser!("clock_set_rate", TraceDevFrequency);

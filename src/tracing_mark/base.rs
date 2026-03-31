@@ -50,14 +50,6 @@ pub(crate) static END_FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
 
 use crate::common::parse_event;
 
-pub(crate) fn contains_begin_marker(line: &str) -> bool {
-    line.contains(" B|") || line.contains(": B|") || line.contains("tracing_mark_write: B|")
-}
-
-pub(crate) fn contains_end_marker(line: &str) -> bool {
-    line.contains(" E|") || line.contains(": E|") || line.contains("tracing_mark_write: E|")
-}
-
 #[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct TracingMark {
@@ -137,9 +129,7 @@ impl EventType for TraceMarkBegin {
 }
 
 impl FastMatch for TraceMarkBegin {
-    fn payload_quick_check(line: &str) -> bool {
-        contains_begin_marker(line)
-    }
+    const PAYLOAD_MARKERS: &'static [&'static [u8]] = &[b"B|"];
 }
 
 impl TemplateEvent for TraceMarkBegin {
@@ -184,9 +174,7 @@ impl EventType for TraceMarkEnd {
 }
 
 impl FastMatch for TraceMarkEnd {
-    fn payload_quick_check(line: &str) -> bool {
-        contains_end_marker(line)
-    }
+    const PAYLOAD_MARKERS: &'static [&'static [u8]] = &[b"E|"];
 }
 
 impl TemplateEvent for TraceMarkEnd {

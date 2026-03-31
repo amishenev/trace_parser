@@ -65,14 +65,34 @@ pub(crate) trait EventType {
 }
 
 pub(crate) trait FastMatch: EventType {
+    /// Маркеры для простой проверки payload (автоматическая SIMD проверка)
+    const PAYLOAD_MARKERS: &'static [&'static [u8]] = &[];
+    
+    /// Быстрая проверка: event_name && маркеры && payload_quick_check
+    /// Все три условия должны выполниться
     fn quick_check(line: &str) -> bool {
-        if let Some(event_name) = extract_event_name(line) {
-            Self::matches_event_name(event_name) && Self::payload_quick_check(line)
-        } else {
-            false
+        let Some(event_name) = extract_event_name(line) else {
+            return false;
+        };
+
+        // 1. Проверка event_name
+        if !Self::matches_event_name(event_name) {
+            return false;
         }
+
+        // 2. Проверка payload маркеров (SIMD)
+        if !Self::PAYLOAD_MARKERS.iter()
+            .all(|m| memmem::find(line.as_bytes(), m).is_some())
+        {
+            return false;
+        }
+
+        // 3. Кастомная проверка payload (если переопределена)
+        Self::payload_quick_check(line)
     }
 
+    /// Кастомная проверка payload (для сложной логики)
+    /// По умолчанию всегда true
     fn payload_quick_check(_line: &str) -> bool {
         true
     }

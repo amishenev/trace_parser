@@ -328,8 +328,19 @@ PayloadTemplate::new(
 
 Для оптимизации используется двухуровневая проверка:
 
-1. `FastMatch::quick_check` — быстрая проверка через `extract_event_name()` (SIMD memchr)
+1. `FastMatch::quick_check` — быстрая проверка через:
+   - `extract_event_name()` (SIMD memchr) для event_name
+   - `PAYLOAD_MARKERS` (SIMD memchr) для payload маркеров
+   - `payload_quick_check()` для кастомной сложной логики
+
 2. Полноценный regex-парсинг только после успешной быстрой проверки
+
+**Примеры PAYLOAD_MARKERS:**
+- `TraceReceiveVsync`: `&[b"B|", b"ReceiveVsync"]`
+- `TraceMarkBegin`: `&[b"B|"]`
+- `TraceMarkEnd`: `&[b"E|"]`
+
+**tracing_mark_registry:** отдельный реестр для подтипов tracing_mark_write с явным порядком парсинга.
 
 ## Конвенции разработки
 
@@ -489,6 +500,12 @@ TracingMark (базовый)
 ├── TraceMarkEnd (E|tgid|payload)
 └── TraceReceiveVsync (специфичный Begin)
 ```
+
+**Порядок парсинга (tracing_mark_registry):**
+1. Зарегистрированные специфичные подтипы (ReceiveVsync, RequestVsync, SubmitVsync...)
+2. TraceMarkBegin (захардкожено)
+3. TraceMarkEnd (захардкожено)
+4. TracingMark (fallback)
 
 ## Отложенные улучшения
 

@@ -219,15 +219,20 @@ Important constraint for future work:
 ### Fast-match heuristics
 
 - `FastMatch::quick_check` uses `extract_event_name()` (SIMD via memchr) for event name extraction
+- `FastMatch::PAYLOAD_MARKERS` — automatic SIMD payload checking with `memmem::find`
+- `FastMatch::payload_quick_check()` — custom complex logic (override when markers aren't enough)
 - `contains_all(line, [...])` and `contains_any(line, [...])` helpers exist for future multi-format heuristics
 - `TraceDevFrequency` overrides `payload_quick_check` to require `clk=ddr_devfreq` or `clk=l3c_devfreq`
-- Shared helpers `contains_begin_marker` / `contains_end_marker` back `TraceMarkBegin`, `TraceMarkEnd`, and `TraceReceiveVsync`
+- `TraceReceiveVsync` uses `PAYLOAD_MARKERS = &[b"B|", b"ReceiveVsync"]`
+- `TraceMarkBegin` uses `PAYLOAD_MARKERS = &[b"B|"]`
+- `TraceMarkEnd` uses `PAYLOAD_MARKERS = &[b"E|"]`
 - The heavy regex work is now gated by cheap fast checks, and `parse_trace()` routes a line to a single parser after these heuristics pass
 - `benches/can_be_parsed.rs` captures the cost of each check path; rerun it whenever you touch the heuristic to judge regression risk
 - Current design intent:
   - for ordinary non-`tracing_mark` events, `event_name` is usually enough for `quick_check`
-  - payload-specific `payload_quick_check` should be used sparingly, mostly where false positives would be common or there is subtype routing
-  - `tracing_mark` subtypes are the main place where payload quick checks matter
+  - payload-specific `PAYLOAD_MARKERS` should be used for simple marker checks (SIMD optimized)
+  - `payload_quick_check()` should be used sparingly for complex logic that markers can't handle
+  - `tracing_mark` subtypes use a separate registry with explicit parsing order
 - `contains_all(...)` may be unused at times, but keep it because it is intended for future multi-format event matching
 
 ## Payload templates
@@ -332,9 +337,20 @@ Current intended usage:
 - `TraceMarkBegin`: payload shape `B|trace_mark_tgid|payload`
 - `TraceMarkEnd`: payload shape `E|trace_mark_tgid|payload`
 - `TraceReceiveVsync`: specific begin mark example
-- keep `TracingMark` on the default `FastMatch` behavior; the class already participates in fast matching via `event_name`
-- `TraceMarkBegin` and `TraceMarkEnd` should specialize only the begin/end payload marker checks
-- `TraceReceiveVsync` should reuse the shared begin-marker helper and add only its own message clue such as `ReceiveVsync `
+
+### Parsing order (tracing_mark_registry.rs)
+
+1. Registered specific subtypes (ReceiveVsync, RequestVsync, SubmitVsync, etc.)
+2. TraceMarkBegin (hardcoded)
+3. TraceMarkEnd (hardcoded)
+4. TracingMark (fallback)
+
+### FastMatch for tracing_mark
+
+- `TraceReceiveVsync`: `PAYLOAD_MARKERS = &[b"B|", b"ReceiveVsync"]`
+- `TraceMarkBegin`: `PAYLOAD_MARKERS = &[b"B|"]`
+- `TraceMarkEnd`: `PAYLOAD_MARKERS = &[b"E|"]`
+- `TracingMark`: default (no markers, accepts any payload)
 
 ### Important unfinished work
 

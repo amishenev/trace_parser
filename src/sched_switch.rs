@@ -8,6 +8,7 @@ use crate::common::{
 };
 use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
+use crate::register_parser;
 use crate::trace::{extract_base_fields, format_trace_header};
 
 static TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
@@ -312,3 +313,6 @@ mod tests {
         );
     }
 }
+
+// Register parser at compile time
+register_parser!("sched_switch", TraceSchedSwitch);

@@ -3,10 +3,11 @@ use pyo3::prelude::*;
 use regex::Captures;
 use std::sync::LazyLock;
 
-use super::base::{BEGIN_TEMPLATE, contains_begin_marker};
+use super::base::BEGIN_TEMPLATE;
 use crate::common::{BaseTraceParts, EventType, FastMatch, TemplateEvent, validate_timestamp};
 use crate::format_registry::FormatRegistry;
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
+use crate::register_tracing_mark_parser;
 use crate::trace::{extract_base_fields, format_trace_header};
 
 static TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
@@ -144,7 +145,7 @@ impl TraceReceiveVsync {
 
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        contains_begin_marker(line) && line.contains("ReceiveVsync ")
+        Self::quick_check(line)
     }
 
     #[staticmethod]
@@ -232,9 +233,7 @@ impl EventType for TraceReceiveVsync {
 }
 
 impl FastMatch for TraceReceiveVsync {
-    fn payload_quick_check(line: &str) -> bool {
-        contains_begin_marker(line) && line.contains("ReceiveVsync ")
-    }
+    const PAYLOAD_MARKERS: &'static [&'static [u8]] = &[b"B|", b"ReceiveVsync"];
 }
 
 impl TemplateEvent for TraceReceiveVsync {
@@ -288,3 +287,6 @@ mod tests {
         assert_eq!(mark.frame_number, 42);
     }
 }
+
+// Register tracing_mark parser at compile time
+register_tracing_mark_parser!(TraceReceiveVsync);

@@ -6,6 +6,7 @@ use lexical_core::parse;
 use crate::common::{validate_timestamp, BaseTraceParts, EventType, FastMatch, TemplateEvent};
 use crate::format_registry::{FormatRegistry, FormatSpec};
 use crate::payload_template::{FieldSpec, PayloadTemplate, TemplateValue};
+use crate::register_parser;
 use crate::trace::{format_trace_header, extract_base_fields};
 
 static TEMPLATE: LazyLock<PayloadTemplate> = LazyLock::new(|| {
@@ -240,3 +241,7 @@ mod tests {
         assert_eq!(result, line);
     }
 }
+
+// Register parser at compile time for both exit1 and exit2
+register_parser!("exit1", TraceExit);
+register_parser!("exit2", TraceExit);

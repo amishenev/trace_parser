@@ -178,25 +178,25 @@ struct TraceSchedSwitch {
 
 ---
 
-### 2.2 Автоматическая регистрация в dispatch таблице
+### 2.2 Автоматическая регистрация в dispatch таблице ✅ ВЫПОЛНЕНО
 
 **Проблема:** Нужно вручную добавлять каждое событие в `dispatch_parse()`.
 
 **Решение:** Использовать `inventory` crate для авто-регистрации:
 
 ```rust
-inventory::submit! {
-    RegisteredParser {
-        event_name: "sched_switch",
-        parser: ParseFn::new::<TraceSchedSwitch>(),
-    }
-}
+// Обычные события
+register_parser!("sched_switch", TraceSchedSwitch);
+
+// tracing_mark подтипы
+register_tracing_mark_parser!(TraceReceiveVsync);
 ```
 
-**Или через макрос:**
-```rust
-#[trace_event(name = "sched_switch", register = true)]
-```
+**Два независимых registry:**
+1. `registry.rs` — для обычных событий (event_name → один парсер)
+2. `tracing_mark_registry.rs` — для tracing_mark подтипов (явный порядок)
+
+**Выгода:** Новое событие добавляется в 1 файл, не нужно обновлять dispatch таблицу.
 
 ---
 
@@ -324,6 +324,7 @@ agg = TraceAggregator()
 - [x] Кэширование в CI (#3.2)
 - [x] `parse_trace_file()` для массового парсинга (#1.3)
 - [x] SIMD оптимизации (#1.4) — memchr + lexical-core ✅
+- [x] Авто-регистрация событий (#2.2) ✅
 
 ### Среднесрочная (1-2 месяца)
 - [ ] Proc-macro для событий (#2.1)
