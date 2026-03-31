@@ -135,3 +135,19 @@ pub fn generate_template_event_impl(
         }
     }
 }
+
+/// Generate registration code for regular trace events
+pub fn generate_registration(struct_name: &Ident, event_attr: &TraceEventAttr) -> TokenStream {
+    let name = &event_attr.name;
+    
+    quote! {
+        ::trace_parser::register_parser!(#name, #struct_name);
+    }
+}
+
+/// Generate registration code for tracing_mark events
+pub fn generate_tracing_mark_registration(struct_name: &Ident) -> TokenStream {
+    quote! {
+        ::trace_parser::register_tracing_mark_parser!(#struct_name);
+    }
+}

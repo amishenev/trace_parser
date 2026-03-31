@@ -17,13 +17,13 @@
 struct TraceSchedSwitch {
     #[field(ty = "string")]
     prev_comm: String,
-    
+
     #[field(ty = "u32")]
     prev_pid: u32,
-    
+
     #[field(ty = "i32")]
     prev_prio: i32,
-    
+
     #[field(ty = "string", name = "prev_state")]
     previous_state: String,  // кастомное имя поля
 }
@@ -140,11 +140,12 @@ impl FastMatch for TraceSchedWakeup {
 - [ ] `__copy__`, `__deepcopy__`
 - [ ] `can_be_parsed()`, `parse()`, `to_string()`
 - [ ] Геттеры/сеттеры для полей
+- [ ] Геттеры `payload()` и `template()`
 
 **Длительность:** 2-3 дня
 
 ### Этап 5: Интеграция
-- [ ] Регистрация через `register_parser!`
+- [x] Регистрация через `register_parser!`
 - [ ] Регистрация через `register_tracing_mark_parser!`
 - [ ] Тесты интеграции с существующим кодом
 
@@ -167,10 +168,10 @@ impl FastMatch for TraceSchedWakeup {
 | 2. Парсинг атрибутов | ✅ Завершено | 2026-03-31 | 2026-03-31 |
 | 3. Генерация traits | ✅ Завершено | 2026-03-31 | 2026-03-31 |
 | 4. Python API | ✅ Завершено | 2026-03-31 | 2026-03-31 |
-| 5. Интеграция | ⏳ В процессе | | |
+| 5. Интеграция | 🔄 В процессе | 2026-03-31 | |
 | 6. Тесты и документация | ⏳ Ожидает | | |
 
-**Общий прогресс:** 4/6 этапов (67%)
+**Общий прогресс:** 4.5/6 этапов (75%)
 
 ---
 

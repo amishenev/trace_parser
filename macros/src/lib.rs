@@ -22,7 +22,10 @@ use attrs::{
     find_trace_event_attr, find_trace_markers_attr, find_define_template_attrs,
     find_field_attr,
 };
-use generator::{generate_event_type_impl, generate_fast_match_impl, generate_template_event_impl};
+use generator::{
+    generate_event_type_impl, generate_fast_match_impl, 
+    generate_template_event_impl, generate_registration,
+};
 use pymethods::generate_pymethods_block;
 use proc_macro::TokenStream;
 use quote::quote;
@@ -79,14 +82,16 @@ pub fn derive_trace_event(input: TokenStream) -> TokenStream {
     let fast_match_impl = generate_fast_match_impl(&input.ident, markers_attr.as_ref());
     let template_event_impl = generate_template_event_impl(&input.ident, &templates, &fields);
     let pymethods = generate_pymethods_block(&input.ident, &fields);
-    
+    let registration = generate_registration(&input.ident, &event_attr);
+
     let expanded = quote! {
         #event_type_impl
         #fast_match_impl
         #template_event_impl
         #pymethods
+        #registration
     };
-    
+
     expanded.into()
 }
 
