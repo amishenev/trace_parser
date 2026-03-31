@@ -15,6 +15,7 @@
 //! - `#[field(ty = "...", name = "...", optional)]` - field attributes
 
 mod attrs;
+mod generator;
 
 use proc_macro::TokenStream;
 
