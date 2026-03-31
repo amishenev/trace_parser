@@ -17,6 +17,9 @@ memchr = "2.7"
 pyo3 = { version = "0.28", features = ["abi3-py310"] }
 regex = "1.12"
 
+[dev-dependencies]
+tempfile = "3"
+
 [[bench]]
 name = "can_be_parsed"
 harness = false

@@ -558,4 +558,38 @@ mod tests {
         assert_eq!(trace.prio, 120);
         assert_eq!(trace.target_cpu, 0);
     }
+
+    #[test]
+    fn sched_wakeup_new_and_methods() {
+        let trace = TraceSchedWakeup::new(
+            "task".into(), 100, 100, 0, "....".into(), 1.0,
+            "bash".into(), 123, 120, 0, Some(5),
+        ).unwrap();
+        assert_eq!(trace.thread_name, "task");
+        assert_eq!(trace.comm, "bash");
+        assert_eq!(trace.pid, 123);
+        assert_eq!(trace.reason, Some(5));
+        assert_eq!(trace.format_id, 1);
+        assert_eq!(trace.payload().unwrap(), "comm=bash pid=123 prio=120 target_cpu=000 reason=5");
+    }
+
+    #[test]
+    fn sched_wakeup_new_constructor() {
+        let trace = TraceSchedWakeupNew::new(
+            "task".into(), 100, 100, 0, "....".into(), 1.0,
+            "bash".into(), 123, 120, 0,
+        ).unwrap();
+        assert_eq!(trace.thread_name, "task");
+        assert_eq!(trace.comm, "bash");
+        assert_eq!(trace.payload().unwrap(), "comm=bash pid=123 prio=120 target_cpu=000");
+    }
+
+    #[test]
+    fn sched_wakeup_template() {
+        let trace = TraceSchedWakeup::new(
+            "task".into(), 100, 100, 0, "....".into(), 1.0,
+            "bash".into(), 123, 120, 0, None,
+        ).unwrap();
+        assert_eq!(trace.template(), "comm={comm} pid={pid} prio={prio} target_cpu={target_cpu}");
+    }
 }

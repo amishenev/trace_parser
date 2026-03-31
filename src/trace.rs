@@ -253,4 +253,36 @@ mod tests {
             "prev_comm=bash prev_pid=1977 ==> next_comm=worker next_pid=123"
         );
     }
+
+    #[test]
+    fn trace_new_and_repr() {
+        let trace = Trace::new(
+            "bash".into(), 1234, 1234, 0, "....".into(), 12345.678901, "test".into(), "payload".into()
+        ).unwrap();
+        assert_eq!(trace.thread_name, "bash");
+        assert_eq!(trace.thread_tid, 1234);
+        assert_eq!(trace.thread_tgid, 1234);
+        assert_eq!(trace.cpu, 0);
+        assert_eq!(trace.flags, "....");
+        assert_eq!(trace.timestamp, 12345.678901);
+        assert_eq!(trace.event_name, "test");
+        assert_eq!(trace.payload_raw, "payload");
+    }
+
+    #[test]
+    fn trace_copy_and_clone() {
+        let trace = Trace::new(
+            "bash".into(), 1234, 1234, 0, "....".into(), 1.0, "test".into(), "payload".into()
+        ).unwrap();
+        let copy = trace.clone();
+        assert_eq!(trace, copy);
+    }
+
+    #[test]
+    fn trace_template() {
+        let trace = Trace::new(
+            "bash".into(), 1234, 1234, 0, "....".into(), 1.0, "test".into(), "payload".into()
+        ).unwrap();
+        assert_eq!(trace.template(), "{payload}");
+    }
 }

@@ -555,6 +555,15 @@ mod tests {
     }
 
     #[test]
+    fn tracing_mark_custom_payload() {
+        let line = "task-100 (100) [000] .... 1.0: tracing_mark_write: custom_payload_here";
+        let mark = TracingMark::parse(line).expect("must parse");
+        assert_eq!(mark.payload_raw, "custom_payload_here");
+        assert_eq!(mark.payload(), "custom_payload_here");
+        assert_eq!(mark.template(), "{payload}");
+    }
+
+    #[test]
     fn trace_mark_begin_parses_generic_begin_payload() {
         let line =
             "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|some_custom_message";
@@ -577,5 +586,37 @@ mod tests {
         let mark = TraceMarkEnd::parse(line).expect("end mark must parse");
         assert_eq!(mark.trace_mark_tgid, 10);
         assert_eq!(mark.message, "done");
+    }
+
+    #[test]
+    fn trace_mark_end_to_string() {
+        let line = "task-100 (100) [000] .... 1.000000: tracing_mark_write: E|100|finished";
+        let mark = TraceMarkEnd::parse(line).expect("must parse");
+        let result = mark.to_string().expect("to_string must work");
+        assert_eq!(result, line);
+    }
+
+    #[test]
+    fn trace_mark_begin_new_and_methods() {
+        let mark = TraceMarkBegin::new(
+            "task".into(), 100, 100, 0, "....".into(), 1.0, "tracing_mark_write".into(),
+            100, "message".into(),
+        ).unwrap();
+        assert_eq!(mark.thread_name, "task");
+        assert_eq!(mark.thread_tid, 100);
+        assert_eq!(mark.trace_mark_tgid, 100);
+        assert_eq!(mark.message, "message");
+        assert_eq!(mark.payload(), "B|100|message");
+    }
+
+    #[test]
+    fn trace_mark_end_new_and_methods() {
+        let mark = TraceMarkEnd::new(
+            "task".into(), 100, 100, 0, "....".into(), 1.0, "tracing_mark_write".into(),
+            100, "done".into(),
+        ).unwrap();
+        assert_eq!(mark.thread_name, "task");
+        assert_eq!(mark.message, "done");
+        assert_eq!(mark.payload(), "E|100|done");
     }
 }
