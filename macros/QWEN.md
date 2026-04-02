@@ -133,6 +133,43 @@ struct TraceReceiveVsync {
 
 Шаблон payload. Можно указать несколько для разных форматов.
 
+#### Явное указание id (опционально)
+
+```rust
+// Явный id=0
+#[define_template("comm={comm} pid={pid}", id = 0)]
+// id=1 по умолчанию (второй темплейт)
+#[define_template("comm={comm} pid={pid} reason={reason}")]
+```
+
+**Правила auto-assign:**
+- Первый темплейт без `id` → `id = 0`
+- Второй темплейт без `id` → `id = 1`
+- Явный `id = N` → использует N
+- Auto-assign продолжает после максимального явного id
+
+**Примеры:**
+```rust
+// [None, None] → [0, 1]
+#[define_template("a={a}")]
+#[define_template("a={a} b={b}")]
+
+// [Some(0), None] → [0, 1]
+#[define_template("a={a}", id = 0)]
+#[define_template("a={a} b={b}")]
+
+// [Some(1), Some(2), None] → [1, 2, 3]
+#[define_template("a={a}", id = 1)]
+#[define_template("a={a} b={b}", id = 2)]
+#[define_template("a={a} b={b} c={c}")]
+
+// [Some(0), None, Some(5), None] → [0, 1, 5, 6]
+#[define_template("a={a}", id = 0)]
+#[define_template("a={a} b={b}")]
+#[define_template("a={a} b={b} c={c}", id = 5)]
+#[define_template("a={a} b={b} c={c} d={d}")]
+```
+
 ### `#[field(...)]`
 
 | Атрибут | Тип | Обязательный | Описание |
@@ -215,6 +252,15 @@ impl TraceSchedSwitch {
 ## Ограничения
 
 1. **Только именованные поля** — `struct NamedFields { field: Type }`
-2. **Базовые поля** — `thread_name`, `thread_tid`, etc. добавляются автоматически
+2. **Базовые поля** — `thread_name`, `thread_tid`, etc. должны быть объявлены вручную
 3. **Порядок полей** — не важен, макрос обработает в любом порядке
-4. **Несколько темплейтов** — детекция формата по наличию полей (TODO: реализовать)
+4. **Несколько темплейтов** — детекция формата реализована через `detect_format()`
+5. **`#[pyclass]`** — должен быть указан вручную для PyO3 совместимости
+
+```rust
+#[derive(TraceEvent)]
+#[pyclass]  // ← требуется для Python API
+pub struct TraceMyEvent {
+    // ...
+}
+```
