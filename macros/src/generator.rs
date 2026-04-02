@@ -160,6 +160,63 @@ pub fn generate_template_event_impl(
         })
         .collect();
 
+    // Generate parse statements for parse_payload
+    let parse_statements: Vec<TokenStream> = fields
+        .iter()
+        .map(|(field_name, field_attr)| {
+            let name_str = field_attr.name.as_ref()
+                .map(|s| s.clone())
+                .unwrap_or_else(|| field_name.to_string());
+            let ty = &field_attr.ty;
+
+            if field_attr.optional {
+                // Optional field: returns Option<T>
+                match ty.as_str() {
+                    "string" => quote! {
+                        #field_name: ::trace_parser::common::cap_str(captures, #name_str)
+                    },
+                    "u32" => quote! {
+                        #field_name: ::trace_parser::common::cap_parse::<u32>(captures, #name_str)
+                    },
+                    "i32" => quote! {
+                        #field_name: ::trace_parser::common::cap_parse::<i32>(captures, #name_str)
+                    },
+                    "f64" => quote! {
+                        #field_name: ::trace_parser::common::cap_parse::<f64>(captures, #name_str)
+                    },
+                    "bool_int" => quote! {
+                        #field_name: ::trace_parser::common::cap_parse::<u8>(captures, #name_str).map(|v| v == 1)
+                    },
+                    _ => quote! {
+                        #field_name: ::trace_parser::common::cap_str(captures, #name_str)
+                    },
+                }
+            } else {
+                // Required field: uses ? operator
+                match ty.as_str() {
+                    "string" => quote! {
+                        #field_name: ::trace_parser::common::cap_str(captures, #name_str)?
+                    },
+                    "u32" => quote! {
+                        #field_name: ::trace_parser::common::cap_parse::<u32>(captures, #name_str)?
+                    },
+                    "i32" => quote! {
+                        #field_name: ::trace_parser::common::cap_parse::<i32>(captures, #name_str)?
+                    },
+                    "f64" => quote! {
+                        #field_name: ::trace_parser::common::cap_parse::<f64>(captures, #name_str)?
+                    },
+                    "bool_int" => quote! {
+                        #field_name: ::trace_parser::common::cap_parse::<u8>(captures, #name_str)? == 1
+                    },
+                    _ => quote! {
+                        #field_name: ::trace_parser::common::cap_str(captures, #name_str)?
+                    },
+                }
+            }
+        })
+        .collect();
+
     quote! {
         impl ::trace_parser::common::TemplateEvent for #struct_name {
             fn formats() -> &'static ::trace_parser::format_registry::FormatRegistry {
@@ -181,8 +238,21 @@ pub fn generate_template_event_impl(
                 captures: &::regex::Captures<'_>,
                 _format_id: u8,
             ) -> ::std::option::Option<Self> {
-                // TODO: implement parsing based on field specs
-                None
+                Some(Self {
+                    // Базовые поля
+                    thread_name: parts.thread_name,
+                    thread_tid: parts.thread_tid,
+                    thread_tgid: parts.thread_tgid,
+                    cpu: parts.cpu,
+                    flags: parts.flags,
+                    timestamp: parts.timestamp,
+                    event_name: parts.event_name,
+                    payload_raw: parts.payload_raw,
+                    format_id: _format_id,
+                    
+                    // Payload поля
+                    #(#parse_statements),*
+                })
             }
 
             fn render_payload(&self) -> ::pyo3::PyResult<::std::string::String> {
@@ -356,5 +426,75 @@ mod tests {
 
         assert!(output_str.contains("\"state\""));
         assert!(output_str.contains("current_state"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_with_parse() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let templates = vec![DefineTemplateAttr("value={value}".to_string())];
+        let fields = vec![(
+            parse_quote!(value),
+            FieldAttr {
+                ty: "u32".to_string(),
+                name: None,
+                optional: false,
+                readonly: false,
+                private: false,
+            },
+        )];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("parse_payload"));
+        assert!(output_str.contains("cap_parse :: < u32 >"));
+        assert!(output_str.contains("Some (Self"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_with_parse_optional() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let templates = vec![DefineTemplateAttr("value={value}".to_string())];
+        let fields = vec![(
+            parse_quote!(value),
+            FieldAttr {
+                ty: "u32".to_string(),
+                name: None,
+                optional: true,
+                readonly: false,
+                private: false,
+            },
+        )];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("parse_payload"));
+        assert!(output_str.contains("cap_parse :: < u32 >"));
+        // Optional field doesn't use ? operator
+        assert!(!output_str.contains("cap_parse :: < u32 > (captures , \"value\") ?"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_with_parse_bool_int() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let templates = vec![DefineTemplateAttr("flag={flag}".to_string())];
+        let fields = vec![(
+            parse_quote!(flag),
+            FieldAttr {
+                ty: "bool_int".to_string(),
+                name: None,
+                optional: false,
+                readonly: false,
+                private: false,
+            },
+        )];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("parse_payload"));
+        assert!(output_str.contains("cap_parse :: < u8 >"));
+        assert!(output_str.contains("== 1"));
     }
 }
