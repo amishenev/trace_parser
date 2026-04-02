@@ -54,14 +54,40 @@ impl Parse for TraceMarkersAttr {
     }
 }
 
-/// Parsed `#[define_template("...")]` attribute
+/// Parsed `#[define_template("...", id = N)]` attribute
+///
+/// Template attributes with optional explicit id:
+/// - `id`: Explicit format id (0, 1, 2, ...). Auto-assigned if not specified.
 #[derive(Debug, Clone)]
-pub struct DefineTemplateAttr(pub String);
+pub struct DefineTemplateAttr {
+    pub template: String,
+    pub id: Option<u8>,
+}
 
 impl Parse for DefineTemplateAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let template: LitStr = input.parse()?;
-        Ok(Self(template.value()))
+        
+        let id = if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+            // Check for `id = N`
+            if input.peek(Ident) {
+                let key: Ident = input.parse()?;
+                if key == "id" {
+                    input.parse::<Token![=]>()?;
+                    let value: syn::LitInt = input.parse()?;
+                    Some(value.base10_parse::<u8>()?)
+                } else {
+                    return Err(syn::Error::new(key.span(), "expected 'id'"));
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        
+        Ok(Self { template: template.value(), id })
     }
 }
 
@@ -187,7 +213,24 @@ mod tests {
     fn test_define_template_attr() {
         let tokens = quote! { "prev_comm={prev_comm} prev_pid={prev_pid}" };
         let attr: DefineTemplateAttr = syn::parse2(tokens).unwrap();
-        assert_eq!(attr.0, "prev_comm={prev_comm} prev_pid={prev_pid}");
+        assert_eq!(attr.template, "prev_comm={prev_comm} prev_pid={prev_pid}");
+        assert!(attr.id.is_none());
+    }
+
+    #[test]
+    fn test_define_template_attr_with_id() {
+        let tokens = quote! { "prev_comm={prev_comm}", id = 1 };
+        let attr: DefineTemplateAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.template, "prev_comm={prev_comm}");
+        assert_eq!(attr.id, Some(1));
+    }
+
+    #[test]
+    fn test_define_template_attr_with_id_zero() {
+        let tokens = quote! { "value={value}", id = 0 };
+        let attr: DefineTemplateAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.template, "value={value}");
+        assert_eq!(attr.id, Some(0));
     }
 
     #[test]

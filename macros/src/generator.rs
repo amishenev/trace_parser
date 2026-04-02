@@ -61,12 +61,26 @@ pub fn generate_template_event_impl(
     }
 
     // Generate format registry with all templates
+    // Auto-assign ids: templates without explicit id get sequential ids starting after max explicit id
+    // Example: explicit ids [1, 2] → auto-assign starts from 3
+    let max_explicit_id = templates
+        .iter()
+        .filter_map(|t| t.id)
+        .max()
+        .unwrap_or(255);
+    
+    let mut next_auto_id = if max_explicit_id == 255 { 0u8 } else { max_explicit_id + 1 };
+    
     let format_specs: Vec<TokenStream> = templates
         .iter()
-        .enumerate()
-        .map(|(id, template)| {
-            let template_str = &template.0;
-            let id = id as u8;
+        .map(|template_attr| {
+            let template_str = &template_attr.template;
+            let id = template_attr.id.unwrap_or_else(|| {
+                let assigned = next_auto_id;
+                next_auto_id += 1;
+                assigned
+            });
+            
             quote! {
                 ::trace_parser::format_registry::FormatSpec {
                     kind: #id,
@@ -78,6 +92,55 @@ pub fn generate_template_event_impl(
             }
         })
         .collect();
+
+    // Generate detect_format logic
+    // For single template: always return 0
+    // For multiple templates: check for unique fields
+    let detect_format_impl = if templates.len() == 1 {
+        quote! {
+            fn detect_format(_payload: &str) -> u8 {
+                0
+            }
+        }
+    } else {
+        // For multiple templates, detect by checking for unique fields
+        // Simple heuristic: check templates in reverse order (most specific first)
+        let checks: Vec<TokenStream> = templates
+            .iter()
+            .rev()
+            .filter_map(|template_attr| {
+                let id = template_attr.id.unwrap_or(0);
+                if id == 0 {
+                    // Skip format 0 (default fallback)
+                    None
+                } else {
+                    // Extract field names from template to check presence
+                    // Simple check: look for "field=" pattern
+                    let template_str = &template_attr.template;
+                    Some(quote! {
+                        if payload.contains(#template_str) {
+                            return #id;
+                        }
+                    })
+                }
+            })
+            .collect();
+        
+        if checks.is_empty() {
+            quote! {
+                fn detect_format(_payload: &str) -> u8 {
+                    0
+                }
+            }
+        } else {
+            quote! {
+                fn detect_format(payload: &str) -> u8 {
+                    #(#checks)*
+                    0
+                }
+            }
+        }
+    };
 
     // Generate field specs for the template (used in parse_payload)
     let _field_specs: Vec<TokenStream> = fields
@@ -226,9 +289,7 @@ pub fn generate_template_event_impl(
                 &FORMATS
             }
 
-            fn detect_format(_payload: &str) -> u8 {
-                0
-            }
+            #detect_format_impl
 
             fn parse_payload(
                 parts: ::trace_parser::common::BaseTraceParts,
@@ -361,7 +422,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_render() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr("value={value}".to_string())];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None }];
         let fields = vec![(
             parse_quote!(value),
             FieldAttr {
@@ -384,7 +445,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_optional() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr("value={value}".to_string())];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None }];
         let fields = vec![(
             parse_quote!(value),
             FieldAttr {
@@ -406,7 +467,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_custom_name() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr("state={state}".to_string())];
+        let templates = vec![DefineTemplateAttr { template: "state={state}".to_string(), id: None }];
         let fields = vec![(
             parse_quote!(current_state),
             FieldAttr {
@@ -428,7 +489,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_parse() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr("value={value}".to_string())];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None }];
         let fields = vec![(
             parse_quote!(value),
             FieldAttr {
@@ -451,7 +512,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_parse_optional() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr("value={value}".to_string())];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None }];
         let fields = vec![(
             parse_quote!(value),
             FieldAttr {
@@ -475,7 +536,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_parse_bool_int() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr("flag={flag}".to_string())];
+        let templates = vec![DefineTemplateAttr { template: "flag={flag}".to_string(), id: None }];
         let fields = vec![(
             parse_quote!(flag),
             FieldAttr {
@@ -493,5 +554,258 @@ mod tests {
         assert!(output_str.contains("parse_payload"));
         assert!(output_str.contains("cap_parse :: < u8 >"));
         assert!(output_str.contains("== 1"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_with_multiple_templates() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let templates = vec![
+            DefineTemplateAttr { template: "a={a}".to_string(), id: Some(0) },
+            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1) },
+        ];
+        let fields = vec![
+            (parse_quote!(a), FieldAttr { ty: "u32".to_string(), name: None, optional: false, readonly: false, private: false }),
+            (parse_quote!(b), FieldAttr { ty: "u32".to_string(), name: None, optional: true, readonly: false, private: false }),
+        ];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("detect_format"));
+        assert!(output_str.contains("FormatSpec"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_single_template_detect_format() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None }];
+        let fields = vec![(
+            parse_quote!(value),
+            FieldAttr {
+                ty: "u32".to_string(),
+                name: None,
+                optional: false,
+                readonly: false,
+                private: false,
+            },
+        )];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        // Single template: detect_format always returns 0
+        assert!(output_str.contains("fn detect_format (_payload : & str) -> u8 { 0 }"));
+    }
+
+    #[test]
+    fn test_template_id_fully_explicit() {
+        // Both templates with explicit ids
+        let templates = vec![
+            DefineTemplateAttr { template: "a={a}".to_string(), id: Some(0) },
+            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1) },
+        ];
+        
+        let max_explicit_id = templates.iter().filter_map(|t| t.id).max().unwrap_or(255);
+        let mut next_auto_id = if max_explicit_id == 255 { 0u8 } else { max_explicit_id + 1 };
+        let ids: Vec<u8> = templates
+            .iter()
+            .map(|t| t.id.unwrap_or_else(|| {
+                let assigned = next_auto_id;
+                next_auto_id += 1;
+                assigned
+            }))
+            .collect();
+        
+        assert_eq!(ids, vec![0, 1]);
+    }
+
+    #[test]
+    fn test_template_id_fully_implicit() {
+        // Both templates without explicit ids (auto-assign from 0)
+        let templates = vec![
+            DefineTemplateAttr { template: "a={a}".to_string(), id: None },
+            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: None },
+        ];
+        
+        let max_explicit_id = templates.iter().filter_map(|t| t.id).max().unwrap_or(255);
+        let mut next_auto_id = if max_explicit_id == 255 { 0u8 } else { max_explicit_id + 1 };
+        let ids: Vec<u8> = templates
+            .iter()
+            .map(|t| t.id.unwrap_or_else(|| {
+                let assigned = next_auto_id;
+                next_auto_id += 1;
+                assigned
+            }))
+            .collect();
+        
+        assert_eq!(ids, vec![0, 1]);
+    }
+
+    #[test]
+    fn test_template_id_mixed_explicit_first() {
+        // First template with explicit id=0, second without (auto-assign starts after max=0, so gets 1)
+        let templates = vec![
+            DefineTemplateAttr { template: "a={a}".to_string(), id: Some(0) },
+            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: None },
+        ];
+        
+        let max_explicit_id = templates.iter().filter_map(|t| t.id).max().unwrap_or(255);
+        let mut next_auto_id = if max_explicit_id == 255 { 0u8 } else { max_explicit_id + 1 };
+        let ids: Vec<u8> = templates
+            .iter()
+            .map(|t| t.id.unwrap_or_else(|| {
+                let assigned = next_auto_id;
+                next_auto_id += 1;
+                assigned
+            }))
+            .collect();
+        
+        assert_eq!(ids, vec![0, 1]); // Second gets 1 (after max explicit 0)
+    }
+
+    #[test]
+    fn test_template_id_mixed_explicit_second() {
+        // First template without explicit id (gets 0), second with explicit 1
+        // max_explicit=1, so auto starts from 2
+        let templates = vec![
+            DefineTemplateAttr { template: "a={a}".to_string(), id: None },
+            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1) },
+        ];
+        
+        let max_explicit_id = templates.iter().filter_map(|t| t.id).max().unwrap_or(255);
+        let mut next_auto_id = if max_explicit_id == 255 { 0u8 } else { max_explicit_id + 1 };
+        let ids: Vec<u8> = templates
+            .iter()
+            .map(|t| t.id.unwrap_or_else(|| {
+                let assigned = next_auto_id;
+                next_auto_id += 1;
+                assigned
+            }))
+            .collect();
+        
+        assert_eq!(ids, vec![2, 1]); // First gets 2 (after max explicit 1), second explicit 1
+    }
+
+    #[test]
+    fn test_template_id_three_templates_mixed() {
+        // Three templates with mixed explicit/implicit ids
+        // Explicit: 0, 2. Max=2, so auto starts from 3
+        let templates = vec![
+            DefineTemplateAttr { template: "a={a}".to_string(), id: Some(0) },
+            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: None },
+            DefineTemplateAttr { template: "a={a} b={b} c={c}".to_string(), id: Some(2) },
+        ];
+        
+        let max_explicit_id = templates.iter().filter_map(|t| t.id).max().unwrap_or(255);
+        let mut next_auto_id = if max_explicit_id == 255 { 0u8 } else { max_explicit_id + 1 };
+        let ids: Vec<u8> = templates
+            .iter()
+            .map(|t| t.id.unwrap_or_else(|| {
+                let assigned = next_auto_id;
+                next_auto_id += 1;
+                assigned
+            }))
+            .collect();
+        
+        assert_eq!(ids, vec![0, 3, 2]); // Second gets 3 (after max explicit 2)
+    }
+
+    #[test]
+    fn test_template_id_explicit_middle() {
+        // First and third implicit, second explicit=1
+        // max_explicit=1, so auto starts from 2
+        let templates = vec![
+            DefineTemplateAttr { template: "a={a}".to_string(), id: None },
+            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1) },
+            DefineTemplateAttr { template: "a={a} b={b} c={c}".to_string(), id: None },
+        ];
+        
+        let max_explicit_id = templates.iter().filter_map(|t| t.id).max().unwrap_or(255);
+        let mut next_auto_id = if max_explicit_id == 255 { 0u8 } else { max_explicit_id + 1 };
+        let ids: Vec<u8> = templates
+            .iter()
+            .map(|t| t.id.unwrap_or_else(|| {
+                let assigned = next_auto_id;
+                next_auto_id += 1;
+                assigned
+            }))
+            .collect();
+        
+        assert_eq!(ids, vec![2, 1, 3]); // First gets 2, third gets 3
+    }
+
+    #[test]
+    fn test_template_id_auto_assign_skips_explicit() {
+        // First two explicit (1, 2), third implicit
+        // max_explicit=2, so auto starts from 3
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let templates = vec![
+            DefineTemplateAttr { template: "a={a}".to_string(), id: Some(1) },
+            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(2) },
+            DefineTemplateAttr { template: "a={a} b={b} c={c}".to_string(), id: None },
+        ];
+        let fields = vec![
+            (parse_quote!(a), FieldAttr { ty: "u32".to_string(), name: None, optional: false, readonly: false, private: false }),
+            (parse_quote!(b), FieldAttr { ty: "u32".to_string(), name: None, optional: true, readonly: false, private: false }),
+            (parse_quote!(c), FieldAttr { ty: "u32".to_string(), name: None, optional: true, readonly: false, private: false }),
+        ];
+        
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+        
+        println!("Generated:\n{}", output_str);
+        
+        // Check that format ids 1, 2, 3 are present
+        assert!(output_str.contains("kind : 1u8"));
+        assert!(output_str.contains("kind : 2u8"));
+        assert!(output_str.contains("kind : 3u8"));
+    }
+
+    #[test]
+    fn test_template_id_auto_assign_with_gap() {
+        // First explicit=0, second implicit, third explicit=5
+        // max_explicit=5, so auto starts from 6
+        let templates = vec![
+            DefineTemplateAttr { template: "a={a}".to_string(), id: Some(0) },
+            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: None },
+            DefineTemplateAttr { template: "a={a} b={b} c={c}".to_string(), id: Some(5) },
+        ];
+        
+        let max_explicit_id = templates.iter().filter_map(|t| t.id).max().unwrap_or(255);
+        let mut next_auto_id = if max_explicit_id == 255 { 0u8 } else { max_explicit_id + 1 };
+        let ids: Vec<u8> = templates
+            .iter()
+            .map(|t| t.id.unwrap_or_else(|| {
+                let assigned = next_auto_id;
+                next_auto_id += 1;
+                assigned
+            }))
+            .collect();
+        
+        assert_eq!(ids, vec![0, 6, 5]); // Second gets 6 (after max explicit 5)
+    }
+
+    #[test]
+    fn test_template_id_user_scenario_explicit_1_2_auto_3() {
+        // User scenario: first id=1, second id=2, third None
+        // Expected: third gets id=3 (continues after max explicit)
+        let templates = vec![
+            DefineTemplateAttr { template: "a={a}".to_string(), id: Some(1) },
+            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(2) },
+            DefineTemplateAttr { template: "a={a} b={b} c={c}".to_string(), id: None },
+        ];
+        
+        let max_explicit_id = templates.iter().filter_map(|t| t.id).max().unwrap_or(255);
+        let mut next_auto_id = if max_explicit_id == 255 { 0u8 } else { max_explicit_id + 1 };
+        let ids: Vec<u8> = templates
+            .iter()
+            .map(|t| t.id.unwrap_or_else(|| {
+                let assigned = next_auto_id;
+                next_auto_id += 1;
+                assigned
+            }))
+            .collect();
+        
+        assert_eq!(ids, vec![1, 2, 3]); // Third gets 3!
     }
 }
