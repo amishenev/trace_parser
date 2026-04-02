@@ -87,7 +87,7 @@ pub fn generate_template_event_impl(
                 .map(|s| s.clone())
                 .unwrap_or_else(|| field_name.to_string());
             let ty = &field_attr.ty;
-            
+
             let field_spec = match ty.as_str() {
                 "string" => quote! { ::trace_parser::payload_template::FieldSpec::string() },
                 "u32" => quote! { ::trace_parser::payload_template::FieldSpec::u32() },
@@ -103,10 +103,67 @@ pub fn generate_template_event_impl(
         })
         .collect();
 
+    // Generate render statements for render_payload
+    let render_statements: Vec<TokenStream> = fields
+        .iter()
+        .map(|(field_name, field_attr)| {
+            let name_str = field_attr.name.as_ref()
+                .map(|s| s.clone())
+                .unwrap_or_else(|| field_name.to_string());
+            let ty = &field_attr.ty;
+
+            if field_attr.optional {
+                // Optional field: wrap in Some/None
+                match ty.as_str() {
+                    "string" => quote! {
+                        (#name_str, self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::Str(v.as_str())))
+                    },
+                    "u32" => quote! {
+                        (#name_str, self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::U32(*v)))
+                    },
+                    "i32" => quote! {
+                        (#name_str, self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::I32(*v)))
+                    },
+                    "f64" => quote! {
+                        (#name_str, self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::F64(*v)))
+                    },
+                    "bool_int" => quote! {
+                        (#name_str, self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::BoolInt(*v)))
+                    },
+                    _ => quote! {
+                        (#name_str, self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::Str(v.as_str())))
+                    },
+                }
+            } else {
+                // Required field: always Some
+                match ty.as_str() {
+                    "string" => quote! {
+                        (#name_str, Some(::trace_parser::payload_template::TemplateValue::Str(self.#field_name.as_str())))
+                    },
+                    "u32" => quote! {
+                        (#name_str, Some(::trace_parser::payload_template::TemplateValue::U32(self.#field_name)))
+                    },
+                    "i32" => quote! {
+                        (#name_str, Some(::trace_parser::payload_template::TemplateValue::I32(self.#field_name)))
+                    },
+                    "f64" => quote! {
+                        (#name_str, Some(::trace_parser::payload_template::TemplateValue::F64(self.#field_name)))
+                    },
+                    "bool_int" => quote! {
+                        (#name_str, Some(::trace_parser::payload_template::TemplateValue::BoolInt(self.#field_name)))
+                    },
+                    _ => quote! {
+                        (#name_str, Some(::trace_parser::payload_template::TemplateValue::Str(self.#field_name.as_str())))
+                    },
+                }
+            }
+        })
+        .collect();
+
     quote! {
         impl ::trace_parser::common::TemplateEvent for #struct_name {
             fn formats() -> &'static ::trace_parser::format_registry::FormatRegistry {
-                static FORMATS: ::std::sync::LazyLock<::trace_parser::format_registry::FormatRegistry> = 
+                static FORMATS: ::std::sync::LazyLock<::trace_parser::format_registry::FormatRegistry> =
                     ::std::sync::LazyLock::new(|| {
                         ::trace_parser::format_registry::FormatRegistry::new(vec![
                             #(#format_specs),*
@@ -129,8 +186,15 @@ pub fn generate_template_event_impl(
             }
 
             fn render_payload(&self) -> ::pyo3::PyResult<::std::string::String> {
-                // TODO: implement rendering based on field specs
-                Ok(String::new())
+                let template = Self::formats().template(0)
+                    .ok_or_else(|| ::pyo3::exceptions::PyRuntimeError::new_err("No template found"))?;
+                
+                let values: &[(&str, ::std::option::Option<::trace_parser::payload_template::TemplateValue>)] = &[
+                    #(#render_statements),*
+                ];
+                
+                template.format(values)
+                    .ok_or_else(|| ::pyo3::exceptions::PyRuntimeError::new_err("Failed to format template"))
             }
         }
     }
@@ -225,5 +289,72 @@ mod tests {
 
         assert!(output_str.contains("register_tracing_mark_parser"));
         assert!(output_str.contains("TraceMarkBegin"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_with_render() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let templates = vec![DefineTemplateAttr("value={value}".to_string())];
+        let fields = vec![(
+            parse_quote!(value),
+            FieldAttr {
+                ty: "u32".to_string(),
+                name: None,
+                optional: false,
+                readonly: false,
+                private: false,
+            },
+        )];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("render_payload"));
+        assert!(output_str.contains("TemplateValue :: U32"));
+        assert!(output_str.contains("value"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_with_optional() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let templates = vec![DefineTemplateAttr("value={value}".to_string())];
+        let fields = vec![(
+            parse_quote!(value),
+            FieldAttr {
+                ty: "u32".to_string(),
+                name: None,
+                optional: true,
+                readonly: false,
+                private: false,
+            },
+        )];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("render_payload"));
+        assert!(output_str.contains("as_ref () . map"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_with_custom_name() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let templates = vec![DefineTemplateAttr("state={state}".to_string())];
+        let fields = vec![(
+            parse_quote!(current_state),
+            FieldAttr {
+                ty: "u32".to_string(),
+                name: Some("state".to_string()),
+                optional: false,
+                readonly: false,
+                private: false,
+            },
+        )];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("\"state\""));
+        assert!(output_str.contains("current_state"));
     }
 }
