@@ -11,67 +11,20 @@ pub fn generate_pymethods_block(
     fields: &[(Ident, FieldAttr)],
 ) -> TokenStream {
     let new_fn = generate_new(fields);
-    let repr_fn = generate_repr(struct_name);
+    let repr_fn = generate_repr();
     let eq_fn = generate_eq(struct_name, fields);
     let str_fn = generate_str();
     let can_be_parsed_fn = generate_can_be_parsed();
-    let parse_fn = generate_parse(struct_name);
+    let parse_fn = generate_parse();
     let to_string_fn = generate_to_string();
-    let copy_fn = generate_copy(struct_name);
-    let deepcopy_fn = generate_deepcopy(struct_name);
+    let copy_fn = generate_copy();
+    let deepcopy_fn = generate_deepcopy();
     let payload_fn = generate_payload();
-    let template_fn = generate_template(struct_name);
+    let template_fn = generate_template();
     
     // Generate field getters/setters for Python API
     // Filters out private fields (not exposed to Python)
     let field_accessors = fields.iter().filter(|(_, attr)| !attr.private).map(|(field_name, field_attr)| {
-        if field_attr.optional {
-            // Optional field: Python gets Option<T>, can be None
-            if field_attr.readonly {
-                // Optional + readonly: getter only, no setter
-                quote! {
-                    #[getter]
-                    fn #field_name(&self) -> ::std::option::Option<::pyo3::PyObject> {
-                        self.#field_name.as_ref().map(|v| ::pyo3::IntoPy::into_py(v, ::pyo3::Python::assume_attached()))
-                    }
-                }
-            } else {
-                // Optional + writable: getter and setter
-                quote! {
-                    #[getter]
-                    fn #field_name(&self) -> ::std::option::Option<::pyo3::PyObject> {
-                        self.#field_name.as_ref().map(|v| ::pyo3::IntoPy::into_py(v, ::pyo3::Python::assume_attached()))
-                    }
-                    
-                    #[setter]
-                    fn #field_name(&mut self, value: ::std::option::Option<impl ::pyo3::IntoPy<::pyo3::PyObject>>) {
-                        self.#field_name = value.and_then(|v| ::pyo3::FromPy::from_py(v, ::pyo3::Python::assume_attached()).ok());
-                    }
-                }
-            }
-        } else {
-            // Required field (not optional)
-            if field_attr.readonly {
-                // Readonly: getter only (e.g., event_name)
-                // #field_name: #field_name is struct field initialization syntax
-                // First #field_name = field name, second = constructor parameter
-                quote! {
-                    #[pyo3(get)]
-                    #field_name: #field_name,
-                }
-            } else {
-                // Writable: getter and setter
-                quote! {
-                    #[pyo3(get, set)]
-                    #field_name: #field_name,
-                }
-            }
-        }
-    });
-
-    // Separate field declarations from getter/setter methods
-    // These are added to the struct definition, not pymethods
-    let field_decls = fields.iter().map(|(field_name, field_attr)| {
         let ty = match field_attr.ty.as_str() {
             "string" => quote! { ::std::string::String },
             "u32" => quote! { u32 },
@@ -80,23 +33,55 @@ pub fn generate_pymethods_block(
             "bool_int" => quote! { bool },
             _ => quote! { ::std::string::String },
         };
-        
-        if field_attr.private {
-            // Private fields - no pyo3 attribute, not exposed to Python
-            if field_attr.optional {
-                quote! { #field_name: ::std::option::Option<#ty> }
+
+        if field_attr.optional {
+            // Optional field: Python gets Option<T>, can be None
+            if field_attr.readonly {
+                // Optional + readonly: getter only, no setter
+                quote! {
+                    #[getter]
+                    fn #field_name(&self) -> ::std::option::Option<#ty> {
+                        self.#field_name
+                    }
+                }
             } else {
-                quote! { #field_name: #ty }
+                // Optional + writable: getter and setter
+                quote! {
+                    #[getter]
+                    fn #field_name(&self) -> ::std::option::Option<#ty> {
+                        self.#field_name
+                    }
+
+                    #[setter]
+                    fn #field_name(&mut self, value: ::std::option::Option<#ty>) {
+                        self.#field_name = value;
+                    }
+                }
             }
-        } else if field_attr.optional {
-            // Optional field with get/set in Python
-            quote! { #[pyo3(get, set)] #field_name: ::std::option::Option<#ty> }
-        } else if field_attr.readonly {
-            // Read-only field - getter only in Python
-            quote! { #[pyo3(get)] #field_name: #ty }
         } else {
-            // Regular field with get/set in Python
-            quote! { #[pyo3(get, set)] #field_name: #ty }
+            // Required field (not optional)
+            if field_attr.readonly {
+                // Readonly: getter only
+                quote! {
+                    #[getter]
+                    fn #field_name(&self) -> &#ty {
+                        &self.#field_name
+                    }
+                }
+            } else {
+                // Writable: getter and setter
+                quote! {
+                    #[getter]
+                    fn #field_name(&self) -> &#ty {
+                        &self.#field_name
+                    }
+                    
+                    #[setter]
+                    fn #field_name(&mut self, value: #ty) {
+                        self.#field_name = value;
+                    }
+                }
+            }
         }
     });
 
@@ -112,12 +97,12 @@ pub fn generate_pymethods_block(
             #to_string_fn
             #copy_fn
             #deepcopy_fn
+            #payload_fn
+            #template_fn
             
-            // Field getters/setters will be added directly to the struct
+            // Field getters/setters
+            #(#field_accessors)*
         }
-        
-        // Field declarations for the struct
-        #( #field_decls ),*
     }
 }
 
@@ -173,9 +158,7 @@ fn generate_new(fields: &[(Ident, FieldAttr)]) -> TokenStream {
 }
 
 /// Generate `__repr__` method
-fn generate_repr(struct_name: &Ident) -> TokenStream {
-    let struct_name_str = struct_name.to_string();
-    
+fn generate_repr() -> TokenStream {
     quote! {
         fn __repr__(&self) -> ::pyo3::PyResult<::std::string::String> {
             Ok(format!("{:?}", self))
@@ -216,7 +199,7 @@ fn generate_can_be_parsed() -> TokenStream {
 }
 
 /// Generate `parse` static method
-fn generate_parse(struct_name: &Ident) -> TokenStream {
+fn generate_parse() -> TokenStream {
     quote! {
         #[staticmethod]
         fn parse(line: &str) -> ::std::option::Option<Self> {
@@ -244,7 +227,7 @@ fn generate_to_string() -> TokenStream {
 }
 
 /// Generate `__copy__` method
-fn generate_copy(struct_name: &Ident) -> TokenStream {
+fn generate_copy() -> TokenStream {
     quote! {
         fn __copy__(slf: ::pyo3::PyRef<'_, Self>, py: ::pyo3::Python<'_>) -> ::pyo3::PyResult<::pyo3::Py<Self>> {
             Ok(slf.clone().into_pyobject(py)?.unbind())
@@ -253,7 +236,7 @@ fn generate_copy(struct_name: &Ident) -> TokenStream {
 }
 
 /// Generate `__deepcopy__` method
-fn generate_deepcopy(struct_name: &Ident) -> TokenStream {
+fn generate_deepcopy() -> TokenStream {
     quote! {
         fn __deepcopy__(&self, _memo: &::pyo3::Bound<'_, ::pyo3::PyAny>) -> ::pyo3::PyResult<Self> {
             Ok(self.clone())
@@ -272,7 +255,7 @@ fn generate_payload() -> TokenStream {
 }
 
 /// Generate `template()` getter - returns the template string
-fn generate_template(struct_name: &Ident) -> TokenStream {
+fn generate_template() -> TokenStream {
     quote! {
         #[getter]
         fn template(&self) -> &'static str {
@@ -284,7 +267,6 @@ fn generate_template(struct_name: &Ident) -> TokenStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use quote::quote;
     use syn::parse_quote;
 
     fn create_test_field(name: &str, ty: &str) -> (Ident, FieldAttr) {
@@ -335,8 +317,7 @@ mod tests {
 
     #[test]
     fn test_generate_repr() {
-        let struct_name: Ident = parse_quote!(TraceSchedSwitch);
-        let output = generate_repr(&struct_name);
+        let output = generate_repr();
 
         assert!(output.to_string().contains("__repr__"));
     }
@@ -372,11 +353,73 @@ mod tests {
 
     #[test]
     fn test_generate_template() {
-        let struct_name: Ident = parse_quote!(TraceSchedSwitch);
-        let output = generate_template(&struct_name);
+        let output = generate_template();
         let output_str = output.to_string();
 
         assert!(output_str.contains("template"));
         assert!(output_str.contains("formats"));
+    }
+
+    #[test]
+    fn test_generate_pymethods_block_with_field_accessors() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let fields = vec![
+            create_test_field("value", "u32"),
+            create_test_field("name", "string"),
+        ];
+
+        let output = generate_pymethods_block(&struct_name, &fields);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("getter"));
+        assert!(output_str.contains("value"));
+        assert!(output_str.contains("name"));
+    }
+
+    #[test]
+    fn test_generate_pymethods_block_with_optional_field() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let fields = vec![(
+            parse_quote!(optional_value),
+            FieldAttr {
+                ty: "u32".to_string(),
+                name: None,
+                optional: true,
+                readonly: false,
+                private: false,
+            },
+        )];
+
+        let output = generate_pymethods_block(&struct_name, &fields);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("Option"));
+        assert!(output_str.contains("optional_value"));
+    }
+
+    #[test]
+    fn test_generate_pymethods_block_excludes_private_field() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let fields = vec![
+            create_test_field("public", "u32"),
+            (
+                parse_quote!(private_field),
+                FieldAttr {
+                    ty: "u32".to_string(),
+                    name: None,
+                    optional: false,
+                    readonly: false,
+                    private: true,
+                },
+            ),
+        ];
+
+        let output = generate_pymethods_block(&struct_name, &fields);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("public"));
+        // private_field не должен быть в геттерах, но может быть в конструкторе
+        // Проверяем что нет getter для private_field
+        assert!(!output_str.contains("fn private_field"));
     }
 }
