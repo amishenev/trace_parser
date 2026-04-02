@@ -19,6 +19,8 @@ pub fn generate_pymethods_block(
     let to_string_fn = generate_to_string();
     let copy_fn = generate_copy(struct_name);
     let deepcopy_fn = generate_deepcopy(struct_name);
+    let payload_fn = generate_payload();
+    let template_fn = generate_template(struct_name);
     
     // Generate field getters/setters for Python API
     // Filters out private fields (not exposed to Python)
@@ -256,5 +258,125 @@ fn generate_deepcopy(struct_name: &Ident) -> TokenStream {
         fn __deepcopy__(&self, _memo: &::pyo3::Bound<'_, ::pyo3::PyAny>) -> ::pyo3::PyResult<Self> {
             Ok(self.clone())
         }
+    }
+}
+
+/// Generate `payload()` getter - returns rendered payload string
+fn generate_payload() -> TokenStream {
+    quote! {
+        #[getter]
+        fn payload(&self) -> ::pyo3::PyResult<::std::string::String> {
+            self.render_payload()
+        }
+    }
+}
+
+/// Generate `template()` getter - returns the template string
+fn generate_template(struct_name: &Ident) -> TokenStream {
+    quote! {
+        #[getter]
+        fn template(&self) -> &'static str {
+            Self::formats().template(self.format_id).unwrap().template_str()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quote::quote;
+    use syn::parse_quote;
+
+    fn create_test_field(name: &str, ty: &str) -> (Ident, FieldAttr) {
+        (
+            syn::Ident::new(name, proc_macro2::Span::call_site()),
+            FieldAttr {
+                ty: ty.to_string(),
+                name: None,
+                optional: false,
+                readonly: false,
+                private: false,
+            },
+        )
+    }
+
+    #[test]
+    fn test_generate_new_basic() {
+        let fields = vec![
+            create_test_field("prev_comm", "string"),
+            create_test_field("prev_pid", "u32"),
+        ];
+
+        let output = generate_new(&fields);
+        // Just check it compiles and produces something with field names
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("prev_comm"));
+        assert!(output_str.contains("prev_pid"));
+    }
+
+    #[test]
+    fn test_generate_new_with_optional() {
+        let fields = vec![(
+            parse_quote!(reason),
+            FieldAttr {
+                ty: "u32".to_string(),
+                name: None,
+                optional: true,
+                readonly: false,
+                private: false,
+            },
+        )];
+
+        let output = generate_new(&fields);
+
+        assert!(output.to_string().contains("Option"));
+    }
+
+    #[test]
+    fn test_generate_repr() {
+        let struct_name: Ident = parse_quote!(TraceSchedSwitch);
+        let output = generate_repr(&struct_name);
+
+        assert!(output.to_string().contains("__repr__"));
+    }
+
+    #[test]
+    fn test_generate_eq() {
+        let struct_name: Ident = parse_quote!(TraceSchedSwitch);
+        let fields = vec![create_test_field("prev_comm", "string")];
+
+        let output = generate_eq(&struct_name, &fields);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("__eq__"));
+        assert!(output_str.contains("prev_comm"));
+    }
+
+    #[test]
+    fn test_generate_can_be_parsed() {
+        let output = generate_can_be_parsed();
+
+        assert!(output.to_string().contains("can_be_parsed"));
+        assert!(output.to_string().contains("quick_check"));
+    }
+
+    #[test]
+    fn test_generate_payload() {
+        let output = generate_payload();
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("payload"));
+        assert!(output_str.contains("render_payload"));
+    }
+
+    #[test]
+    fn test_generate_template() {
+        let struct_name: Ident = parse_quote!(TraceSchedSwitch);
+        let output = generate_template(&struct_name);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("template"));
+        assert!(output_str.contains("formats"));
     }
 }

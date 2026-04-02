@@ -151,3 +151,79 @@ pub fn generate_tracing_mark_registration(struct_name: &Ident) -> TokenStream {
         ::trace_parser::register_tracing_mark_parser!(#struct_name);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quote::quote;
+    use syn::parse_quote;
+
+    #[test]
+    fn test_generate_event_type_impl() {
+        let struct_name: Ident = parse_quote!(TraceSchedSwitch);
+        let event_attr = TraceEventAttr {
+            name: "sched_switch".to_string(),
+            aliases: vec!["sched_sw".to_string()],
+        };
+
+        let output = generate_event_type_impl(&struct_name, &event_attr);
+
+        let expected = quote! {
+            impl ::trace_parser::common::EventType for TraceSchedSwitch {
+                const EVENT_NAME: &'static str = "sched_switch";
+                const EVENT_ALIASES: &'static [&'static str] = &["sched_sw"];
+            }
+        };
+
+        assert_eq!(output.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn test_generate_fast_match_impl_with_markers() {
+        let struct_name: Ident = parse_quote!(TraceMarkBegin);
+        let markers_attr = Some(TraceMarkersAttr(vec!["B|".to_string()]));
+
+        let output = generate_fast_match_impl(&struct_name, markers_attr.as_ref());
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("FastMatch"));
+        assert!(output_str.contains("B"));
+    }
+
+    #[test]
+    fn test_generate_fast_match_impl_empty() {
+        let struct_name: Ident = parse_quote!(TraceSchedSwitch);
+        let markers_attr: Option<TraceMarkersAttr> = None;
+
+        let output = generate_fast_match_impl(&struct_name, markers_attr.as_ref());
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("FastMatch"));
+    }
+
+    #[test]
+    fn test_generate_registration() {
+        let struct_name: Ident = parse_quote!(TraceSchedSwitch);
+        let event_attr = TraceEventAttr {
+            name: "sched_switch".to_string(),
+            aliases: vec![],
+        };
+
+        let output = generate_registration(&struct_name, &event_attr);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("register_parser"));
+        assert!(output_str.contains("TraceSchedSwitch"));
+    }
+
+    #[test]
+    fn test_generate_tracing_mark_registration() {
+        let struct_name: Ident = parse_quote!(TraceMarkBegin);
+
+        let output = generate_tracing_mark_registration(&struct_name);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("register_tracing_mark_parser"));
+        assert!(output_str.contains("TraceMarkBegin"));
+    }
+}
