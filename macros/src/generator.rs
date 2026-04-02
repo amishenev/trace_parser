@@ -83,8 +83,7 @@ pub fn generate_template_event_impl(
     let _field_specs: Vec<TokenStream> = fields
         .iter()
         .map(|(field_name, field_attr)| {
-            let name_str = field_attr.name.as_ref()
-                .map(|s| s.clone())
+            let name_str = field_attr.name.clone()
                 .unwrap_or_else(|| field_name.to_string());
             let ty = &field_attr.ty;
 
@@ -107,8 +106,7 @@ pub fn generate_template_event_impl(
     let render_statements: Vec<TokenStream> = fields
         .iter()
         .map(|(field_name, field_attr)| {
-            let name_str = field_attr.name.as_ref()
-                .map(|s| s.clone())
+            let name_str = field_attr.name.clone()
                 .unwrap_or_else(|| field_name.to_string());
             let ty = &field_attr.ty;
 
@@ -164,8 +162,7 @@ pub fn generate_template_event_impl(
     let parse_statements: Vec<TokenStream> = fields
         .iter()
         .map(|(field_name, field_attr)| {
-            let name_str = field_attr.name.as_ref()
-                .map(|s| s.clone())
+            let name_str = field_attr.name.clone()
                 .unwrap_or_else(|| field_name.to_string());
             let ty = &field_attr.ty;
 
