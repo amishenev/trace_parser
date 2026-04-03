@@ -17,28 +17,30 @@ use trace_parser_macros::TraceEvent;
 #[define_template("prev_comm={prev_comm} prev_pid={prev_pid} prev_prio={prev_prio} prev_state={prev_state} ==> next_comm={next_comm} next_pid={next_pid} next_prio={next_prio}")]
 #[derive(TraceEvent)]
 struct TraceSchedSwitch {
-    #[field(ty = "string")]
+    #[field]
     prev_comm: String,
-    
-    #[field(ty = "u32")]
+
+    #[field]
     prev_pid: u32,
-    
-    #[field(ty = "i32")]
+
+    #[field]
     prev_prio: i32,
-    
-    #[field(ty = "string")]
+
+    #[field]
     prev_state: String,
-    
-    #[field(ty = "string")]
+
+    #[field]
     next_comm: String,
-    
-    #[field(ty = "u32")]
+
+    #[field]
     next_pid: u32,
-    
-    #[field(ty = "i32")]
+
+    #[field]
     next_prio: i32,
 }
 ```
+
+Тип поля автоматически выводится из Rust-типа: `String` → `string()`, `u32` → `u32()`, `bool` → `bool_int()`, `Option<T>` → optional.
 
 ### Событие с кастомным именем поля
 
@@ -47,10 +49,10 @@ struct TraceSchedSwitch {
 #[define_template("state={state} cpu_id={cpu_id}")]
 #[derive(TraceEvent)]
 struct TraceCpuFrequency {
-    #[field(ty = "u32", name = "state")]
+    #[field(name = "state")]
     current_state: u32,  // ← имя переменной отличается от имени в payload
-    
-    #[field(ty = "u32")]
+
+    #[field]
     cpu_id: u32,  // ← имя совпадает
 }
 ```
@@ -63,27 +65,77 @@ struct TraceCpuFrequency {
 #[define_template("comm={comm} pid={pid} prio={prio} target_cpu={target_cpu} reason={reason}")]
 #[derive(TraceEvent)]
 struct TraceSchedWakeup {
-    #[field(ty = "string")]
+    #[field]
     comm: String,
-    
-    #[field(ty = "u32")]
+
+    #[field]
     pid: u32,
-    
-    #[field(ty = "u32")]
+
+    #[field]
     prio: i32,
-    
-    #[field(ty = "u32")]
+
+    #[field]
     target_cpu: u32,
-    
-    #[field(ty = "u32", optional)]
+
+    #[field(optional)]
     reason: Option<u32>,  // ← опциональное поле
 }
+```
 
-// Кастомная проверка payload (если нужно)
-impl FastMatch for TraceSchedWakeup {
-    fn payload_quick_check(line: &str) -> bool {
-        line.contains("reason=")
-    }
+### Событие с кастомным regex
+
+```rust
+#[trace_event(name = "custom_event")]
+#[define_template("code={code}")]
+#[derive(TraceEvent)]
+struct TraceCustomEvent {
+    #[field(regex = r"[A-Z]{2}\d{3}")]
+    code: String,  // ← нестандартный формат, кастомный regex
+}
+```
+
+### Событие с choice (ограниченный набор значений)
+
+```rust
+#[trace_event(name = "clock_set_rate")]
+#[define_template("clk={clk} state={state} cpu_id={cpu_id}")]
+#[derive(TraceEvent)]
+struct TraceDevFrequency {
+    #[field(choice = ["ddr_devfreq", "l3c_devfreq"])]
+    clk: String,  // ← только эти значения допустимы
+
+    #[field]
+    state: u32,
+
+    #[field]
+    cpu_id: u32,
+}
+```
+
+### Enum для payload полей
+
+```rust
+use trace_parser_macros::TraceEnum;
+
+#[derive(TraceEnum)]
+pub enum PrevState {
+    #[value("S")]
+    Sleeping,
+    #[value("R")]
+    Running,
+    #[value("D")]
+    DiskSleep,
+    #[value("X")]
+    Dead,
+}
+
+// Затем в событии:
+#[trace_event(name = "sched_switch")]
+#[define_template("prev_state={prev_state}")]
+#[derive(TraceEvent)]
+struct TraceSchedSwitch {
+    #[field]
+    prev_state: PrevState,  // ← enum тип
 }
 ```
 
@@ -97,10 +149,10 @@ use trace_parser_macros::TracingMarkEvent;
 #[define_template("B|{trace_mark_tgid}|{message}")]
 #[derive(TracingMarkEvent)]
 struct TraceMarkBegin {
-    #[field(ty = "u32")]
+    #[field]
     trace_mark_tgid: u32,
-    
-    #[field(ty = "string")]
+
+    #[field]
     message: String,
 }
 
@@ -109,7 +161,7 @@ struct TraceMarkBegin {
 #[define_template("{?ignore:extra_info}ReceiveVsync {frame_number}")]
 #[derive(TracingMarkEvent)]
 struct TraceReceiveVsync {
-    #[field(ty = "u32")]
+    #[field]
     frame_number: u32,
 }
 ```
@@ -148,47 +200,30 @@ struct TraceReceiveVsync {
 - Явный `id = N` → использует N
 - Auto-assign продолжает после максимального явного id
 
-**Примеры:**
-```rust
-// [None, None] → [0, 1]
-#[define_template("a={a}")]
-#[define_template("a={a} b={b}")]
-
-// [Some(0), None] → [0, 1]
-#[define_template("a={a}", id = 0)]
-#[define_template("a={a} b={b}")]
-
-// [Some(1), Some(2), None] → [1, 2, 3]
-#[define_template("a={a}", id = 1)]
-#[define_template("a={a} b={b}", id = 2)]
-#[define_template("a={a} b={b} c={c}")]
-
-// [Some(0), None, Some(5), None] → [0, 1, 5, 6]
-#[define_template("a={a}", id = 0)]
-#[define_template("a={a} b={b}")]
-#[define_template("a={a} b={b} c={c}", id = 5)]
-#[define_template("a={a} b={b} c={c} d={d}")]
-```
-
 ### `#[field(...)]`
 
 | Атрибут | Тип | Обязательный | Описание |
 |---------|-----|--------------|----------|
-| `ty` | string | ✅ | Тип парсинга |
+| `ty` | string | ❌ устарел | Тип парсинга (теперь выводится автоматически) |
 | `name` | string | ❌ | Имя в payload (по умолчанию = имя поля) |
+| `regex` | string | ❌ | Кастомный regex для парсинга |
+| `choice` | array | ❌ | Ограниченный набор значений |
 | `optional` | flag | ❌ | Поле опционально (Option<T>) |
 | `readonly` | flag | ❌ | Только чтение в Python |
 | `private` | flag | ❌ | Не экспортировать в Python |
 
-### Поддерживаемые типы (`ty`)
+### Автоматический вывод типов
 
-| `ty` | Rust тип | Описание |
-|------|----------|----------|
-| `"string"` | `String` | Строка |
-| `"u32"` | `u32` | Беззнаковое 32-bit |
-| `"i32"` | `i32` | Знаковое 32-bit |
-| `"f64"` | `f64` | Float 64-bit |
-| `"bool_int"` | `bool` | Булево как 0/1 |
+| Rust тип | FieldSpec | Описание |
+|----------|-----------|----------|
+| `String` | `string()` | Строка |
+| `u8/u16/u32` | `u32()` | Беззнаковое |
+| `u64` | `custom(r"\d+")` | Большое беззнаковое |
+| `i8/i16/i32` | `i32()` | Знаковое |
+| `i64` | `custom(r"-?\d+")` | Большое знаковое |
+| `f32/f64` | `f64()` | Float |
+| `bool` | `bool_int()` | Булево как 0/1 |
+| `Option<T>` | auto | Опциональное поле |
 
 ---
 
@@ -221,21 +256,21 @@ impl ::trace_parser::common::TemplateEvent for TraceSchedSwitch {
 impl TraceSchedSwitch {
     #[new]
     fn new(thread_name: String, thread_tid: u32, ..., prev_comm: String, ...) -> PyResult<Self> { ... }
-    
+
     #[staticmethod]
     fn can_be_parsed(line: &str) -> bool { ... }
-    
+
     #[staticmethod]
     fn parse(line: &str) -> Option<Self> { ... }
-    
+
     fn to_string(&self) -> PyResult<String> { ... }
-    
+
     #[getter]
     fn payload(&self) -> PyResult<String> { ... }
-    
+
     #[getter]
     fn template(&self) -> &'static str { ... }
-    
+
     // + геттеры/сеттеры для полей
 }
 
@@ -246,6 +281,38 @@ impl TraceSchedSwitch {
 ### Для `#[derive(TracingMarkEvent)]`
 
 Всё то же самое + регистрация через `register_tracing_mark_parser!`.
+
+### Для `#[derive(TraceEnum)]`
+
+```rust
+impl ::std::fmt::Display for PrevState {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match self {
+            Self::Sleeping => f.write_str("S"),
+            Self::Running => f.write_str("R"),
+            // ...
+        }
+    }
+}
+
+impl ::std::str::FromStr for PrevState {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "S" => Ok(Self::Sleeping),
+            "R" => Ok(Self::Running),
+            // ...
+            _ => Err(format!("invalid PrevState: {}", s)),
+        }
+    }
+}
+
+impl ::trace_parser::payload_template::TraceEnum for PrevState {
+    fn values() -> &'static [&'static str] {
+        &["S", "R", "D", "X"]
+    }
+}
+```
 
 ---
 

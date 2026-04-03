@@ -520,30 +520,38 @@ TracingMark (базовый)
 
 ### Отложенные улучшения
 
-**Proc-macro генерация pymethods** — начата реализация, но НЕ завершена:
+**Proc-macro генерация pymethods** — ✅ завершена:
+
+**Реализованные фичи:**
+
+| Фича | Синтаксис | Статус |
+|------|-----------|--------|
+| Вывод типов | `#[field]` без `ty` | ✅ |
+| Кастомный regex | `#[field(regex = r"\d{3}")]` | ✅ |
+| Choice | `#[field(choice = ["a", "b"])]` | ✅ |
+| Enum | `#[derive(TraceEnum)]` + `#[value("...")]` | ✅ |
+| `generate_pymethods` | `generate_pymethods = true/false` | ✅ |
 
 **Что работает:**
 - `macros/` crate с `#[derive(TraceEvent)]` и `#[derive(TracingMarkEvent)]`
-- Генерация `EventType`, `FastMatch`, `TemplateEvent` (formats, parse_payload, render_payload)
-- Генерация `#[pymethods]` с `new`, `can_be_parsed`, `parse`, `to_string`, `payload`, `template`, `timestamp_ms/ns`
-- `generate_pymethods` флаг для отключения генерации pymethods
+- Генерация `EventType`, `FastMatch`, `TemplateEvent`
+- Генерация `#[pymethods]` с `new`, `can_be_parsed`, `parse`, `to_string`, `payload`, `template`
+- Type inference из Rust-типа (String, u8/u16/u32/u64, i8/i16/i32/i64, f32/f64, bool, Option<T>)
+- Кастомный regex для полей с нестандартным форматом
+- Choice для полей с ограниченным набором значений
+- `#[derive(TraceEnum)]` — генерация Display, FromStr, TraceEnum trait
 
-**Что НЕ работает:**
-- `TraceSchedSwitch` использует макрос, но проект НЕ собирается из-за конфликтов
-- Макрос генерирует дубликаты полей (`thread_name`, `thread_tid`, и т.д.) — они уже объявлены в структуре
-- `#[field(ty = "...", pyo3)]` не реализован — `pyo3` и `readonly` флаги есть в парсинге, но не используются
-- `private` флаг есть в парсинге, но не используется
+**Тесты:** 39 макрос + 41 основной = 80 total, clippy clean
 
-**Проблема:**
-- Макрос генерирует pymethods с getter/setter для всех полей
-- Но `#[pyclass]` + `#[pyo3(get, set)]` на полях тоже генерирует getter/setter
-- Конфликт: duplicate definitions
+**История проблем (решены):**
+- ~~Макрос генерирует дубликаты полей~~ — решено: макрос не генерирует getter/setter, пользователь ставит `#[pyo3(get, set)]` вручную
+- ~~`#[field(ty = "...")]` не реализован~~ — решено: тип выводится из Rust-типа, `ty` убран
+- ~~Конфликт duplicate definitions~~ — решено: pymethods генерирует только методы, не field accessors
 
-**План решения:**
-1. Макрос НЕ должен генерировать getter/setter для полей — пользователь ставит `#[pyo3(get, set)]` вручную
-2. Макрос генерирует только: `EventType`, `FastMatch`, `TemplateEvent`, `#[pymethods]` (без field_accessors)
-3. Убрать `payload_raw` из структуры (не нужен в типизированных событиях)
-4. Обновить документацию
+**Что остаётся (не связано с полями):**
+- Наследование через PyO3 `extends` — см. INHERITANCE_PLAN.md
+- Миграция всех событий на макрос (сейчас только TraceSchedSwitch использует)
+- E2E интеграционные тесты
 
 ## Ссылки
 

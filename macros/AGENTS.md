@@ -7,7 +7,8 @@ macros/src/
 ├── lib.rs           # Entry point, derive макросы
 ├── attrs.rs         # Парсинг атрибутов
 ├── generator.rs     # Генерация кода (traits)
-└── pymethods.rs     # Генерация Python API
+├── pymethods.rs     # Генерация Python API
+└── enum_gen.rs      # Генерация TraceEnum (Display, FromStr)
 ```
 
 ## Модули
@@ -16,6 +17,7 @@ macros/src/
 
 - `derive_trace_event` — основной макрос для обычных событий
 - `derive_tracing_mark_event` — макрос для tracing_mark подтипов
+- `derive_trace_enum` — макрос для enum-типов (Display, FromStr, TraceEnum)
 - Парсит атрибуты, вызывает генераторы
 
 ### `attrs.rs`
@@ -24,7 +26,7 @@ macros/src/
 - `TraceEventAttr` — `#[trace_event(name, aliases)]`
 - `TraceMarkersAttr` — `#[trace_markers(...)]`
 - `DefineTemplateAttr` — `#[define_template("...")]`
-- `FieldAttr` — `#[field(ty, name, optional, readonly, private)]`
+- `FieldAttr` — `#[field(name, regex, choice, optional, readonly, private)]`
 
 ### `generator.rs`
 
@@ -34,6 +36,7 @@ macros/src/
 - `generate_template_event_impl` — `impl TemplateEvent`
 - `generate_registration` — регистрация через `register_parser!`
 - `generate_tracing_mark_registration` — регистрация через `register_tracing_mark_parser!`
+- `InferredType` — вывод типов из Rust-типа
 
 ### `pymethods.rs`
 
@@ -46,6 +49,12 @@ macros/src/
 - `generate_payload`, `generate_template` — геттеры
 - `generate_field_accessors` — геттеры/сеттеры для полей
 
+### `enum_gen.rs`
+
+Генерация для `#[derive(TraceEnum)]`:
+- `generate_trace_enum` — Display, FromStr, TraceEnum trait
+- `parse_variants` — парсинг `#[value("...")]` атрибутов
+
 ---
 
 ## Known Issues
@@ -56,6 +65,8 @@ macros/src/
 
 - **E2E тесты с реальным событием** — требуют дополнительной проработки архитектуры макроса
 - **`#[pyclass]`** — должен указываться пользователем вручную
+- **Миграция всех событий на макрос** — только TraceSchedSwitch использует сейчас
+- **Наследование через PyO3 `extends`** — см. INHERITANCE_PLAN.md
 
 ---
 
@@ -71,11 +82,15 @@ macros/src/
 ### Среднесрочный (1 месяц)
 
 - [x] Автоматическая детекция формата по наличию полей ✅
-- [ ] Поддержка `#[field(choice = ["A", "B", "C"])]`
-- [ ] Поддержка `#[field(pattern = r"\d+")]` для кастомных regex
+- [x] Поддержка `#[field(choice = ["A", "B", "C"])]` ✅
+- [x] Поддержка `#[field(regex = r"\d+")]` для кастомных regex ✅
+- [x] Вывод типов из Rust-типа (`#[field]` без `ty`) ✅
 
 ### Долгосрочный (2-3 месяца)
 
+- [ ] Наследование через PyO3 `extends` — см. INHERITANCE_PLAN.md
+- [ ] Миграция всех событий на макрос
+- [ ] E2E интеграционные тесты
 - [ ] Макрос для автоматической генерации `#[define_template]` из полей
 - [ ] Поддержка вложенных структур
 - [ ] Генерация Python type stubs (.pyi)
@@ -90,8 +105,10 @@ macros/src/
 1. **Парсинг атрибутов**
    - `#[trace_event(name = "...")]` — обязательный
    - `#[trace_event(name = "...", aliases = ["..."])]` — с алиасами
-   - `#[field(ty = "string")]` — базовый тип
-   - `#[field(ty = "u32", name = "...")]` — кастомное имя
+   - `#[field]` — без аргументов, вывод типа
+   - `#[field(name = "...")]` — кастомное имя
+   - `#[field(regex = "...")]` — кастомный regex
+   - `#[field(choice = [...])]` — ограниченный набор
    - `#[field(optional)]` — опциональное поле
    - `#[field(readonly)]` — readonly
    - `#[field(private)]` — private
@@ -102,15 +119,14 @@ macros/src/
    - `impl TemplateEvent` — форматы, parse_payload, render_payload
    - `#[pymethods]` — конструктор, методы, геттеры
 
-3. **Регистрация**
+3. **TraceEnum генерация**
+   - Display — правильное строковое представление
+   - FromStr — парсинг обратно в enum
+   - TraceEnum trait — values() метод
+
+4. **Регистрация**
    - `register_parser!` — для обычных событий
    - `register_tracing_mark_parser!` — для tracing_mark
-
-4. **Python API**
-   - Конструктор с базовыми полями
-   - `can_be_parsed()`, `parse()`, `to_string()`
-   - `payload`, `template` геттеры
-   - Геттеры/сеттеры для полей
 
 ### Примеры тестов
 
@@ -131,8 +147,18 @@ fn test_optional_field() {
 }
 
 #[test]
-fn test_tracing_mark_event() {
-    // Проверяем регистрацию tracing_mark событий
+fn test_custom_regex() {
+    // Проверяем кастомный regex
+}
+
+#[test]
+fn test_choice_field() {
+    // Проверяем FieldSpec::choice
+}
+
+#[test]
+fn test_trace_enum() {
+    // Проверяем генерацию Display/FromStr/TraceEnum
 }
 ```
 
@@ -144,5 +170,6 @@ fn test_tracing_mark_event() {
 - `::trace_parser::common::EventType`
 - `::trace_parser::register_parser!`
 - `::trace_parser::payload_template::PayloadTemplate`
+- `::trace_parser::payload_template::TraceEnum`
 
 **Важно:** Основной crate должен экспортировать эти items.

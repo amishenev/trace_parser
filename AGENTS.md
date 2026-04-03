@@ -539,23 +539,15 @@ Python package files live in:
 - `macros/` crate with `#[derive(TraceEvent)]` and `#[derive(TracingMarkEvent)]`
 - Generates: `EventType`, `FastMatch`, `TemplateEvent`, `#[pymethods]` block
 - `generate_pymethods` flag to disable pymethods generation
+- **Type inference** — `#[field]` without `ty`, inferred from Rust type (String, u8/u16/u32/u64, i8/i16/i32/i64, f32/f64, bool, Option<T>)
+- **Custom regex** — `#[field(regex = r"\d{3}")]` for non-standard field formats
+- **Choice** — `#[field(choice = ["ddr_devfreq", "l3c_devfreq"])]` for limited value sets
+- **TraceEnum derive** — `#[derive(TraceEnum)]` generates Display, FromStr, TraceEnum trait
 
-**Not working:**
-- `TraceSchedSwitch` uses macro but project does NOT compile due to conflicts
-- Macro generates duplicate field definitions (thread_name, thread_tid, etc.)
-- `#[field(ty = "...", pyo3)]` not implemented — pyo3/readonly flags parsed but not used
-- `private` flag parsed but not used
-
-**Problem:**
-- Macro generates pymethods with getter/setter for all fields
-- But `#[pyclass]` + `#[pyo3(get, set)]` on fields also generates getter/setter
-- Conflict: duplicate definitions
-
-**Plan:**
-1. Macro should NOT generate getter/setter for fields — user adds `#[pyo3(get, set)]` manually
-2. Macro generates only: `EventType`, `FastMatch`, `TemplateEvent`, `#[pymethods]` (without field_accessors)
-3. Remove `payload_raw` from struct (not needed in typed events)
-4. Update documentation
+**Not working / planned:**
+- Migration of existing events to macro (only `TraceSchedSwitch` uses it now)
+- PyO3 `extends` inheritance (see INHERITANCE_PLAN.md)
+- E2E integration tests with real trace lines
 
 ## Deferred design issue
 
