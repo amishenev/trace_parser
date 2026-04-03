@@ -9,49 +9,49 @@ use trace_parser_macros::TraceEvent;
 #[trace_event(name = "sched_switch")]
 #[define_template("prev_comm={prev_comm} prev_pid={prev_pid} prev_prio={prev_prio} prev_state={prev_state} ==> next_comm={next_comm} next_pid={next_pid} next_prio={next_prio}")]
 pub struct TraceSchedSwitch {
-    #[field(ty = "u8")]
+    #[field]
     format_id: u8,
     #[pyo3(get, set)]
-    #[field(ty = "string")]
+    #[field]
     pub thread_name: String,
     #[pyo3(get, set)]
-    #[field(ty = "u32")]
+    #[field]
     pub thread_tid: u32,
     #[pyo3(get, set)]
-    #[field(ty = "u32")]
+    #[field]
     pub thread_tgid: u32,
     #[pyo3(get, set)]
-    #[field(ty = "u32")]
+    #[field]
     pub cpu: u32,
     #[pyo3(get, set)]
-    #[field(ty = "string")]
+    #[field]
     pub flags: String,
     #[pyo3(get, set)]
-    #[field(ty = "f64")]
+    #[field]
     pub timestamp: f64,
     #[pyo3(get)]
-    #[field(ty = "string")]
+    #[field]
     pub event_name: String,
     #[pyo3(get, set)]
-    #[field(ty = "string")]
+    #[field]
     pub prev_comm: String,
     #[pyo3(get, set)]
-    #[field(ty = "u32")]
+    #[field]
     pub prev_pid: u32,
     #[pyo3(get, set)]
-    #[field(ty = "i32")]
+    #[field]
     pub prev_prio: i32,
     #[pyo3(get, set)]
-    #[field(ty = "string")]
+    #[field]
     pub prev_state: String,
     #[pyo3(get, set)]
-    #[field(ty = "string")]
+    #[field]
     pub next_comm: String,
     #[pyo3(get, set)]
-    #[field(ty = "u32")]
+    #[field]
     pub next_pid: u32,
     #[pyo3(get, set)]
-    #[field(ty = "i32")]
+    #[field]
     pub next_prio: i32,
 }
 

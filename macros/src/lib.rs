@@ -65,6 +65,7 @@ pub fn derive_trace_event(input: TokenStream) -> TokenStream {
     let templates = find_define_template_attrs(&input.attrs);
     
     // Parse fields - only named fields with identifiers
+    // Collect (ident, field_type, field_attr)
     let fields = match &input.data {
         syn::Data::Struct(data) => {
             match &data.fields {
@@ -72,7 +73,7 @@ pub fn derive_trace_event(input: TokenStream) -> TokenStream {
                     fields.named.iter()
                         .filter_map(|f| {
                             f.ident.as_ref().and_then(|ident| {
-                                find_field_attr(&f.attrs).map(|attr| (ident.clone(), attr))
+                                find_field_attr(&f.attrs).map(|attr| (ident.clone(), f.ty.clone(), attr))
                             })
                         })
                         .collect::<Vec<_>>()
@@ -82,7 +83,7 @@ pub fn derive_trace_event(input: TokenStream) -> TokenStream {
         }
         _ => Vec::new(),
     };
-    
+
     // Generate code
     let event_type_impl = generate_event_type_impl(&input.ident, &event_attr);
     let fast_match_impl = generate_fast_match_impl(&input.ident, markers_attr.as_ref());
@@ -136,6 +137,7 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
     let templates = find_define_template_attrs(&input.attrs);
     
     // Parse fields - only named fields with identifiers
+    // Collect (ident, field_type, field_attr)
     let fields = match &input.data {
         syn::Data::Struct(data) => {
             match &data.fields {
@@ -143,7 +145,7 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
                     fields.named.iter()
                         .filter_map(|f| {
                             f.ident.as_ref().and_then(|ident| {
-                                find_field_attr(&f.attrs).map(|attr| (ident.clone(), attr))
+                                find_field_attr(&f.attrs).map(|attr| (ident.clone(), f.ty.clone(), attr))
                             })
                         })
                         .collect::<Vec<_>>()
@@ -153,7 +155,7 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
         }
         _ => Vec::new(),
     };
-    
+
     // Generate code
     let event_type_impl = generate_event_type_impl(&input.ident, &event_attr);
     let fast_match_impl = generate_fast_match_impl(&input.ident, markers_attr.as_ref());

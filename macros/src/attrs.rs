@@ -96,18 +96,13 @@ impl Parse for DefineTemplateAttr {
     }
 }
 
-/// Parsed `#[field(ty = "...", name = "...", optional, readonly, private)]` attribute
+/// Parsed `#[field(name = "...", optional, readonly, private)]` attribute
 ///
-/// Field attributes control how struct fields are exposed to Python:
-/// - `ty`: Type for payload parsing (string, u32, i32, f64, bool_int)
-/// - `name`: Custom name in payload template (defaults to field name)
-/// - `optional`: Field is Option<T>, can be None in Python
-/// - `readonly`: Field has getter only, no setter (e.g., event_name)
-/// - `private`: Field is not exposed to Python (internal use only)
+/// Field attributes control how struct fields are exposed to Python.
+/// Type is inferred from the Rust field type (String, u32, i32, f64, bool).
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct FieldAttr {
-    pub ty: String,
     pub name: Option<String>,
     pub optional: bool,
     pub readonly: bool,
@@ -116,7 +111,6 @@ pub struct FieldAttr {
 
 impl Parse for FieldAttr {
     fn parse(input: ParseStream) -> Result<Self> {
-        let mut ty = None;
         let mut name = None;
         let mut optional = false;
         let mut readonly = false;
@@ -127,34 +121,23 @@ impl Parse for FieldAttr {
             let key: Ident = input.parse()?;
 
             if key == "optional" || key == "readonly" || key == "private" {
-                // Boolean flags
-                if key == "optional" {
-                    optional = true;
-                } else if key == "readonly" {
-                    readonly = true;
-                } else if key == "private" {
-                    private = true;
-                }
+                if key == "optional" { optional = true; }
+                else if key == "readonly" { readonly = true; }
+                else if key == "private" { private = true; }
             } else {
                 input.parse::<Token![=]>()?;
                 let value: LitStr = input.parse()?;
-
-                if key == "ty" {
-                    ty = Some(value.value());
-                } else if key == "name" {
+                if key == "name" {
                     name = Some(value.value());
                 }
             }
 
-            // Parse optional comma
             if !input.is_empty() {
                 input.parse::<Token![,]>()?;
             }
         }
 
-        let ty = ty.ok_or_else(|| syn::Error::new(input.span(), "missing 'ty' attribute"))?;
-
-        Ok(Self { ty, name, optional, readonly, private })
+        Ok(Self { name, optional, readonly, private })
     }
 }
 
@@ -184,7 +167,24 @@ pub fn find_define_template_attrs(attrs: &[Attribute]) -> Vec<DefineTemplateAttr
 pub fn find_field_attr(attrs: &[Attribute]) -> Option<FieldAttr> {
     attrs.iter()
         .find(|attr| attr.path().is_ident("field"))
-        .and_then(|attr| attr.parse_args().ok())
+        .and_then(|attr| {
+            // #[field] без аргументов → пустой FieldAttr
+            let empty = match &attr.meta {
+                syn::Meta::Path(_) => true,
+                syn::Meta::List(list) => list.tokens.is_empty(),
+                syn::Meta::NameValue(_) => false,
+            };
+            if empty {
+                Some(FieldAttr {
+                    name: None,
+                    optional: false,
+                    readonly: false,
+                    private: false,
+                })
+            } else {
+                attr.parse_args().ok()
+            }
+        })
 }
 
 #[cfg(test)]
@@ -241,9 +241,8 @@ mod tests {
 
     #[test]
     fn test_field_attr_basic() {
-        let tokens = quote! { ty = "string" };
+        let tokens = quote! {};
         let attr: FieldAttr = syn::parse2(tokens).unwrap();
-        assert_eq!(attr.ty, "string");
         assert!(attr.name.is_none());
         assert!(!attr.optional);
         assert!(!attr.readonly);
@@ -252,41 +251,36 @@ mod tests {
 
     #[test]
     fn test_field_attr_with_name() {
-        let tokens = quote! { ty = "u32", name = "state" };
+        let tokens = quote! { name = "state" };
         let attr: FieldAttr = syn::parse2(tokens).unwrap();
-        assert_eq!(attr.ty, "u32");
         assert_eq!(attr.name, Some("state".to_string()));
     }
 
     #[test]
     fn test_field_attr_optional() {
-        let tokens = quote! { ty = "u32", optional };
+        let tokens = quote! { optional };
         let attr: FieldAttr = syn::parse2(tokens).unwrap();
-        assert_eq!(attr.ty, "u32");
         assert!(attr.optional);
     }
 
     #[test]
     fn test_field_attr_readonly() {
-        let tokens = quote! { ty = "string", readonly };
+        let tokens = quote! { readonly };
         let attr: FieldAttr = syn::parse2(tokens).unwrap();
-        assert_eq!(attr.ty, "string");
         assert!(attr.readonly);
     }
 
     #[test]
     fn test_field_attr_private() {
-        let tokens = quote! { ty = "u8", private };
+        let tokens = quote! { private };
         let attr: FieldAttr = syn::parse2(tokens).unwrap();
-        assert_eq!(attr.ty, "u8");
         assert!(attr.private);
     }
 
     #[test]
     fn test_field_attr_all_flags() {
-        let tokens = quote! { ty = "u32", name = "state", optional, readonly, private };
+        let tokens = quote! { name = "state", optional, readonly, private };
         let attr: FieldAttr = syn::parse2(tokens).unwrap();
-        assert_eq!(attr.ty, "u32");
         assert_eq!(attr.name, Some("state".to_string()));
         assert!(attr.optional);
         assert!(attr.readonly);

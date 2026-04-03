@@ -1,14 +1,15 @@
 //! Python API generation for trace_event macros.
 
 use crate::attrs::FieldAttr;
+use crate::generator::InferredType;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Ident;
+use syn::{Ident, Type};
 
 /// Generate the complete `#[pymethods]` block for the struct
 pub fn generate_pymethods_block(
     struct_name: &Ident,
-    fields: &[(Ident, FieldAttr)],
+    fields: &[(Ident, Type, FieldAttr)],
 ) -> TokenStream {
     let new_fn = generate_new(fields);
     let repr_fn = generate_repr();
@@ -64,19 +65,13 @@ pub fn generate_pymethods_block(
 }
 
 /// Generate `#[new]` constructor
-fn generate_new(fields: &[(Ident, FieldAttr)]) -> TokenStream {
-    let field_names: Vec<&Ident> = fields.iter().map(|(name, _)| name).collect();
+fn generate_new(fields: &[(Ident, Type, FieldAttr)]) -> TokenStream {
+    let field_names: Vec<&Ident> = fields.iter().map(|(name, _, _)| name).collect();
 
-    let field_params: Vec<TokenStream> = fields.iter().map(|(field_name, field_attr)| {
-        let ty = match field_attr.ty.as_str() {
-            "string" => quote! { ::std::string::String },
-            "u32" => quote! { u32 },
-            "i32" => quote! { i32 },
-            "f64" => quote! { f64 },
-            "bool_int" => quote! { bool },
-            "u8" => quote! { u8 },
-            _ => quote! { ::std::string::String },
-        };
+    let field_params: Vec<TokenStream> = fields.iter().map(|(field_name, field_ty, field_attr)| {
+        let inferred = InferredType::from_syn(field_ty)
+            .expect("unsupported field type in constructor");
+        let ty = inferred.rust_type_tokens();
 
         if field_attr.optional {
             quote! { #field_name: ::std::option::Option<#ty> }
@@ -85,7 +80,7 @@ fn generate_new(fields: &[(Ident, FieldAttr)]) -> TokenStream {
         }
     }).collect();
 
-    let field_inits: Vec<TokenStream> = fields.iter().map(|(field_name, field_attr)| {
+    let field_inits: Vec<TokenStream> = fields.iter().map(|(field_name, _field_ty, field_attr)| {
         if field_attr.optional {
             quote! { #field_name: #field_name.unwrap_or_default() }
         } else {
@@ -116,8 +111,8 @@ fn generate_repr() -> TokenStream {
 }
 
 /// Generate `__eq__` method
-fn generate_eq(struct_name: &Ident, fields: &[(Ident, FieldAttr)]) -> TokenStream {
-    let field_comparisons: Vec<TokenStream> = fields.iter().map(|(field_name, _)| {
+fn generate_eq(struct_name: &Ident, fields: &[(Ident, Type, FieldAttr)]) -> TokenStream {
+    let field_comparisons: Vec<TokenStream> = fields.iter().map(|(field_name, _, _)| {
         quote! { self.#field_name == other.#field_name }
     }).collect();
 
