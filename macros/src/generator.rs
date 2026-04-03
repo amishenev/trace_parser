@@ -5,6 +5,25 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
 
+/// Базовые поля трассировки, которые НЕ включаются в payload template
+/// но автоматически добавляются в parse_payload из BaseTraceParts
+const BASE_FIELDS: &[&str] = &[
+    "thread_name",
+    "thread_tid",
+    "thread_tgid",
+    "cpu",
+    "flags",
+    "timestamp",
+    "event_name",
+    "payload_raw",
+    "format_id",
+];
+
+/// Проверить является ли поле базовым
+fn is_base_field(name: &str) -> bool {
+    BASE_FIELDS.contains(&name)
+}
+
 /// Generate `impl EventType` for the struct
 pub fn generate_event_type_impl(
     struct_name: &Ident,
@@ -76,8 +95,10 @@ pub fn generate_template_event_impl(
         .collect();
 
     // Generate field specs for the template (used in parse_payload and template construction)
+    // Исключаем базовые поля — они не входят в payload template
     let field_specs: Vec<TokenStream> = fields
         .iter()
+        .filter(|(field_name, _)| !is_base_field(&field_name.to_string()))
         .map(|(field_name, field_attr)| {
             let name_str = field_attr.name.clone()
                 .unwrap_or_else(|| field_name.to_string());
@@ -190,8 +211,10 @@ pub fn generate_template_event_impl(
     };
 
     // Generate render statements for render_payload
+    // Исключаем базовые поля — они не рендерятся в payload
     let render_statements: Vec<TokenStream> = fields
         .iter()
+        .filter(|(field_name, _)| !is_base_field(&field_name.to_string()))
         .map(|(field_name, field_attr)| {
             let name_str = field_attr.name.clone()
                 .unwrap_or_else(|| field_name.to_string());
@@ -246,8 +269,10 @@ pub fn generate_template_event_impl(
         .collect();
 
     // Generate parse statements for parse_payload
+    // Исключаем базовые поля — они добавляются вручную из parts
     let parse_statements: Vec<TokenStream> = fields
         .iter()
+        .filter(|(field_name, _)| !is_base_field(&field_name.to_string()))
         .map(|(field_name, field_attr)| {
             let name_str = field_attr.name.clone()
                 .unwrap_or_else(|| field_name.to_string());

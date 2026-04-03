@@ -11,6 +11,9 @@ mod trace_exit;
 mod tracing_mark;
 mod tracing_mark_registry;
 
+// Make the crate visible under its own name for proc-macros
+extern crate self as trace_parser;
+
 pub use format_registry::{FormatRegistry, FormatSpec};
 pub use frequency::{TraceCpuFrequency, TraceDevFrequency};
 pub use sched_process_exit::TraceSchedProcessExit;

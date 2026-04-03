@@ -520,7 +520,30 @@ TracingMark (базовый)
 
 ### Отложенные улучшения
 
-Нет текущих отложенных улучшений.
+**Proc-macro генерация pymethods** — начата реализация, но НЕ завершена:
+
+**Что работает:**
+- `macros/` crate с `#[derive(TraceEvent)]` и `#[derive(TracingMarkEvent)]`
+- Генерация `EventType`, `FastMatch`, `TemplateEvent` (formats, parse_payload, render_payload)
+- Генерация `#[pymethods]` с `new`, `can_be_parsed`, `parse`, `to_string`, `payload`, `template`, `timestamp_ms/ns`
+- `generate_pymethods` флаг для отключения генерации pymethods
+
+**Что НЕ работает:**
+- `TraceSchedSwitch` использует макрос, но проект НЕ собирается из-за конфликтов
+- Макрос генерирует дубликаты полей (`thread_name`, `thread_tid`, и т.д.) — они уже объявлены в структуре
+- `#[field(ty = "...", pyo3)]` не реализован — `pyo3` и `readonly` флаги есть в парсинге, но не используются
+- `private` флаг есть в парсинге, но не используется
+
+**Проблема:**
+- Макрос генерирует pymethods с getter/setter для всех полей
+- Но `#[pyclass]` + `#[pyo3(get, set)]` на полях тоже генерирует getter/setter
+- Конфликт: duplicate definitions
+
+**План решения:**
+1. Макрос НЕ должен генерировать getter/setter для полей — пользователь ставит `#[pyo3(get, set)]` вручную
+2. Макрос генерирует только: `EventType`, `FastMatch`, `TemplateEvent`, `#[pymethods]` (без field_accessors)
+3. Убрать `payload_raw` из структуры (не нужен в типизированных событиях)
+4. Обновить документацию
 
 ## Ссылки
 

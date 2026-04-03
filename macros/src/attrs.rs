@@ -105,6 +105,7 @@ impl Parse for DefineTemplateAttr {
 /// - `readonly`: Field has getter only, no setter (e.g., event_name)
 /// - `private`: Field is not exposed to Python (internal use only)
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct FieldAttr {
     pub ty: String,
     pub name: Option<String>,

@@ -595,6 +595,7 @@ dependencies = [
  "pyo3",
  "regex",
  "tempfile",
+ "trace_parser_macros",
 ]
 
 [[package]]

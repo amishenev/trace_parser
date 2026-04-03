@@ -531,6 +531,31 @@ Python package files live in:
 1. Keep composition for now and postpone flattened Python access until there is one shared mechanism
 2. Add more kernel event families after that
 3. Keep event modules small and avoid unnecessary internal helper structs
+4. **Proc-macro**: finish pymethods generation (see QWEN.md "Отложенные улучшения")
+
+## Proc-macro status
+
+**Done:**
+- `macros/` crate with `#[derive(TraceEvent)]` and `#[derive(TracingMarkEvent)]`
+- Generates: `EventType`, `FastMatch`, `TemplateEvent`, `#[pymethods]` block
+- `generate_pymethods` flag to disable pymethods generation
+
+**Not working:**
+- `TraceSchedSwitch` uses macro but project does NOT compile due to conflicts
+- Macro generates duplicate field definitions (thread_name, thread_tid, etc.)
+- `#[field(ty = "...", pyo3)]` not implemented — pyo3/readonly flags parsed but not used
+- `private` flag parsed but not used
+
+**Problem:**
+- Macro generates pymethods with getter/setter for all fields
+- But `#[pyclass]` + `#[pyo3(get, set)]` on fields also generates getter/setter
+- Conflict: duplicate definitions
+
+**Plan:**
+1. Macro should NOT generate getter/setter for fields — user adds `#[pyo3(get, set)]` manually
+2. Macro generates only: `EventType`, `FastMatch`, `TemplateEvent`, `#[pymethods]` (without field_accessors)
+3. Remove `payload_raw` from struct (not needed in typed events)
+4. Update documentation
 
 ## Deferred design issue
 
