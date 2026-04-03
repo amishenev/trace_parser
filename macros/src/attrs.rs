@@ -7,12 +7,14 @@ use syn::{parse::{Parse, ParseStream}, Attribute, Ident, LitStr, Result, Token};
 pub struct TraceEventAttr {
     pub name: String,
     pub aliases: Vec<String>,
+    pub generate_pymethods: bool,
 }
 
 impl Parse for TraceEventAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut name = None;
         let mut aliases = Vec::new();
+        let mut generate_pymethods = true;
 
         // Parse comma-separated key-value pairs
         while !input.is_empty() {
@@ -28,6 +30,9 @@ impl Parse for TraceEventAttr {
                 syn::bracketed!(content in input);
                 let list = content.parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
                 aliases = list.iter().map(|s| s.value()).collect();
+            } else if key == "generate_pymethods" {
+                let value: syn::LitBool = input.parse()?;
+                generate_pymethods = value.value();
             }
 
             // Parse optional comma
@@ -38,7 +43,7 @@ impl Parse for TraceEventAttr {
 
         let name = name.ok_or_else(|| syn::Error::new(input.span(), "missing 'name' attribute"))?;
 
-        Ok(Self { name, aliases })
+        Ok(Self { name, aliases, generate_pymethods })
     }
 }
 

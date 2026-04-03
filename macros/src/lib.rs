@@ -87,8 +87,14 @@ pub fn derive_trace_event(input: TokenStream) -> TokenStream {
     let event_type_impl = generate_event_type_impl(&input.ident, &event_attr);
     let fast_match_impl = generate_fast_match_impl(&input.ident, markers_attr.as_ref());
     let template_event_impl = generate_template_event_impl(&input.ident, &templates, &fields);
-    let pymethods = generate_pymethods_block(&input.ident, &fields);
     let registration = generate_registration(&input.ident, &event_attr);
+
+    // Generate pymethods only if requested
+    let pymethods = if event_attr.generate_pymethods {
+        generate_pymethods_block(&input.ident, &fields)
+    } else {
+        quote! {}
+    };
 
     let expanded = quote! {
         #event_type_impl
@@ -152,8 +158,14 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
     let event_type_impl = generate_event_type_impl(&input.ident, &event_attr);
     let fast_match_impl = generate_fast_match_impl(&input.ident, markers_attr.as_ref());
     let template_event_impl = generate_template_event_impl(&input.ident, &templates, &fields);
-    let pymethods = generate_pymethods_block(&input.ident, &fields);
     let registration = generate_tracing_mark_registration(&input.ident);
+
+    // Generate pymethods only if requested
+    let pymethods = if event_attr.generate_pymethods {
+        generate_pymethods_block(&input.ident, &fields)
+    } else {
+        quote! {}
+    };
 
     let expanded = quote! {
         #event_type_impl
