@@ -258,7 +258,7 @@ fn generate_payload() -> TokenStream {
 fn generate_template() -> TokenStream {
     quote! {
         #[getter]
-        fn template(&self) -> &'static str {
+        fn template(&self) -> &str {
             Self::formats().template(self.format_id).unwrap().template_str()
         }
     }
