@@ -67,7 +67,12 @@ impl InferredType {
         }
     }
 
-    fn field_spec(&self, custom_regex: Option<&str>) -> TokenStream {
+    fn field_spec(&self, custom_regex: Option<&str>, choice_values: Option<&[String]>) -> TokenStream {
+        if let Some(values) = choice_values
+            && !values.is_empty()
+        {
+            return quote! { ::trace_parser::payload_template::FieldSpec::choice(&[#(#values),*]) };
+        }
         if let Some(regex) = custom_regex {
             return quote! { ::trace_parser::payload_template::FieldSpec::custom(#regex) };
         }
@@ -282,7 +287,8 @@ pub fn generate_template_event_impl(
             let name_str = field_attr.name.clone()
                 .unwrap_or_else(|| field_name.to_string());
 
-            let field_spec = inferred.field_spec(field_attr.regex.as_deref());
+            let choice = if field_attr.choice.is_empty() { None } else { Some(field_attr.choice.as_slice()) };
+            let field_spec = inferred.field_spec(field_attr.regex.as_deref(), choice);
 
             quote! {
                 (#name_str, #field_spec)
@@ -539,6 +545,7 @@ mod tests {
                     parse_quote!(u32),
                     FieldAttr {
                         name: None,
+                        choice: vec![],
                         regex: None,
                         optional: false,
                         readonly: false,
@@ -643,6 +650,7 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: None,
+                        choice: vec![],
                 regex: None,
                 optional: false,
                 readonly: false,
@@ -667,6 +675,7 @@ mod tests {
             parse_quote!(Option<u32>),
             FieldAttr {
                 name: None,
+                        choice: vec![],
                 regex: None,
                 optional: true,
                 readonly: false,
@@ -691,6 +700,7 @@ mod tests {
             FieldAttr {
                 name: Some("state".to_string()),
                 regex: None,
+                choice: vec![],
                 optional: false,
                 readonly: false,
                 private: false,
@@ -713,6 +723,7 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: None,
+                        choice: vec![],
                 regex: None,
                 optional: false,
                 readonly: false,
@@ -737,6 +748,7 @@ mod tests {
             parse_quote!(Option<u32>),
             FieldAttr {
                 name: None,
+                        choice: vec![],
                 regex: None,
                 optional: true,
                 readonly: false,
@@ -762,6 +774,7 @@ mod tests {
             parse_quote!(bool),
             FieldAttr {
                 name: None,
+                        choice: vec![],
                 regex: None,
                 optional: false,
                 readonly: false,
@@ -785,8 +798,8 @@ mod tests {
             DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1) },
         ];
         let fields = vec![
-            (parse_quote!(a), parse_quote!(u32), FieldAttr { name: None, regex: None, optional: false, readonly: false, private: false }),
-            (parse_quote!(b), parse_quote!(Option<u32>), FieldAttr { name: None, regex: None, optional: true, readonly: false, private: false }),
+            (parse_quote!(a), parse_quote!(u32), FieldAttr { name: None, choice: vec![], regex: None, optional: false, readonly: false, private: false }),
+            (parse_quote!(b), parse_quote!(Option<u32>), FieldAttr { name: None, choice: vec![], regex: None, optional: true, readonly: false, private: false }),
         ];
 
         let output = generate_template_event_impl(&struct_name, &templates, &fields);
@@ -805,6 +818,7 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: None,
+                        choice: vec![],
                 regex: None,
                 optional: false,
                 readonly: false,
@@ -828,6 +842,7 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: None,
+                        choice: vec![],
                 regex: Some(r"\d{3}".to_string()),
                 optional: false,
                 readonly: false,
@@ -846,16 +861,17 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_template_event_impl_with_custom_regex_optional() {
+    fn test_generate_template_event_impl_with_choice() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "cpu={cpu_id}".to_string(), id: None }];
+        let templates = vec![DefineTemplateAttr { template: "clk={clk}".to_string(), id: None }];
         let fields = vec![(
-            parse_quote!(cpu_id),
-            parse_quote!(Option<u32>),
+            parse_quote!(clk),
+            parse_quote!(String),
             FieldAttr {
                 name: None,
-                regex: Some(r"\d{3}".to_string()),
-                optional: true,
+                regex: None,
+                choice: vec!["ddr_devfreq".to_string(), "l3c_devfreq".to_string()],
+                optional: false,
                 readonly: false,
                 private: false,
             },
@@ -864,8 +880,9 @@ mod tests {
         let output = generate_template_event_impl(&struct_name, &templates, &fields);
         let output_str = output.to_string();
 
-        assert!(output_str.contains("FieldSpec :: custom"));
-        // Optional custom field uses cap_str without ?
-        assert!(output_str.contains("cap_str"));
+        // Should use FieldSpec::choice
+        assert!(output_str.contains("FieldSpec :: choice"));
+        assert!(output_str.contains("ddr_devfreq"));
+        assert!(output_str.contains("l3c_devfreq"));
     }
 }

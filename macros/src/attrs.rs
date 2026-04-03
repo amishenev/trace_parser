@@ -96,7 +96,7 @@ impl Parse for DefineTemplateAttr {
     }
 }
 
-/// Parsed `#[field(name = "...", regex = "...", optional, readonly, private)]` attribute
+/// Parsed `#[field(name = "...", regex = "...", choice = ["a", "b"], optional, readonly, private)]` attribute
 ///
 /// Field attributes control how struct fields are exposed to Python.
 /// Type is inferred from the Rust field type (String, u32, i32, f64, bool).
@@ -105,6 +105,7 @@ impl Parse for DefineTemplateAttr {
 pub struct FieldAttr {
     pub name: Option<String>,
     pub regex: Option<String>,
+    pub choice: Vec<String>,
     pub optional: bool,
     pub readonly: bool,
     pub private: bool,
@@ -114,6 +115,7 @@ impl Parse for FieldAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut name = None;
         let mut regex = None;
+        let mut choice = Vec::new();
         let mut optional = false;
         let mut readonly = false;
         let mut private = false;
@@ -128,11 +130,25 @@ impl Parse for FieldAttr {
                 else if key == "private" { private = true; }
             } else {
                 input.parse::<Token![=]>()?;
-                let value: LitStr = input.parse()?;
+
                 if key == "name" {
+                    let value: LitStr = input.parse()?;
                     name = Some(value.value());
                 } else if key == "regex" {
+                    let value: LitStr = input.parse()?;
                     regex = Some(value.value());
+                } else if key == "choice" {
+                    // Parse array: ["val1", "val2"] or [11, 12]
+                    let content;
+                    syn::bracketed!(content in input);
+                    let list = content.parse_terminated(|input: ParseStream| input.parse::<syn::Lit>(), Token![,])?;
+                    for lit in list {
+                        match lit {
+                            syn::Lit::Str(s) => choice.push(s.value()),
+                            syn::Lit::Int(i) => choice.push(i.base10_digits().to_string()),
+                            _ => {}
+                        }
+                    }
                 }
             }
 
@@ -141,7 +157,7 @@ impl Parse for FieldAttr {
             }
         }
 
-        Ok(Self { name, regex, optional, readonly, private })
+        Ok(Self { name, regex, choice, optional, readonly, private })
     }
 }
 
@@ -182,6 +198,7 @@ pub fn find_field_attr(attrs: &[Attribute]) -> Option<FieldAttr> {
                 Some(FieldAttr {
                     name: None,
                     regex: None,
+                    choice: Vec::new(),
                     optional: false,
                     readonly: false,
                     private: false,
