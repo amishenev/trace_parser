@@ -9,6 +9,8 @@ use trace_parser_macros::TraceEvent;
 #[trace_event(name = "sched_switch")]
 #[define_template("prev_comm={prev_comm} prev_pid={prev_pid} prev_prio={prev_prio} prev_state={prev_state} ==> next_comm={next_comm} next_pid={next_pid} next_prio={next_prio}")]
 pub struct TraceSchedSwitch {
+    #[field(ty = "u8")]
+    format_id: u8,
     #[pyo3(get, set)]
     #[field(ty = "string")]
     pub thread_name: String,
@@ -30,10 +32,6 @@ pub struct TraceSchedSwitch {
     #[pyo3(get)]
     #[field(ty = "string")]
     pub event_name: String,
-    #[field(ty = "u8")]
-    pub format_id: u8,
-    #[field(ty = "string")]
-    pub payload_raw: String,
     #[pyo3(get, set)]
     #[field(ty = "string")]
     pub prev_comm: String,

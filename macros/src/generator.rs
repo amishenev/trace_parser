@@ -15,7 +15,6 @@ const BASE_FIELDS: &[&str] = &[
     "flags",
     "timestamp",
     "event_name",
-    "payload_raw",
     "format_id",
 ];
 
@@ -356,9 +355,8 @@ pub fn generate_template_event_impl(
                     flags: parts.flags,
                     timestamp: parts.timestamp,
                     event_name: parts.event_name,
-                    payload_raw: parts.payload_raw,
                     format_id: _format_id,
-                    
+
                     // Payload поля
                     #(#parse_statements),*
                 })
