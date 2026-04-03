@@ -20,6 +20,7 @@ pub mod attrs;
 #[cfg(not(test))]
 mod attrs;
 
+mod enum_gen;
 mod generator;
 mod pymethods;
 
@@ -27,6 +28,7 @@ use attrs::{
     find_trace_event_attr, find_trace_markers_attr, find_define_template_attrs,
     find_field_attr,
 };
+use enum_gen::{generate_trace_enum, parse_variants};
 use generator::{
     generate_event_type_impl, generate_fast_match_impl, 
     generate_template_event_impl, generate_registration,
@@ -178,4 +180,19 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
     };
 
     expanded.into()
+}
+
+/// Derive macro for payload enum types.
+/// Generates Display, FromStr, and TraceEnum implementations.
+/// Use `#[value("...")]` to specify the string representation.
+#[proc_macro_derive(TraceEnum, attributes(value))]
+pub fn derive_trace_enum(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let variants = match &input.data {
+        syn::Data::Enum(data) => parse_variants(&data.variants),
+        _ => return syn::Error::new(input.ident.span(), "TraceEnum only works on enums")
+            .to_compile_error().into(),
+    };
+    let generated = generate_trace_enum(&input.ident, &variants);
+    generated.into()
 }
