@@ -96,7 +96,7 @@ impl Parse for DefineTemplateAttr {
     }
 }
 
-/// Parsed `#[field(name = "...", optional, readonly, private)]` attribute
+/// Parsed `#[field(name = "...", regex = "...", optional, readonly, private)]` attribute
 ///
 /// Field attributes control how struct fields are exposed to Python.
 /// Type is inferred from the Rust field type (String, u32, i32, f64, bool).
@@ -104,6 +104,7 @@ impl Parse for DefineTemplateAttr {
 #[allow(dead_code)]
 pub struct FieldAttr {
     pub name: Option<String>,
+    pub regex: Option<String>,
     pub optional: bool,
     pub readonly: bool,
     pub private: bool,
@@ -112,6 +113,7 @@ pub struct FieldAttr {
 impl Parse for FieldAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut name = None;
+        let mut regex = None;
         let mut optional = false;
         let mut readonly = false;
         let mut private = false;
@@ -129,6 +131,8 @@ impl Parse for FieldAttr {
                 let value: LitStr = input.parse()?;
                 if key == "name" {
                     name = Some(value.value());
+                } else if key == "regex" {
+                    regex = Some(value.value());
                 }
             }
 
@@ -137,7 +141,7 @@ impl Parse for FieldAttr {
             }
         }
 
-        Ok(Self { name, optional, readonly, private })
+        Ok(Self { name, regex, optional, readonly, private })
     }
 }
 
@@ -177,6 +181,7 @@ pub fn find_field_attr(attrs: &[Attribute]) -> Option<FieldAttr> {
             if empty {
                 Some(FieldAttr {
                     name: None,
+                    regex: None,
                     optional: false,
                     readonly: false,
                     private: false,

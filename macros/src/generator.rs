@@ -67,7 +67,10 @@ impl InferredType {
         }
     }
 
-    fn field_spec(&self) -> TokenStream {
+    fn field_spec(&self, custom_regex: Option<&str>) -> TokenStream {
+        if let Some(regex) = custom_regex {
+            return quote! { ::trace_parser::payload_template::FieldSpec::custom(#regex) };
+        }
         match self {
             Self::String => quote! { ::trace_parser::payload_template::FieldSpec::string() },
             Self::U8 => quote! { ::trace_parser::payload_template::FieldSpec::u32() },
@@ -84,8 +87,22 @@ impl InferredType {
         }
     }
 
-    fn parse_code(&self, captures: &TokenStream, name: &str) -> TokenStream {
+    fn parse_code(&self, captures: &TokenStream, name: &str, custom_regex: Option<&str>) -> TokenStream {
         let name = name.to_string();
+        // Custom regex: always parse as string, then convert
+        if custom_regex.is_some() {
+            return match self {
+                Self::String => quote! { ::trace_parser::common::cap_str(#captures, #name)? },
+                Self::U8 | Self::U16 | Self::U32 | Self::U64 | Self::I8 | Self::I16 | Self::I32 | Self::I64 => {
+                    quote! { ::trace_parser::common::cap_str(#captures, #name)?.parse().ok()? }
+                }
+                Self::F32 | Self::F64 => {
+                    quote! { ::trace_parser::common::cap_str(#captures, #name)?.parse().ok()? }
+                }
+                Self::Bool => quote! { ::trace_parser::common::cap_str(#captures, #name)? == "1" },
+            };
+        }
+        // Default: use type-specific parsing
         match self {
             Self::String => quote! { ::trace_parser::common::cap_str(#captures, #name)? },
             Self::U8 => quote! { ::trace_parser::common::cap_parse::<u8>(#captures, #name)? },
@@ -102,8 +119,20 @@ impl InferredType {
         }
     }
 
-    fn parse_optional_code(&self, captures: &TokenStream, name: &str) -> TokenStream {
+    fn parse_optional_code(&self, captures: &TokenStream, name: &str, custom_regex: Option<&str>) -> TokenStream {
         let name = name.to_string();
+        if custom_regex.is_some() {
+            return match self {
+                Self::String => quote! { ::trace_parser::common::cap_str(#captures, #name) },
+                Self::U8 | Self::U16 | Self::U32 | Self::U64 | Self::I8 | Self::I16 | Self::I32 | Self::I64 => {
+                    quote! { ::trace_parser::common::cap_str(#captures, #name).and_then(|s| s.parse().ok()) }
+                }
+                Self::F32 | Self::F64 => {
+                    quote! { ::trace_parser::common::cap_str(#captures, #name).and_then(|s| s.parse().ok()) }
+                }
+                Self::Bool => quote! { ::trace_parser::common::cap_str(#captures, #name).map(|v| v == "1") },
+            };
+        }
         match self {
             Self::String => quote! { ::trace_parser::common::cap_str(#captures, #name) },
             Self::U8 => quote! { ::trace_parser::common::cap_parse::<u8>(#captures, #name) },
@@ -253,7 +282,7 @@ pub fn generate_template_event_impl(
             let name_str = field_attr.name.clone()
                 .unwrap_or_else(|| field_name.to_string());
 
-            let field_spec = inferred.field_spec();
+            let field_spec = inferred.field_spec(field_attr.regex.as_deref());
 
             quote! {
                 (#name_str, #field_spec)
@@ -387,14 +416,15 @@ pub fn generate_template_event_impl(
                 .expect("unsupported field type for parse");
             let name_str = field_attr.name.clone()
                 .unwrap_or_else(|| field_name.to_string());
+            let regex = field_attr.regex.as_deref();
 
             if field_attr.optional {
-                let parse = inferred.parse_optional_code(&quote! { captures }, &name_str);
+                let parse = inferred.parse_optional_code(&quote! { captures }, &name_str, regex);
                 quote! {
                     #field_name: #parse
                 }
             } else {
-                let parse = inferred.parse_code(&quote! { captures }, &name_str);
+                let parse = inferred.parse_code(&quote! { captures }, &name_str, regex);
                 quote! {
                     #field_name: #parse
                 }
@@ -509,6 +539,7 @@ mod tests {
                     parse_quote!(u32),
                     FieldAttr {
                         name: None,
+                        regex: None,
                         optional: false,
                         readonly: false,
                         private: false,
@@ -538,6 +569,7 @@ mod tests {
         let event_attr = TraceEventAttr {
             name: "sched_switch".to_string(),
             aliases: vec!["sched_sw".to_string()],
+            generate_pymethods: true,
         };
 
         let output = generate_event_type_impl(&struct_name, &event_attr);
@@ -581,6 +613,7 @@ mod tests {
         let event_attr = TraceEventAttr {
             name: "sched_switch".to_string(),
             aliases: vec![],
+            generate_pymethods: true,
         };
 
         let output = generate_registration(&struct_name, &event_attr);
@@ -610,6 +643,7 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: None,
+                regex: None,
                 optional: false,
                 readonly: false,
                 private: false,
@@ -633,6 +667,7 @@ mod tests {
             parse_quote!(Option<u32>),
             FieldAttr {
                 name: None,
+                regex: None,
                 optional: true,
                 readonly: false,
                 private: false,
@@ -655,6 +690,7 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: Some("state".to_string()),
+                regex: None,
                 optional: false,
                 readonly: false,
                 private: false,
@@ -677,6 +713,7 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: None,
+                regex: None,
                 optional: false,
                 readonly: false,
                 private: false,
@@ -700,6 +737,7 @@ mod tests {
             parse_quote!(Option<u32>),
             FieldAttr {
                 name: None,
+                regex: None,
                 optional: true,
                 readonly: false,
                 private: false,
@@ -724,6 +762,7 @@ mod tests {
             parse_quote!(bool),
             FieldAttr {
                 name: None,
+                regex: None,
                 optional: false,
                 readonly: false,
                 private: false,
@@ -746,8 +785,8 @@ mod tests {
             DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1) },
         ];
         let fields = vec![
-            (parse_quote!(a), parse_quote!(u32), FieldAttr { name: None, optional: false, readonly: false, private: false }),
-            (parse_quote!(b), parse_quote!(Option<u32>), FieldAttr { name: None, optional: true, readonly: false, private: false }),
+            (parse_quote!(a), parse_quote!(u32), FieldAttr { name: None, regex: None, optional: false, readonly: false, private: false }),
+            (parse_quote!(b), parse_quote!(Option<u32>), FieldAttr { name: None, regex: None, optional: true, readonly: false, private: false }),
         ];
 
         let output = generate_template_event_impl(&struct_name, &templates, &fields);
@@ -766,6 +805,7 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: None,
+                regex: None,
                 optional: false,
                 readonly: false,
                 private: false,
@@ -777,5 +817,55 @@ mod tests {
 
         // Single template: detect_format always returns 0
         assert!(output_str.contains("fn detect_format (_payload : & str) -> u8 { 0 }"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_with_custom_regex() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let templates = vec![DefineTemplateAttr { template: "cpu={cpu_id}".to_string(), id: None }];
+        let fields = vec![(
+            parse_quote!(cpu_id),
+            parse_quote!(u32),
+            FieldAttr {
+                name: None,
+                regex: Some(r"\d{3}".to_string()),
+                optional: false,
+                readonly: false,
+                private: false,
+            },
+        )];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        // Should use FieldSpec::custom with the regex
+        assert!(output_str.contains("FieldSpec :: custom"));
+        assert!(output_str.contains("\\d{3}"));
+        // Parse via cap_str (not cap_parse) because custom regex
+        assert!(output_str.contains("cap_str"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_with_custom_regex_optional() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let templates = vec![DefineTemplateAttr { template: "cpu={cpu_id}".to_string(), id: None }];
+        let fields = vec![(
+            parse_quote!(cpu_id),
+            parse_quote!(Option<u32>),
+            FieldAttr {
+                name: None,
+                regex: Some(r"\d{3}".to_string()),
+                optional: true,
+                readonly: false,
+                private: false,
+            },
+        )];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("FieldSpec :: custom"));
+        // Optional custom field uses cap_str without ?
+        assert!(output_str.contains("cap_str"));
     }
 }
