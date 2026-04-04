@@ -27,17 +27,20 @@ The current design keeps parsing in Rust and exposes Python classes only when re
 
 ## Current event support
 
-- `Trace`
-- `TraceSchedSwitch`
-- `TraceSchedWakeup`
-- `TraceSchedWakeupNew`
-- `TraceSchedProcessExit`
-- `TraceCpuFrequency`
-- `TraceDevFrequency`
-- `TracingMark`
-- `TraceMarkBegin`
-- `TraceMarkEnd`
-- `TraceReceiveVsync`
+| Event | Description |
+|-------|-------------|
+| `Trace` | Generic fallback for any trace line |
+| `TraceSchedSwitch` | Scheduler context switch (`sched_switch`) |
+| `TraceSchedWakeup` | Process wakeup (`sched_wakeup`) |
+| `TraceSchedWakeupNew` | New process wakeup (`sched_wakeup_new`) |
+| `TraceSchedProcessExit` | Process exit (`sched_process_exit`) |
+| `TraceExit` | Kernel exit events (`exit1`, `exit2`) |
+| `TraceCpuFrequency` | CPU frequency change (`cpu_frequency`) |
+| `TraceDevFrequency` | Device frequency change (`clock_set_rate`) |
+| `TracingMark` | Generic tracing mark (any payload) |
+| `TraceMarkBegin` | Begin mark (`B|tgid|message`) |
+| `TraceMarkEnd` | End mark (`E|tgid|message`) |
+| `TraceReceiveVsync` | ReceiveVsync begin mark |
 
 ## Python API
 
@@ -94,33 +97,52 @@ cargo clippy --all-targets -- -D warnings
 ## Example
 
 ```python
-from trace_parser import TraceSchedSwitch, TraceDevFrequency, TraceReceiveVsync
+from trace_parser import (
+    TraceSchedSwitch,
+    TraceSchedWakeup,
+    TraceDevFrequency,
+    TraceReceiveVsync,
+    parse_trace,
+)
 
-switch_line = (
+# Factory parsing — auto-detects event type
+line = (
     "bash-1977 (12) [000] .... 12345.678901: sched_switch: "
     "prev_comm=bash prev_pid=1977 prev_prio=120 prev_state=S ==> "
     "next_comm=worker next_pid=123 next_prio=120"
 )
+event = parse_trace(line)
+print(type(event).__name__)  # TraceSchedSwitch
 
-switch = TraceSchedSwitch.parse(switch_line)
+# Direct parsing with typed class
+switch = TraceSchedSwitch.parse(line)
 assert switch is not None
 print(switch.timestamp)
 print(switch.prev_comm, switch.next_comm)
 
+# Multi-format events (sched_wakeup with optional reason)
+wakeup_line = (
+    "kworker-123 (123) [000] .... 12345.679001: sched_wakeup: "
+    "comm=bash pid=1977 prio=120 target_cpu=000 reason=3"
+)
+wakeup = TraceSchedWakeup.parse(wakeup_line)
+assert wakeup is not None
+print(wakeup.reason)  # 3
+
+# Device frequency (fast-match via SIMD)
 freq_line = (
     "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: "
     "clk=ddr_devfreq state=933000000 cpu_id=0"
 )
-
 freq = TraceDevFrequency.parse(freq_line)
 assert freq is not None
 print(freq.clk, freq.state)
 
+# Tracing marks (begin/end with TGID prefix)
 vsync_line = (
     "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: "
     "B|10|[ExtraInfo]ReceiveVsync 42"
 )
-
 vsync = TraceReceiveVsync.parse(vsync_line)
 assert vsync is not None
 print(vsync.frame_number)
@@ -129,37 +151,67 @@ print(vsync.frame_number)
 ## Project layout
 
 ```text
-src/
-  trace.rs
-  sched_switch.rs
-  sched_wakeup.rs
-  sched_process_exit.rs
-  frequency.rs
-  tracing_mark/
-    base.rs
-    receive_vsync.rs
+src/                          # Rust source
+  trace.rs                    # Base Trace class (hand-written, fallback)
+  common.rs                   # Shared traits & utilities
+  payload_template.rs         # Payload template system
+  format_registry.rs          # Multi-format registry
+  registry.rs                 # Event parser registry
+  sched_switch.rs             # sched_switch (macro-generated)
+  sched_wakeup.rs             # sched_wakeup / sched_wakeup_new (macro-generated)
+  sched_process_exit.rs       # sched_process_exit (macro-generated)
+  frequency.rs                # cpu_frequency / clock_set_rate (macro-generated)
+  trace_exit.rs               # exit1 / exit2 (macro-generated)
+  tracing_mark/               # Tracing mark events (macro-generated)
+    base.rs                   # TracingMark
+    begin.rs                  # TraceMarkBegin
+    end.rs                    # TraceMarkEnd
+    receive_vsync.rs          # TraceReceiveVsync
+  tracing_mark_registry.rs    # Tracing mark dispatch
 
-python/trace_parser/
-  __init__.py
-  __init__.pyi
-  trace.py
-  frequency.py
-  sched_switch.py
-  sched_wakeup.py
-  sched_process_exit.py
-  tracing_mark/
-    base.py
-    receive_vsync.py
+trace_parser/                 # Python package
+  __init__.py                 # Public API (re-exports from _native)
+  __init__.pyi                # Type stubs
+  _native.pyi                 # Native module stubs
+  py.typed                    # PEP 561 marker
+
+macros/                       # Proc-macro crate
+  src/
+    lib.rs                    # TraceEvent, TracingMarkEvent, TraceEnum
+    attrs.rs                  # Attribute parsing
+    generator.rs              # Trait generation
+    pymethods.rs              # Python API generation
+    enum_gen.rs               # TraceEnum generation
+  examples/                   # Macro usage examples
+
+tests/python/                 # Python smoke tests
+examples/                     # Python usage examples
+benches/                      # Rust benchmarks
 ```
 
 ## Development notes
 
-- Python package typing lives in `python/trace_parser/*.pyi`
-- `maturin develop` creates local native artifacts under `python/trace_parser/`
+- Python package typing lives in `trace_parser/*.pyi`
+- `maturin develop` creates local native artifacts under `trace_parser/`
 - those native build artifacts are ignored by git
 - Python smoke tests live in `tests/python/`
 - Minimum Rust version: 1.83 (edition 2024)
-- PyO3 version: 0.28.2+
+- PyO3 version: 0.28
+- Proc-macros: `trace_parser_macros` crate (see `macros/` directory)
+
+### Proc-macro system
+
+**All typed events are generated** via `#[derive(TraceEvent)]` or `#[derive(TracingMarkEvent)]` from the `trace_parser_macros` crate. The only hand-written event is `Trace` (generic fallback).
+
+The macro generates:
+
+- `impl EventType` — event name and aliases
+- `impl FastMatch` — SIMD-based quick checks
+- `impl TemplateEvent` — payload parsing and rendering
+- `#[pymethods]` — Python API (constructor, parse, to_string, etc.)
+- Parser registration via `inventory::submit!`
+
+See `macros/QWEN.md` for the full macro syntax reference.
 
 ## CI
 
@@ -192,10 +244,12 @@ git push origin v0.1.0
 
 ## Roadmap
 
-- add more typed trace events
+- add more typed trace events (sched_migrate, sched_waking, etc.)
+- migrate remaining hand-written events onto proc-macros
+- PyO3 `extends` for shared base fields (see INHERITANCE_PLAN.md)
+- E2E integration tests with real trace files
 - stabilize the typed-event authoring pattern
-- improve Python-side ergonomics for common base fields
-- expand Python smoke coverage and release artifacts
+- expand Python smoke coverage
 
 ## Performance
 

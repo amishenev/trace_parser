@@ -5,9 +5,8 @@ use trace_parser_macros::TracingMarkEvent;
 #[derive(Clone, Debug, PartialEq)]
 #[derive(TracingMarkEvent)]
 #[trace_event(name = "tracing_mark_write", begin, skip_registration)]
-#[trace_markers("ReceiveVsync")]
-#[define_template("{?ignore:extra_info}ReceiveVsync {frame_number}", extra_info = r"\[[^\]]+\]")]
-pub struct TraceReceiveVsync {
+#[define_template("{message}")]
+pub struct TraceMarkBegin {
     #[field]
     format_id: u8,
     #[pyo3(get, set)]
@@ -36,30 +35,35 @@ pub struct TraceReceiveVsync {
     pub trace_mark_tgid: u32,
     #[pyo3(get, set)]
     #[field]
-    pub frame_number: u32,
+    pub message: String,
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::TraceReceiveVsync;
+    use crate::TraceMarkBegin;
 
     #[test]
-    fn receive_vsync_parses_specific_begin_payload() {
+    fn trace_mark_begin_parses() {
         let line =
-            "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|ReceiveVsync 42";
-        let mark = TraceReceiveVsync::parse(line).expect("receive vsync begin mark must parse");
+            "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|some_custom_message";
+        let mark = TraceMarkBegin::parse(line).expect("begin mark must parse");
         assert_eq!(mark.trace_mark_tgid, 10);
-        assert_eq!(mark.frame_number, 42);
+        assert_eq!(mark.message, "some_custom_message");
         assert_eq!(
             mark.to_string().expect("to_string must work"),
-            "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|ReceiveVsync 42"
+            "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|some_custom_message"
         );
     }
 
     #[test]
-    fn receive_vsync_ignores_service_prefix() {
-        let line = "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: B|10|[ExtraInfo]ReceiveVsync 42";
-        let mark = TraceReceiveVsync::parse(line).expect("receive vsync begin mark must parse");
-        assert_eq!(mark.frame_number, 42);
+    fn trace_mark_begin_new_and_methods() {
+        let mark = TraceMarkBegin::new(
+            0, "task".into(), 100, 100, 0, "....".into(), 1.0, "tracing_mark_write".into(),
+            100, "message".into(),
+        ).unwrap();
+        assert_eq!(mark.thread_name, "task");
+        assert_eq!(mark.thread_tid, 100);
+        assert_eq!(mark.trace_mark_tgid, 100);
+        assert_eq!(mark.message, "message");
     }
 }

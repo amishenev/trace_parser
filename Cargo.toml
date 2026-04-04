@@ -1,3 +1,14 @@
+[workspace]
+members = [
+    ".",
+    "macros",
+]
+
+[workspace.dependencies]
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+
 [package]
 name = "trace_parser"
 version = "0.2.0"
@@ -17,6 +28,7 @@ lexical-core = { version = "1.0", features = ["parse"] }
 memchr = "2.7"
 pyo3 = { version = "0.28", features = ["abi3-py310"] }
 regex = "1.12"
+trace_parser_macros = { path = "macros" }
 
 [dev-dependencies]
 tempfile = "3"

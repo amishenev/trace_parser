@@ -1,0 +1,20 @@
+---
+description: trace_parser — always-on agent context pointer
+alwaysApply: true
+---
+
+# trace_parser
+
+**Ftrace/tracefs log parser:** Rust core + PyO3 0.28, Python 3.10+, `uv` + `.venv`.
+
+**Before non-trivial edits, read** `AGENT_QUICKSTART.md` (repo root) for file map, commands, and invariants. **Full policy:** `AGENTS.md`.
+
+**Hard rules**
+
+- Typed events use **composition** (`base: Trace` / nested); **no** ad-hoc flattened Python properties per class.
+- **FastMatch** before expensive parse; after heuristic changes, consider `cargo bench --bench can_be_parsed`.
+- New/changed **public API**: Rust exports + `python/trace_parser/__init__.py` + **all relevant `.pyi`** + example + `tests/python` smoke test.
+- Commits: **Conventional Commits, English** (CI commitlint).
+- Python dev: `maturin develop`, not ad-hoc copying `.so` into the package.
+
+**Quick verify:** `cargo test -q`, `cargo clippy --all-targets -- -D warnings`, `pytest -q tests/python` after binding changes.

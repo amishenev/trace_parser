@@ -91,10 +91,14 @@ cargo clippy --all-targets -- -D warnings
 ### Пример использования
 
 ```python
-from trace_parser import parse_trace, TraceSchedSwitch, TraceDevFrequency
+from trace_parser import parse_trace, parse_trace_file, TraceSchedSwitch, TraceDevFrequency
 
-# Парсинг через фабрику
+# Парсинг через фабрику (однострочный)
 event = parse_trace(line)
+
+# Парсинг всего файла (быстрее чем построчный вызов parse_trace)
+events = parse_trace_file("trace.txt")
+events_filtered = parse_trace_file("trace.txt", filter_event="sched_switch")
 
 # Прямой парсинг
 switch = TraceSchedSwitch.parse(line)
@@ -119,28 +123,34 @@ print(switch.template)     # Строка шаблона
 ```
 trace_parser/
 ├── src/                          # Rust исходники
-│   ├── lib.rs                    # Точка входа, экспорты
+│   ├── lib.rs                    # Точка входа, экспорты, parse_trace, parse_trace_file
 │   ├── trace.rs                  # Базовый класс Trace
-│   ├── common.rs                 # Общие утилиты парсинга
+│   ├── common.rs                 # Общие утилиты парсинга, FastMatch, EventType
 │   ├── payload_template.rs       # Шаблоны полезной нагрузки
-│   ├── sched_switch.rs           # sched_switch парсер
-│   ├── sched_wakeup.rs           # sched_wakeup/wakeup_new парсеры
+│   ├── format_registry.rs        # Реестр форматов (multi-format)
+│   ├── registry.rs               # Реестр парсеров событий
+│   ├── sched_switch.rs           # sched_switch парсер (macro-generated)
+│   ├── sched_wakeup.rs           # sched_wakeup/wakeup_new парсеры (macro-generated)
 │   ├── sched_process_exit.rs     # sched_process_exit парсер
-│   ├── frequency.rs              # Частотные события
-│   └── tracing_mark/             # Tracing mark события
-│       ├── base.rs               # TracingMark, TraceMarkBegin, TraceMarkEnd
-│       └── receive_vsync.rs      # TraceReceiveVsync
-├── python/trace_parser/          # Python обёртки
-│   ├── __init__.py               # Публичный API
+│   ├── frequency.rs              # Частотные события (macro-generated)
+│   ├── trace_exit.rs             # exit1, exit2 парсеры
+│   ├── tracing_mark/             # Tracing mark события
+│   │   ├── base.rs               # TracingMark, TraceMarkBegin, TraceMarkEnd
+│   │   └── receive_vsync.rs      # TraceReceiveVsync
+│   └── tracing_mark_registry.rs  # Реестр tracing_mark подтипов
+├── trace_parser/                 # Python пакет
+│   ├── __init__.py               # Публичный API (реэкспорт из _native)
 │   ├── __init__.pyi              # Type stubs
-│   ├── trace.py(i)               # Trace класс
-│   ├── sched_switch.py(i)        # TraceSchedSwitch
-│   ├── sched_wakeup.py(i)        # TraceSchedWakeup/New
-│   ├── sched_process_exit.py(i)  # TraceSchedProcessExit
-│   ├── frequency.py(i)           # TraceCpu/DevFrequency
-│   └── tracing_mark/             # Tracing mark модули
-│       ├── base.py(i)
-│       └── receive_vsync.py(i)
+│   ├── _native.pyi               # Native module stubs
+│   └── py.typed                  # PEP 561 marker
+├── macros/                       # Proc-macro crate
+│   ├── src/
+│   │   ├── lib.rs                # TraceEvent, TracingMarkEvent, TraceEnum
+│   │   ├── attrs.rs              # Парсинг атрибутов
+│   │   ├── generator.rs          # Генерация trait impl
+│   │   ├── pymethods.rs          # Генерация Python API
+│   │   └── enum_gen.rs           # Генерация TraceEnum
+│   └── examples/                 # Примеры использования макросов
 ├── tests/python/                 # Python smoke тесты
 ├── examples/                     # Примеры использования
 └── benches/                      # Бенчмарки
@@ -520,7 +530,42 @@ TracingMark (базовый)
 
 ### Отложенные улучшения
 
-Нет текущих отложенных улучшений.
+**Proc-macro генерация pymethods** — ✅ завершена:
+
+**Реализованные фичи:**
+
+| Фича | Синтаксис | Статус |
+|------|-----------|--------|
+| Вывод типов | `#[field]` без `ty` | ✅ |
+| Кастомный regex | `#[field(regex = r"\d{3}")]` | ✅ |
+| Choice | `#[field(choice = ["a", "b"])]` | ✅ |
+| Enum | `#[derive(TraceEnum)]` + `#[value("...")]` | ✅ |
+| `generate_pymethods` | `generate_pymethods = true/false` | ✅ |
+| Формат рендера | `#[field(format = "{:03}")]` | ✅ |
+| Multi-template | несколько `#[define_template(...)]` + `detect = [...]` | ✅ |
+| Fast-match | `#[fast_match(contains_any = [...])]` | ✅ |
+| TracingMark | `#[derive(TracingMarkEvent)]` + `begin`/`end` | ✅ |
+
+**Что работает:**
+- `macros/` crate с `#[derive(TraceEvent)]`, `#[derive(TracingMarkEvent)]` и `#[derive(TraceEnum)]`
+- Генерация `EventType`, `FastMatch`, `TemplateEvent`
+- Генерация `#[pymethods]` с `new`, `can_be_parsed`, `parse`, `to_string`, `payload`, `template`
+- Type inference из Rust-типа (String, u8/u16/u32/u64, i8/i16/i32/i64, f32/f64, bool, Option<T>)
+- Кастомный regex для полей с нестандартным форматом
+- Choice для полей с ограниченным набором значений
+- `#[field(format = "...")]` для кастомного рендера (например `{:03}` → `000`)
+- Multi-template с SIMD-детекцией формата через `detect = ["..."]`
+- `#[derive(TraceEnum)]` — генерация Display, FromStr, TraceEnum trait
+- `skip_registration` для TraceMarkBegin/End (регистрируются явно)
+
+**Все типовые события на макросах:** `TraceSchedSwitch`, `TraceSchedWakeup`, `TraceSchedWakeupNew`, `TraceSchedProcessExit`, `TraceExit`, `TraceCpuFrequency`, `TraceDevFrequency`, `TracingMark`, `TraceMarkBegin`, `TraceMarkEnd`, `TraceReceiveVsync`
+
+**Единственное ручное событие:** `Trace` (базовый fallback класс, не `TemplateEvent`)
+
+**Что остаётся (не связано с миграцией):**
+- Наследование через PyO3 `extends` — см. INHERITANCE_PLAN.md
+- E2E интеграционные тесты
+- Генерация Python type stubs (.pyi) из макросов
 
 ## Ссылки
 
