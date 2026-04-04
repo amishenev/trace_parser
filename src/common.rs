@@ -58,7 +58,7 @@ pub fn extract_event_name(line: &str) -> Option<&str> {
 pub(crate) trait EventType {
     const EVENT_NAME: &'static str;
     const EVENT_ALIASES: &'static [&'static str] = &[];
-    
+
     fn matches_event_name(name: &str) -> bool {
         name == Self::EVENT_NAME || Self::EVENT_ALIASES.contains(&name)
     }
@@ -67,7 +67,7 @@ pub(crate) trait EventType {
 pub(crate) trait FastMatch: EventType {
     /// Маркеры для простой проверки payload (автоматическая SIMD проверка)
     const PAYLOAD_MARKERS: &'static [&'static [u8]] = &[];
-    
+
     /// Быстрая проверка: event_name && маркеры && payload_quick_check
     /// Все три условия должны выполниться
     fn quick_check(line: &str) -> bool {
@@ -121,37 +121,16 @@ pub(crate) trait TemplateEvent: EventType {
     fn render_payload(&self) -> PyResult<String>;
 }
 
-#[allow(dead_code)]
-pub(crate) fn contains_all(line: &str, needles: &[&str]) -> bool {
-    needles.iter().all(|needle| line.contains(needle))
-}
-
 pub(crate) fn contains_any(line: &str, needles: &[&str]) -> bool {
     needles.iter().any(|needle| line.contains(needle))
 }
 
-pub(crate) fn parse_event<T: EventType>(line: &str) -> Option<BaseTraceParts> {
-    let parts = parse_base_parts(line)?;
-    if !T::matches_event_name(&parts.event_name) {
-        return None;
-    }
-    Some(parts)
-}
-
 pub(crate) fn parse_template_event<T: TemplateEvent>(line: &str) -> Option<T> {
-    let parts = parse_event::<T>(line)?;
+    let parts = parse_base_parts(line)?;
     let payload_raw = parts.payload_raw.clone();
-
-    // Детекция формата
     let format_id = T::detect_format(&payload_raw);
-
-    // Выбор шаблона по формату
     let template = T::formats().template(format_id)?;
-
-    // Парсинг через regex
     let captures = template.captures(&payload_raw)?;
-
-    // Создание объекта
     T::parse_payload(parts, &captures, format_id)
 }
 

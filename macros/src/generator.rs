@@ -526,26 +526,43 @@ pub fn generate_template_event_impl(
     }
 }
 
-/// Generate registration code — regular, tracing_mark, or skipped
+/// Generate registration code — emits inventory::submit! directly
 pub fn generate_registration(struct_name: &Ident, event_attr: &TraceEventAttr, is_tracing_mark: bool) -> TokenStream {
     if event_attr.skip_registration {
         return quote! {};
     }
     if is_tracing_mark {
         quote! {
-            ::trace_parser::register_tracing_mark_parser!(#struct_name);
+            inventory::submit! {
+                ::trace_parser::tracing_mark_registry::TracingMarkEntry {
+                    parser: |py, line| ::trace_parser::parse_and_wrap(py, line, <#struct_name>::parse),
+                }
+            }
         }
     } else {
         let name = &event_attr.name;
         let aliases = &event_attr.aliases;
-        let alias_registrations = aliases.iter().map(|alias| {
-            quote! {
-                ::trace_parser::register_parser!(#alias, #struct_name);
+        let primary = quote! {
+            inventory::submit! {
+                ::trace_parser::registry::RegisteredParser {
+                    event_name: #name,
+                    parser: |py, line| ::trace_parser::parse_and_wrap(py, line, <#struct_name>::parse),
+                }
             }
-        });
+        };
+        let alias_submits: Vec<TokenStream> = aliases.iter().map(|alias| {
+            quote! {
+                inventory::submit! {
+                    ::trace_parser::registry::RegisteredParser {
+                        event_name: #alias,
+                        parser: |py, line| ::trace_parser::parse_and_wrap(py, line, <#struct_name>::parse),
+                    }
+                }
+            }
+        }).collect();
         quote! {
-            ::trace_parser::register_parser!(#name, #struct_name);
-            #(#alias_registrations)*
+            #primary
+            #(#alias_submits)*
         }
     }
 }
@@ -691,7 +708,8 @@ mod tests {
         let output = generate_registration(&struct_name, &event_attr, false);
         let output_str = output.to_string();
 
-        assert!(output_str.contains("register_parser"));
+        assert!(output_str.contains("inventory :: submit"));
+        assert!(output_str.contains("sched_switch"));
         assert!(output_str.contains("TraceSchedSwitch"));
     }
 
@@ -712,6 +730,9 @@ mod tests {
         assert!(output_str.contains("exit1"));
         assert!(output_str.contains("exit2"));
         assert!(output_str.contains("TraceExit"));
+        // Two submit! calls: one for name, one for alias
+        let count = output_str.matches("inventory :: submit").count();
+        assert_eq!(count, 2);
     }
 
     #[test]
@@ -728,7 +749,8 @@ mod tests {
         let output = generate_registration(&struct_name, &event_attr, true);
         let output_str = output.to_string();
 
-        assert!(output_str.contains("register_tracing_mark_parser"));
+        assert!(output_str.contains("inventory :: submit"));
+        assert!(output_str.contains("TracingMarkEntry"));
         assert!(output_str.contains("TraceReceiveVsync"));
     }
 

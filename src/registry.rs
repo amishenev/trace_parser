@@ -13,21 +13,6 @@ pub struct RegisteredParser {
 // Collect all registered parsers at compile time
 inventory::collect!(RegisteredParser);
 
-/// Register a parser for a specific event name.
-///
-/// Usage: `register_parser!("event_name", EventTypeStruct);`
-#[macro_export]
-macro_rules! register_parser {
-    ($event_name:expr, $parser:ty) => {
-        inventory::submit! {
-            $crate::registry::RegisteredParser {
-                event_name: $event_name,
-                parser: |py, line| $crate::parse_and_wrap(py, line, <$parser>::parse),
-            }
-        }
-    };
-}
-
 /// Dispatch parsing to the appropriate parser based on event name
 ///
 /// Iterates through all registered parsers and uses the first one that matches.

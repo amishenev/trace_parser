@@ -15,22 +15,6 @@ pub struct TracingMarkEntry {
 // Collect all registered tracing_mark parsers at compile time
 inventory::collect!(TracingMarkEntry);
 
-/// Register a tracing_mark parser for specific subtypes.
-///
-/// Usage: `register_tracing_mark_parser!(EventTypeStruct);`
-///
-/// Example: `register_tracing_mark_parser!(TraceReceiveVsync);`
-#[macro_export]
-macro_rules! register_tracing_mark_parser {
-    ($parser:ty) => {
-        inventory::submit! {
-            $crate::tracing_mark_registry::TracingMarkEntry {
-                parser: |py, line| $crate::parse_and_wrap(py, line, <$parser>::parse),
-            }
-        }
-    };
-}
-
 /// Parse tracing_mark_write events.
 ///
 /// Order of parsing:

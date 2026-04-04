@@ -26,10 +26,4 @@ impl FormatRegistry {
             .find(|spec| spec.kind == kind)
             .map(|spec| spec.template)
     }
-
-    /// Получить формат по индексу
-    #[allow(dead_code)]
-    pub fn get(&self, kind: u8) -> Option<&FormatSpec> {
-        self.formats.iter().find(|spec| spec.kind == kind)
-    }
 }
