@@ -103,11 +103,11 @@ Python packaging baseline:
 
 Editable build artifacts:
 
-- `maturin develop` places native artifacts such as `_native.abi3.so` under `python/trace_parser/`
+- `maturin develop` places native artifacts such as `_native.abi3.so` under `trace_parser/`
 - macOS may also emit `*.dSYM/` alongside that extension
 - these are expected local build artifacts
 - they must be ignored by git
-- do not manually copy or symlink native libraries into `python/trace_parser/`
+- do not manually copy or symlink native libraries into `trace_parser/`
 
 ## Commit messages
 
@@ -158,15 +158,17 @@ Base fields (Rust / Python use `thread_tid` and `thread_tgid`; trace line still 
 
 Current typed classes:
 
-- `TraceSchedSwitch`
-- `TraceSchedWakeup`
-- `TraceSchedWakeupNew`
+- `Trace` (generic fallback)
+- `TraceSchedSwitch` (macro-generated)
+- `TraceSchedWakeup` (macro-generated)
+- `TraceSchedWakeupNew` (macro-generated)
 - `TraceSchedProcessExit`
-- `TraceCpuFrequency`
-- `TraceDevFrequency`
-- `TracingMark`
-- `TraceMarkBegin`
-- `TraceMarkEnd`
+- `TraceExit` (exit1, exit2)
+- `TraceCpuFrequency` (macro-generated)
+- `TraceDevFrequency` (macro-generated)
+- `TracingMark` (macro-generated)
+- `TraceMarkBegin` (macro-generated)
+- `TraceMarkEnd` (macro-generated)
 - `TraceReceiveVsync`
 
 ### Flat typed events + proc-macro authoring
@@ -434,7 +436,7 @@ Current performance intent:
 
 Python package now lives under:
 
-- `python/trace_parser/`
+- `trace_parser/`
 
 Native extension module name:
 
@@ -512,18 +514,18 @@ Python package files live in:
 ## Proc-macro status
 
 **Done:**
-- `macros/` crate with `#[derive(TraceEvent)]` and `#[derive(TracingMarkEvent)]`
+- `macros/` crate with `#[derive(TraceEvent)]`, `#[derive(TracingMarkEvent)]`, and `#[derive(TraceEnum)]`
 - Generates: `EventType`, `FastMatch`, `TemplateEvent`, optional `#[pymethods]` block (`generate_pymethods = false` supported)
 - **Type inference** — `#[field]` without `ty`, inferred from Rust type
 - **Custom regex** — `#[field(regex = r"...")]`
-- **Zero-padded payload rendering** — `#[field(zero_pad = N)]` for integer fields (e.g. `target_cpu`)
+- **Format rendering** — `#[field(format = "{:03}")]` for integer fields (e.g. `target_cpu`)
 - **`#[fast_match(contains_any = [...])]`** → `FastMatch::payload_quick_check` via `contains_any`
-- **Multi-template `detect_format`** — extra placeholders vs first template (e.g. `reason=`)
+- **Multi-template `detect_format`** — SIMD detection via `detect = [...]` (e.g. `reason=`)
 - **`render_payload` uses `format_id`** (multi-format round-trip)
-- **`register_tracing_mark = false`** for Begin/End (inventory registration optional)
+- **`skip_registration`** for Begin/End (explicit registration)
 - **TraceEnum derive** — `#[derive(TraceEnum)]`
 
-**In use in `src/`:** `TraceSchedSwitch`, `TraceSchedWakeup`, `TraceSchedWakeupNew`, `TraceSchedProcessExit`, `TraceCpuFrequency`, `TraceDevFrequency`, `TraceMarkBegin`, `TraceMarkEnd` (see source). **Still manual:** `Trace`, `TracingMark`, `TraceReceiveVsync`, `TraceExit`, etc.
+**In use in `src/`:** `TraceSchedSwitch`, `TraceSchedWakeup`, `TraceSchedWakeupNew`, `TraceCpuFrequency`, `TraceDevFrequency`, `TraceMarkBegin`, `TraceMarkEnd`, `TracingMark` (see source). **Still manual:** `Trace`, `TraceReceiveVsync`, `TraceExit`, `TraceSchedProcessExit`
 
 **Planned:**
 - PyO3 `extends` (see INHERITANCE_PLAN.md)

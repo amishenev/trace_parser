@@ -367,11 +367,27 @@ impl ::trace_parser::payload_template::TraceEnum for PrevState {
 3. **Порядок полей** — не важен, макрос обработает в любом порядке
 4. **Несколько темплейтов** — детекция формата реализована через `detect_format()`
 5. **`#[pyclass]`** — должен быть указан вручную для PyO3 совместимости
+6. **Регистрация** — макрос генерирует `inventory::submit!` напрямую
 
 ```rust
 #[derive(TraceEvent)]
-#[pyclass]  // ← требуется для Python API
+#[pyclass(skip_from_py_object)]  // ← требуется для Python API
 pub struct TraceMyEvent {
     // ...
 }
 ```
+
+## События на макросах
+
+Следующие события используют макросы:
+
+- `TraceSchedSwitch` — `#[derive(TraceEvent)]`
+- `TraceSchedWakeup` — `#[derive(TraceEvent)]` (multi-template)
+- `TraceSchedWakeupNew` — `#[derive(TraceEvent)]`
+- `TraceCpuFrequency` — `#[derive(TraceEvent)]`
+- `TraceDevFrequency` — `#[derive(TraceEvent)]` (fast_match + choice)
+- `TraceMarkBegin` — `#[derive(TracingMarkEvent)]` (skip_registration)
+- `TraceMarkEnd` — `#[derive(TracingMarkEvent)]` (skip_registration)
+- `TracingMark` — `#[derive(TraceEvent)]`
+
+Остались ручными: `Trace`, `TraceReceiveVsync`, `TraceExit`, `TraceSchedProcessExit`.

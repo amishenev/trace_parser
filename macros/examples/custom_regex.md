@@ -3,18 +3,44 @@
 Использование `#[field(regex = "...")]` для нестандартного парсинга поля.
 
 ```rust
+use pyo3::prelude::*;
 use trace_parser_macros::TraceEvent;
 
+#[pyclass(skip_from_py_object)]
+#[derive(Clone, Debug, PartialEq)]
+#[derive(TraceEvent)]
 #[trace_event(name = "custom_event")]
 #[define_template("code={code} value={value}")]
-#[derive(TraceEvent)]
 struct TraceCustomCode {
+    #[field]
+    format_id: u8,
+    #[pyo3(get, set)]
+    #[field]
+    pub thread_name: String,
+    #[pyo3(get, set)]
+    #[field]
+    pub thread_tid: u32,
+    #[pyo3(get, set)]
+    #[field]
+    pub thread_tgid: u32,
+    #[pyo3(get, set)]
+    #[field]
+    pub cpu: u32,
+    #[pyo3(get, set)]
+    #[field]
+    pub flags: String,
+    #[pyo3(get, set)]
+    #[field]
+    pub timestamp: f64,
+    #[pyo3(get)]
+    #[field]
+    pub event_name: String,
     // Парсится как строка по кастомному regex
     #[field(regex = r"[A-Z]{2}\d{3}")]
-    code: String,
+    pub code: String,
 
     #[field]
-    value: u32,
+    pub value: u32,
 }
 ```
 

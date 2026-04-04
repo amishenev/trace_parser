@@ -3,21 +3,47 @@
 Использование `#[field(format = "...")]` для кастомного рендера payload.
 
 ```rust
+use pyo3::prelude::*;
 use trace_parser_macros::TraceEvent;
 
+#[pyclass(skip_from_py_object)]
+#[derive(Clone, Debug, PartialEq)]
+#[derive(TraceEvent)]
 #[trace_event(name = "sched_wakeup")]
 #[define_template("comm={comm} pid={pid} target_cpu={target_cpu}")]
-#[derive(TraceEvent)]
 struct TraceSchedWakeup {
     #[field]
-    comm: String,
+    format_id: u8,
+    #[pyo3(get, set)]
+    #[field]
+    pub thread_name: String,
+    #[pyo3(get, set)]
+    #[field]
+    pub thread_tid: u32,
+    #[pyo3(get, set)]
+    #[field]
+    pub thread_tgid: u32,
+    #[pyo3(get, set)]
+    #[field]
+    pub cpu: u32,
+    #[pyo3(get, set)]
+    #[field]
+    pub flags: String,
+    #[pyo3(get, set)]
+    #[field]
+    pub timestamp: f64,
+    #[pyo3(get)]
+    #[field]
+    pub event_name: String,
+    #[field]
+    pub comm: String,
 
     #[field]
-    pid: u32,
+    pub pid: u32,
 
     // Рендерится как "000", "001", "012" и т.д.
     #[field(format = "{:03}")]
-    target_cpu: u32,
+    pub target_cpu: u32,
 }
 ```
 

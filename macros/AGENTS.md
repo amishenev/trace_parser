@@ -66,7 +66,7 @@ macros/src/
 
 - **E2E тесты с реальным событием** — требуют дополнительной проработки архитектуры макроса
 - **`#[pyclass]`** — должен указываться пользователем вручную
-- **Миграция всех событий на макрос** — только TraceSchedSwitch использует сейчас
+- **Миграция всех событий на макрос** — большинство событий уже на макросах (`TraceSchedSwitch`, `TraceSchedWakeup`, `TraceSchedWakeupNew`, `TraceCpuFrequency`, `TraceDevFrequency`, `TraceMarkBegin`, `TraceMarkEnd`, `TracingMark`)
 - **Наследование через PyO3 `extends`** — см. INHERITANCE_PLAN.md
 
 ---
@@ -86,11 +86,13 @@ macros/src/
 - [x] Поддержка `#[field(choice = ["A", "B", "C"])]` ✅
 - [x] Поддержка `#[field(regex = r"\d+")]` для кастомных regex ✅
 - [x] Вывод типов из Rust-типа (`#[field]` без `ty`) ✅
+- [x] Поддержка `#[field(format = "{:03}")]` для кастомного рендера ✅
+- [x] `skip_registration` для TraceMarkBegin/End ✅
 
 ### Долгосрочный (2-3 месяца)
 
 - [ ] Наследование через PyO3 `extends` — см. INHERITANCE_PLAN.md
-- [ ] Миграция всех событий на макрос
+- [ ] Миграция всех оставшихся событий на макрос
 - [ ] E2E интеграционные тесты
 - [ ] Макрос для автоматической генерации `#[define_template]` из полей
 - [ ] Поддержка вложенных структур
@@ -192,7 +194,8 @@ fn test_trace_enum() {
 
 Макросы используют пути к основному crate:
 - `::trace_parser::common::EventType`
-- `::trace_parser::register_parser!`
+- `::trace_parser::common::FastMatch`
+- `::trace_parser::common::TemplateEvent`
 - `::trace_parser::payload_template::PayloadTemplate`
 - `::trace_parser::payload_template::TraceEnum`
 

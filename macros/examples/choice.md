@@ -3,18 +3,44 @@
 Использование `#[field(choice = [...])]` для полей с фиксированным набором значений.
 
 ```rust
+use pyo3::prelude::*;
 use trace_parser_macros::TraceEvent;
 
+#[pyclass(skip_from_py_object)]
+#[derive(Clone, Debug, PartialEq)]
+#[derive(TraceEvent)]
 #[trace_event(name = "clock_set_rate")]
 #[define_template("clk={clk} state={state}")]
-#[derive(TraceEvent)]
 struct TraceClockRate {
+    #[field]
+    format_id: u8,
+    #[pyo3(get, set)]
+    #[field]
+    pub thread_name: String,
+    #[pyo3(get, set)]
+    #[field]
+    pub thread_tid: u32,
+    #[pyo3(get, set)]
+    #[field]
+    pub thread_tgid: u32,
+    #[pyo3(get, set)]
+    #[field]
+    pub cpu: u32,
+    #[pyo3(get, set)]
+    #[field]
+    pub flags: String,
+    #[pyo3(get, set)]
+    #[field]
+    pub timestamp: f64,
+    #[pyo3(get)]
+    #[field]
+    pub event_name: String,
     // Принимает только указанные значения
     #[field(choice = ["ddr_devfreq", "l3c_devfreq", "gpu"])]
-    clk: String,
+    pub clk: String,
 
     #[field]
-    state: u32,
+    pub state: u32,
 }
 ```
 

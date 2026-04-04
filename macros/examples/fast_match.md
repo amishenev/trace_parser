@@ -3,21 +3,47 @@
 Использование `#[fast_match(contains_any = [...])]` для SIMD-проверки payload через `memchr::memmem::find`.
 
 ```rust
+use pyo3::prelude::*;
 use trace_parser_macros::TraceEvent;
 
+#[pyclass(skip_from_py_object)]
+#[derive(Clone, Debug, PartialEq)]
+#[derive(TraceEvent)]
 #[trace_event(name = "clock_set_rate")]
 #[fast_match(contains_any = ["clk=ddr_devfreq", "clk=l3c_devfreq"])]
 #[define_template("clk={clk} state={state} cpu_id={cpu_id}")]
-#[derive(TraceEvent)]
 struct TraceDevFrequency {
+    #[field]
+    format_id: u8,
+    #[pyo3(get, set)]
+    #[field]
+    pub thread_name: String,
+    #[pyo3(get, set)]
+    #[field]
+    pub thread_tid: u32,
+    #[pyo3(get, set)]
+    #[field]
+    pub thread_tgid: u32,
+    #[pyo3(get, set)]
+    #[field]
+    pub cpu: u32,
+    #[pyo3(get, set)]
+    #[field]
+    pub flags: String,
+    #[pyo3(get, set)]
+    #[field]
+    pub timestamp: f64,
+    #[pyo3(get)]
+    #[field]
+    pub event_name: String,
     #[field(choice = ["ddr_devfreq", "l3c_devfreq"])]
-    clk: String,
+    pub clk: String,
 
     #[field]
-    state: u32,
+    pub state: u32,
 
     #[field]
-    cpu_id: u32,
+    pub cpu_id: u32,
 }
 ```
 

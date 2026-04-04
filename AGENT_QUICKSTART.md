@@ -16,7 +16,7 @@ Base fields live on `Trace` (`thread_name`, `tid`, `tgid`, `cpu`, `flags`, `time
 
 ## Typed events (public surface)
 
-`Trace`, `TraceSchedSwitch`, `TraceSchedWakeup`, `TraceSchedWakeupNew`, `TraceSchedProcessExit`, `TraceCpuFrequency`, `TraceDevFrequency`, `TracingMark`, `TraceMarkBegin`, `TraceMarkEnd`, `TraceReceiveVsync`.
+`Trace`, `TraceSchedSwitch`, `TraceSchedWakeup`, `TraceSchedWakeupNew`, `TraceSchedProcessExit`, `TraceExit`, `TraceCpuFrequency`, `TraceDevFrequency`, `TracingMark`, `TraceMarkBegin`, `TraceMarkEnd`, `TraceReceiveVsync`.
 
 Factory: `parse_trace(line)`. Bulk: `parse_trace_file(...)` (see README).
 
@@ -24,11 +24,12 @@ Factory: `parse_trace(line)`. Bulk: `parse_trace_file(...)` (see README).
 
 | Area | Location |
 |------|----------|
-| Core + dispatch | `src/lib.rs`, `src/trace.rs`, `src/dispatch.rs` (if present) |
-| Event families | `src/sched_*.rs`, `src/frequency.rs`, `src/tracing_mark/` |
+| Core + dispatch | `src/lib.rs`, `src/trace.rs`, `src/registry.rs` |
+| Event families | `src/sched_*.rs`, `src/frequency.rs`, `src/trace_exit.rs`, `src/tracing_mark/` |
 | Payload templates | `src/payload_template.rs` |
+| Format registry | `src/format_registry.rs` |
 | Proc-macros | `macros/` (`TraceEvent`, `TracingMarkEvent`, `TraceEnum`) |
-| Python package | `python/trace_parser/` (`__init__.py`, `*.pyi`, submodules) |
+| Python package | `trace_parser/` (`__init__.py`, `*.pyi`, `_native.pyi`) |
 | Python tests | `tests/python/` |
 
 ## Architecture rules (do not violate)
@@ -58,7 +59,7 @@ maturin develop
 pytest -q tests/python
 ```
 
-Do not commit native artifacts under `python/trace_parser/` (gitignored).
+Do not commit native artifacts under `trace_parser/` (gitignored).
 
 ## Validation (run what you touch)
 
@@ -83,4 +84,5 @@ Do not commit native artifacts under `python/trace_parser/` (gitignored).
 ## Known direction / drift
 
 - **QWEN.md** is Russian context for another tool; may not match current code — prefer `AGENTS.md` + source.
-- **Macro migration:** only `TraceSchedSwitch` on macro path; rest hand-written until migrated (`macros/AGENTS.md`).
+- **Macro migration:** most events migrated to macro path; rest hand-written until migrated (`macros/AGENTS.md`).
+- **Python package** lives in `trace_parser/` (not `python/trace_parser/`).
