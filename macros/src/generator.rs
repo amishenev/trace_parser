@@ -343,52 +343,59 @@ pub fn generate_template_event_impl(
         .collect();
 
     // Generate detect_format logic
-    // For single template: always return 0
-    // For multiple templates: check for unique fields
-    let detect_format_impl = if templates.len() == 1 {
-        quote! {
-        fn detect_format(_payload: &str) -> u8 {
-            0
-            }
-        }
-    } else {
-        // For multiple templates, detect by checking for unique fields
-        // Simple heuristic: check templates in reverse order (most specific first)
-        let checks: Vec<TokenStream> = templates
+    // If any template has detect markers → SIMD-based detection
+    // Otherwise → call detect_format_override (inherent method, defaults to 0)
+    let detect_markers: Vec<(Vec<u8>, u8)> = templates
+        .iter()
+        .zip(template_ids.iter())
+        .filter(|(t, _)| !t.detect.is_empty())
+        .flat_map(|(t, &id)| {
+            t.detect.iter().map(move |d| (d.as_bytes().to_vec(), id))
+        })
+        .collect();
+
+    let detect_format_impl = if !detect_markers.is_empty() {
+        let markers: Vec<TokenStream> = detect_markers
             .iter()
-            .rev()
-            .filter_map(|template_attr| {
-                let id = template_attr.id.unwrap_or(0);
-                if id == 0 {
-                    // Skip format 0 (default fallback)
-                    None
-                } else {
-                    // Extract field names from template to check presence
-                    // Simple check: look for "field=" pattern
-                    let template_str = &template_attr.template;
-                    Some(quote! {
-                        if payload.contains(#template_str) {
-                            return #id;
-                        }
-                    })
+            .map(|(bytes, id)| {
+                let byte_values: Vec<_> = bytes.iter().map(|b| quote! { #b }).collect();
+                quote! {
+                    (&[#(#byte_values),*], #id)
                 }
             })
             .collect();
 
-        if checks.is_empty() {
-            quote! {
-                fn detect_format(_payload: &str) -> u8 {
-                    0
+        quote! {
+            fn detect_format(payload: &str) -> u8 {
+                const MARKERS: &'static [(&[u8], u8)] = &[#(#markers),*];
+                for (marker, id) in MARKERS {
+                    if memchr::memmem::find(payload.as_bytes(), *marker).is_some() {
+                        return *id;
+                    }
                 }
+                0
             }
-        } else {
-            quote! {
-                fn detect_format(payload: &str) -> u8 {
-                    #(#checks)*
+        }
+    } else {
+        quote! {
+            fn detect_format(payload: &str) -> u8 {
+                Self::detect_format_override(payload)
+            }
+        }
+    };
+
+    // Generate detect_format_override inherent method (default: return 0)
+    let detect_format_override = if detect_markers.is_empty() {
+        quote! {
+            impl #struct_name {
+                /// Override this method for custom format detection logic.
+                fn detect_format_override(_payload: &str) -> u8 {
                     0
                 }
             }
         }
+    } else {
+        quote! {}
     };
 
     // Generate render statements for render_payload
@@ -500,6 +507,8 @@ pub fn generate_template_event_impl(
                     .ok_or_else(|| ::pyo3::exceptions::PyRuntimeError::new_err("Failed to format template"))
             }
         }
+
+        #detect_format_override
     }
 }
 
@@ -548,6 +557,7 @@ mod tests {
             .map(|(i, id)| DefineTemplateAttr {
                 template: format!("field{}={{field{}}}", i, i),
                 id: *id,
+                detect: vec![],
             })
             .collect();
 
@@ -592,6 +602,7 @@ mod tests {
             name: "sched_switch".to_string(),
             aliases: vec!["sched_sw".to_string()],
             generate_pymethods: true,
+            skip_registration: false,
         };
 
         let output = generate_event_type_impl(&struct_name, &event_attr);
@@ -680,7 +691,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_render() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None }];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![] }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(u32),
@@ -706,7 +717,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_optional() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None }];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![] }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(Option<u32>),
@@ -731,7 +742,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_custom_name() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "state={state}".to_string(), id: None }];
+        let templates = vec![DefineTemplateAttr { template: "state={state}".to_string(), id: None, detect: vec![] }];
         let fields = vec![(
             parse_quote!(current_state),
             parse_quote!(u32),
@@ -756,7 +767,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_parse() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None }];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![] }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(u32),
@@ -782,7 +793,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_parse_optional() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None }];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![] }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(Option<u32>),
@@ -809,7 +820,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_parse_bool() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "flag={flag}".to_string(), id: None }];
+        let templates = vec![DefineTemplateAttr { template: "flag={flag}".to_string(), id: None, detect: vec![] }];
         let fields = vec![(
             parse_quote!(flag),
             parse_quote!(bool),
@@ -836,8 +847,8 @@ mod tests {
     fn test_generate_template_event_impl_with_multiple_templates() {
         let struct_name: Ident = parse_quote!(TestEvent);
         let templates = vec![
-            DefineTemplateAttr { template: "a={a}".to_string(), id: Some(0) },
-            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1) },
+            DefineTemplateAttr { template: "a={a}".to_string(), id: Some(0), detect: vec![] },
+            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1), detect: vec![] },
         ];
         let fields = vec![
             (parse_quote!(a), parse_quote!(u32), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false }),
@@ -854,7 +865,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_single_template_detect_format() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None }];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![] }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(u32),
@@ -872,14 +883,40 @@ mod tests {
         let output = generate_template_event_impl(&struct_name, &templates, &fields);
         let output_str = output.to_string();
 
-        // Single template: detect_format always returns 0
-        assert!(output_str.contains("fn detect_format (_payload : & str) -> u8 { 0 }"));
+        // Single template: detect_format calls detect_format_override
+        assert!(output_str.contains("fn detect_format (payload"));
+        assert!(output_str.contains("detect_format_override"));
+        // detect_format_override inherent method is generated
+        assert!(output_str.contains("fn detect_format_override (_payload"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_with_detect_markers() {
+        let struct_name: Ident = parse_quote!(TraceSchedWakeup);
+        let templates = vec![
+            DefineTemplateAttr { template: "comm={comm} pid={pid}".to_string(), id: Some(0), detect: vec![] },
+            DefineTemplateAttr { template: "comm={comm} pid={pid} reason={reason}".to_string(), id: Some(1), detect: vec!["reason=".to_string()] },
+        ];
+        let fields = vec![
+            (parse_quote!(comm), parse_quote!(String), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false }),
+            (parse_quote!(pid), parse_quote!(u32), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false }),
+            (parse_quote!(reason), parse_quote!(Option<u32>), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: true, readonly: false, private: false }),
+        ];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        // Should use SIMD markers, not detect_format_override
+        assert!(output_str.contains("MARKERS"));
+        assert!(output_str.contains("memmem :: find"));
+        assert!(output_str.contains("reason"));
+        assert!(!output_str.contains("detect_format_override"));
     }
 
     #[test]
     fn test_generate_template_event_impl_with_custom_regex() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "cpu={cpu_id}".to_string(), id: None }];
+        let templates = vec![DefineTemplateAttr { template: "cpu={cpu_id}".to_string(), id: None, detect: vec![] }];
         let fields = vec![(
             parse_quote!(cpu_id),
             parse_quote!(u32),
@@ -907,7 +944,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_choice() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "clk={clk}".to_string(), id: None }];
+        let templates = vec![DefineTemplateAttr { template: "clk={clk}".to_string(), id: None, detect: vec![] }];
         let fields = vec![(
             parse_quote!(clk),
             parse_quote!(String),

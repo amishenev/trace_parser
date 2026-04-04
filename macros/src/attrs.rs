@@ -100,40 +100,47 @@ impl Parse for TraceMarkersAttr {
     }
 }
 
-/// Parsed `#[define_template("...", id = N)]` attribute
+/// Parsed `#[define_template("...", id = N, detect = ["...", ...])]` attribute
 ///
-/// Template attributes with optional explicit id:
+/// Template attributes with optional explicit id and detect markers:
 /// - `id`: Explicit format id (0, 1, 2, ...). Auto-assigned if not specified.
+/// - `detect`: Substring markers for format detection via SIMD.
 #[derive(Debug, Clone)]
 pub struct DefineTemplateAttr {
     pub template: String,
     pub id: Option<u8>,
+    pub detect: Vec<String>,
 }
 
 impl Parse for DefineTemplateAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let template: LitStr = input.parse()?;
 
-        let id = if input.peek(Token![,]) {
-            input.parse::<Token![,]>()?;
-            // Check for `id = N`
-            if input.peek(Ident) {
-                let key: Ident = input.parse()?;
-                if key == "id" {
-                    input.parse::<Token![=]>()?;
-                    let value: syn::LitInt = input.parse()?;
-                    Some(value.base10_parse::<u8>()?)
-                } else {
-                    return Err(syn::Error::new(key.span(), "expected 'id'"));
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let mut id: Option<u8> = None;
+        let mut detect: Vec<String> = Vec::new();
 
-        Ok(Self { template: template.value(), id })
+        while input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+            let key: Ident = input.call(Ident::parse_any)?;
+            if key == "id" {
+                input.parse::<Token![=]>()?;
+                let value: syn::LitInt = input.parse()?;
+                id = Some(value.base10_parse::<u8>()?);
+            } else if key == "detect" {
+                input.parse::<Token![=]>()?;
+                let content;
+                syn::bracketed!(content in input);
+                let list = content.parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
+                detect = list.iter().map(|s| s.value()).collect();
+            } else {
+                return Err(syn::Error::new(key.span(), "expected 'id' or 'detect'"));
+            }
+        }
+
+        Ok(Self { template: template.value(), id, detect })
     }
 }
 
@@ -314,6 +321,7 @@ mod tests {
         let attr: DefineTemplateAttr = syn::parse2(tokens).unwrap();
         assert_eq!(attr.template, "prev_comm={prev_comm} prev_pid={prev_pid}");
         assert!(attr.id.is_none());
+        assert!(attr.detect.is_empty());
     }
 
     #[test]
@@ -330,6 +338,23 @@ mod tests {
         let attr: DefineTemplateAttr = syn::parse2(tokens).unwrap();
         assert_eq!(attr.template, "value={value}");
         assert_eq!(attr.id, Some(0));
+    }
+
+    #[test]
+    fn test_define_template_attr_with_detect() {
+        let tokens = quote! { "comm={comm} reason={reason}", detect = ["reason="] };
+        let attr: DefineTemplateAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.template, "comm={comm} reason={reason}");
+        assert_eq!(attr.detect, vec!["reason="]);
+    }
+
+    #[test]
+    fn test_define_template_attr_with_id_and_detect() {
+        let tokens = quote! { "comm={comm} reason={reason}", id = 1, detect = ["reason="] };
+        let attr: DefineTemplateAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.template, "comm={comm} reason={reason}");
+        assert_eq!(attr.id, Some(1));
+        assert_eq!(attr.detect, vec!["reason="]);
     }
 
     #[test]

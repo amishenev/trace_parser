@@ -187,9 +187,22 @@ struct TraceReceiveVsync {
 
 Опционально: `FastMatch::payload_quick_check` через `contains_any(line, ...)`. Если атрибута нет — только `PAYLOAD_MARKERS` / дефолтная проверка.
 
-### `#[define_template("...")]`
+### `#[define_template("...", id = N, detect = ["...", ...])]`
 
 Шаблон payload. Можно указать несколько для разных форматов.
+
+| Параметр | Обязательный | Описание |
+|----------|--------------|----------|
+| `id` | ❌ | Явный format id (авто-назначение если нет) |
+| `detect` | ❌ | Массив подстрок для SIMD-детекции формата |
+
+Если хотя бы один шаблон имеет `detect` — макрос генерирует SIMD-проверку через `memchr::memmem::find`.
+Если ни один шаблон не имеет `detect` — генерируется `detect_format_override` (inherent method, по умолчанию `0`), которую можно переопределить вручную.
+
+```rust
+#[define_template("comm={comm} pid={pid}")]
+#[define_template("comm={comm} pid={pid} reason={reason}", detect = ["reason="])]
+```
 
 #### Явное указание id (опционально)
 
