@@ -1,6 +1,5 @@
 use pyo3::prelude::*;
 
-use crate::register_parser;
 use trace_parser_macros::TraceEvent;
 
 #[pyclass(skip_from_py_object)]
@@ -110,6 +109,3 @@ mod tests {
         );
     }
 }
-
-// Register parser at compile time
-register_parser!("sched_switch", TraceSchedSwitch);
