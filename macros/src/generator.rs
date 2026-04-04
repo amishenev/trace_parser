@@ -240,9 +240,12 @@ pub fn generate_fast_match_impl(
     let quick_check = if payload_contains_any.is_empty() {
         quote! {}
     } else {
+        let checks: Vec<TokenStream> = payload_contains_any.iter().map(|s| {
+            quote! { line.contains(#s) }
+        }).collect();
         quote! {
             fn payload_quick_check(line: &str) -> bool {
-                ::trace_parser::common::contains_any(line, &[#(#payload_contains_any),*])
+                #(#checks)||*
             }
         }
     };
@@ -690,6 +693,7 @@ mod tests {
         let output_str = output.to_string();
 
         assert!(output_str.contains("payload_quick_check"));
+        assert!(output_str.contains("line . contains"));
         assert!(output_str.contains("clk=ddr_devfreq"));
         assert!(output_str.contains("clk=l3c_devfreq"));
     }

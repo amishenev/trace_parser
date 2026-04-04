@@ -121,10 +121,6 @@ pub(crate) trait TemplateEvent: EventType {
     fn render_payload(&self) -> PyResult<String>;
 }
 
-pub(crate) fn contains_any(line: &str, needles: &[&str]) -> bool {
-    needles.iter().any(|needle| line.contains(needle))
-}
-
 pub(crate) fn parse_template_event<T: TemplateEvent>(line: &str) -> Option<T> {
     let parts = parse_base_parts(line)?;
     let payload_raw = parts.payload_raw.clone();
