@@ -308,7 +308,7 @@ pub fn generate_template_event_impl(
         .map(|(template_attr, id)| {
             let template_str = &template_attr.template;
             let template_name = syn::Ident::new(
-                &format!("TEMPLATE_{}", id),
+                &format!("__TRACE_PARSER_{}_TMPL_{}", struct_name, id),
                 proc_macro2::Span::call_site(),
             );
 
@@ -329,7 +329,7 @@ pub fn generate_template_event_impl(
         .zip(template_ids.iter())
         .map(|(_template_attr, id)| {
             let template_name = syn::Ident::new(
-                &format!("TEMPLATE_{}", id),
+                &format!("__TRACE_PARSER_{}_TMPL_{}", struct_name, id),
                 proc_macro2::Span::call_site(),
             );
 
