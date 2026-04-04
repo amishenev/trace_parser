@@ -171,12 +171,13 @@ struct TraceReceiveVsync {
 
 ## Атрибуты
 
-### `#[trace_event(name, aliases)]`
+### `#[trace_event(name, aliases, skip_registration)]`
 
 | Параметр | Обязательный | Описание |
 |----------|--------------|----------|
 | `name` | ✅ | Имя события (event_name) |
 | `aliases` | ❌ | Алиасы для event_name |
+| `skip_registration` | ❌ | Пропустить регистрацию — для событий, обрабатываемых явно (TraceMarkBegin/End) |
 
 ### `#[trace_markers("...", "...")]`
 

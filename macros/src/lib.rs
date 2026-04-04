@@ -33,7 +33,6 @@ use enum_gen::{generate_trace_enum, parse_variants};
 use generator::{
     generate_event_type_impl, generate_fast_match_impl,
     generate_template_event_impl, generate_registration,
-    generate_tracing_mark_registration,
 };
 use pymethods::generate_pymethods_block;
 use proc_macro::TokenStream;
@@ -100,7 +99,7 @@ pub fn derive_trace_event(input: TokenStream) -> TokenStream {
         contains_any,
     );
     let template_event_impl = generate_template_event_impl(&input.ident, &templates, &fields);
-    let registration = generate_registration(&input.ident, &event_attr);
+    let registration = generate_registration(&input.ident, &event_attr, false);
 
     // Generate pymethods only if requested
     let pymethods = if event_attr.generate_pymethods {
@@ -181,7 +180,7 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
         contains_any,
     );
     let template_event_impl = generate_template_event_impl(&input.ident, &templates, &fields);
-    let registration = generate_tracing_mark_registration(&input.ident);
+    let registration = generate_registration(&input.ident, &event_attr, true);
 
     // Generate pymethods only if requested
     let pymethods = if event_attr.generate_pymethods {

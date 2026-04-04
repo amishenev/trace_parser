@@ -2,12 +2,14 @@
 
 use syn::{parse::{Parse, ParseStream}, ext::IdentExt, Attribute, Ident, LitStr, Result, Token};
 
-/// Parsed `#[trace_event(name = "...", aliases = ["...", ...])]` attribute
+/// Parsed `#[trace_event(name = "...", aliases = ["...", ...], skip_registration)]` attribute
 #[derive(Debug, Clone)]
 pub struct TraceEventAttr {
     pub name: String,
     pub aliases: Vec<String>,
     pub generate_pymethods: bool,
+    /// Skip automatic registration — used for events handled explicitly (e.g. TraceMarkBegin/End).
+    pub skip_registration: bool,
 }
 
 impl Parse for TraceEventAttr {
@@ -15,24 +17,31 @@ impl Parse for TraceEventAttr {
         let mut name = None;
         let mut aliases = Vec::new();
         let mut generate_pymethods = true;
+        let mut skip_registration = false;
 
         // Parse comma-separated key-value pairs
         while !input.is_empty() {
-            let key: Ident = input.parse()?;
-            input.parse::<Token![=]>()?;
+            let key: Ident = input.call(Ident::parse_any)?;
 
-            if key == "name" {
+            if key == "skip_registration" {
+                skip_registration = true;
+            } else if key == "name" {
+                input.parse::<Token![=]>()?;
                 let value: LitStr = input.parse()?;
                 name = Some(value.value());
             } else if key == "aliases" {
+                input.parse::<Token![=]>()?;
                 // Parse array: ["alias1", "alias2"]
                 let content;
                 syn::bracketed!(content in input);
                 let list = content.parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
                 aliases = list.iter().map(|s| s.value()).collect();
             } else if key == "generate_pymethods" {
+                input.parse::<Token![=]>()?;
                 let value: syn::LitBool = input.parse()?;
                 generate_pymethods = value.value();
+            } else {
+                return Err(syn::Error::new(key.span(), "unknown attribute"));
             }
 
             // Parse optional comma
@@ -43,7 +52,7 @@ impl Parse for TraceEventAttr {
 
         let name = name.ok_or_else(|| syn::Error::new(input.span(), "missing 'name' attribute"))?;
 
-        Ok(Self { name, aliases, generate_pymethods })
+        Ok(Self { name, aliases, generate_pymethods, skip_registration })
     }
 }
 
@@ -275,6 +284,21 @@ mod tests {
         let attr: TraceEventAttr = syn::parse2(tokens).unwrap();
         assert_eq!(attr.name, "sched_switch");
         assert_eq!(attr.aliases, vec!["sched_sw", "switch"]);
+    }
+
+    #[test]
+    fn test_trace_event_attr_skip_registration() {
+        let tokens = quote! { name = "tracing_mark_write", skip_registration };
+        let attr: TraceEventAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.name, "tracing_mark_write");
+        assert!(attr.skip_registration);
+    }
+
+    #[test]
+    fn test_trace_event_attr_default_no_skip_registration() {
+        let tokens = quote! { name = "sched_switch" };
+        let attr: TraceEventAttr = syn::parse2(tokens).unwrap();
+        assert!(!attr.skip_registration);
     }
 
     #[test]

@@ -503,19 +503,20 @@ pub fn generate_template_event_impl(
     }
 }
 
-/// Generate registration code for regular trace events
-pub fn generate_registration(struct_name: &Ident, event_attr: &TraceEventAttr) -> TokenStream {
-    let name = &event_attr.name;
-
-    quote! {
-        ::trace_parser::register_parser!(#name, #struct_name);
+/// Generate registration code — regular, tracing_mark, or skipped
+pub fn generate_registration(struct_name: &Ident, event_attr: &TraceEventAttr, is_tracing_mark: bool) -> TokenStream {
+    if event_attr.skip_registration {
+        return quote! {};
     }
-}
-
-/// Generate registration code for tracing_mark events
-pub fn generate_tracing_mark_registration(struct_name: &Ident) -> TokenStream {
-    quote! {
-        ::trace_parser::register_tracing_mark_parser!(#struct_name);
+    if is_tracing_mark {
+        quote! {
+            ::trace_parser::register_tracing_mark_parser!(#struct_name);
+        }
+    } else {
+        let name = &event_attr.name;
+        quote! {
+            ::trace_parser::register_parser!(#name, #struct_name);
+        }
     }
 }
 
@@ -635,9 +636,10 @@ mod tests {
             name: "sched_switch".to_string(),
             aliases: vec![],
             generate_pymethods: true,
+            skip_registration: false,
         };
 
-        let output = generate_registration(&struct_name, &event_attr);
+        let output = generate_registration(&struct_name, &event_attr, false);
         let output_str = output.to_string();
 
         assert!(output_str.contains("register_parser"));
@@ -645,14 +647,34 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_tracing_mark_registration() {
-        let struct_name: Ident = parse_quote!(TraceMarkBegin);
+    fn test_generate_registration_tracing_mark() {
+        let struct_name: Ident = parse_quote!(TraceReceiveVsync);
+        let event_attr = TraceEventAttr {
+            name: "tracing_mark_write".to_string(),
+            aliases: vec![],
+            generate_pymethods: false,
+            skip_registration: false,
+        };
 
-        let output = generate_tracing_mark_registration(&struct_name);
+        let output = generate_registration(&struct_name, &event_attr, true);
         let output_str = output.to_string();
 
         assert!(output_str.contains("register_tracing_mark_parser"));
-        assert!(output_str.contains("TraceMarkBegin"));
+        assert!(output_str.contains("TraceReceiveVsync"));
+    }
+
+    #[test]
+    fn test_generate_registration_skip_registration() {
+        let struct_name: Ident = parse_quote!(TraceMarkBegin);
+        let event_attr = TraceEventAttr {
+            name: "tracing_mark_write".to_string(),
+            aliases: vec![],
+            generate_pymethods: false,
+            skip_registration: true,
+        };
+
+        let output = generate_registration(&struct_name, &event_attr, true);
+        assert_eq!(output.to_string(), quote! {}.to_string());
     }
 
     #[test]
