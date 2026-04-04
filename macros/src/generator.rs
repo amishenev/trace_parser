@@ -410,11 +410,19 @@ pub fn generate_template_event_impl(
                 .unwrap_or_else(|| field_name.to_string());
 
             if let Some(fmt) = &field_attr.format {
-                return quote! {
-                    (#name_str, Some(::trace_parser::payload_template::TemplateValue::Str(
-                        &::std::format!(#fmt, self.#field_name)
-                    )))
-                };
+                if field_attr.optional {
+                    return quote! {
+                        (#name_str, self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::Str(
+                            &::std::format!(#fmt, v)
+                        )))
+                    };
+                } else {
+                    return quote! {
+                        (#name_str, Some(::trace_parser::payload_template::TemplateValue::Str(
+                            &::std::format!(#fmt, self.#field_name)
+                        )))
+                    };
+                }
             }
 
             if field_attr.optional {
