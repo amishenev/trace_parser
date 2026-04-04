@@ -132,7 +132,7 @@ pub(crate) fn contains_any(line: &str, needles: &[&str]) -> bool {
 
 pub(crate) fn parse_event<T: EventType>(line: &str) -> Option<BaseTraceParts> {
     let parts = parse_base_parts(line)?;
-    if parts.event_name != T::EVENT_NAME {
+    if !T::matches_event_name(&parts.event_name) {
         return None;
     }
     Some(parts)
