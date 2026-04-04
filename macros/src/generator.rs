@@ -495,7 +495,7 @@ pub fn generate_template_event_impl(
             }
 
             fn render_payload(&self) -> ::pyo3::PyResult<::std::string::String> {
-                let template = Self::formats().template(0)
+                let template = Self::formats().template(self.format_id)
                     .ok_or_else(|| ::pyo3::exceptions::PyRuntimeError::new_err("No template found"))?;
 
                 let values = &[
