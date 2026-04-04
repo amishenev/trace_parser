@@ -30,9 +30,10 @@ struct TraceMarkEnd {
 }
 
 // Специфичная метка ReceiveVsync — маркеры объединяются: ["B|", "ReceiveVsync"]
+// extra_info — игнорируемое поле, не создаётся в структуре
 #[trace_event(name = "tracing_mark_write", begin)]
 #[trace_markers("ReceiveVsync")]
-#[define_template("{?ignore:extra_info}ReceiveVsync {frame_number}")]
+#[define_template("{?ignore:extra_info}ReceiveVsync {frame_number}", extra_info = r"\[[^\]]+\]")]
 #[derive(TracingMarkEvent)]
 struct TraceReceiveVsync {
     #[field]

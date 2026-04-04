@@ -165,7 +165,8 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
                 crate::attrs::DefineTemplateAttr {
                     template: wrapped_template,
                     id: t.id,
-                    detect: t.detect,
+                    detect: t.detect.clone(),
+                    extra_fields: t.extra_fields,
                 }
             })
             .collect();

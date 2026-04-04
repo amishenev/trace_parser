@@ -114,16 +114,20 @@ impl Parse for TraceMarkersAttr {
     }
 }
 
-/// Parsed `#[define_template("...", id = N, detect = ["...", ...])]` attribute
+/// Parsed `#[define_template("...", id = N, detect = ["..."], field_name = "...")]` attribute
 ///
-/// Template attributes with optional explicit id and detect markers:
+/// Template attributes with optional explicit id, detect markers, and extra field definitions.
 /// - `id`: Explicit format id (0, 1, 2, ...). Auto-assigned if not specified.
 /// - `detect`: Substring markers for format detection via SIMD.
+/// - Extra fields (e.g., `extra_info = r"\[[^\]]+\]"`): Field specs for ignored fields.
 #[derive(Debug, Clone)]
 pub struct DefineTemplateAttr {
     pub template: String,
     pub id: Option<u8>,
     pub detect: Vec<String>,
+    /// Extra fields defined in the attribute (e.g., ignored fields).
+    /// Maps field_name -> regex
+    pub extra_fields: Vec<(String, String)>,
 }
 
 impl Parse for DefineTemplateAttr {
@@ -132,6 +136,7 @@ impl Parse for DefineTemplateAttr {
 
         let mut id: Option<u8> = None;
         let mut detect: Vec<String> = Vec::new();
+        let mut extra_fields: Vec<(String, String)> = Vec::new();
 
         while input.peek(Token![,]) {
             input.parse::<Token![,]>()?;
@@ -150,11 +155,14 @@ impl Parse for DefineTemplateAttr {
                 let list = content.parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
                 detect = list.iter().map(|s| s.value()).collect();
             } else {
-                return Err(syn::Error::new(key.span(), "expected 'id' or 'detect'"));
+                // Assume it's an extra field: key = "regex"
+                input.parse::<Token![=]>()?;
+                let value: LitStr = input.parse()?;
+                extra_fields.push((key.to_string(), value.value()));
             }
         }
 
-        Ok(Self { template: template.value(), id, detect })
+        Ok(Self { template: template.value(), id, detect, extra_fields })
     }
 }
 
@@ -345,6 +353,16 @@ mod tests {
         let attr: DefineTemplateAttr = syn::parse2(tokens).unwrap();
         assert_eq!(attr.template, "prev_comm={prev_comm}");
         assert_eq!(attr.id, Some(1));
+    }
+
+    #[test]
+    fn test_define_template_attr_with_extra_fields() {
+        let tokens = quote! { "{?ignore:extra_info}ReceiveVsync {frame}", extra_info = r"\[[^\]]+\]" };
+        let attr: DefineTemplateAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.template, "{?ignore:extra_info}ReceiveVsync {frame}");
+        assert_eq!(attr.extra_fields.len(), 1);
+        assert_eq!(attr.extra_fields[0].0, "extra_info");
+        assert_eq!(attr.extra_fields[0].1, r"\[[^\]]+\]");
     }
 
     #[test]

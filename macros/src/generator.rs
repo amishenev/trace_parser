@@ -312,12 +312,19 @@ pub fn generate_template_event_impl(
                 proc_macro2::Span::call_site(),
             );
 
+            // Generate specs from extra_fields (ignored fields not in struct)
+            let extra_field_specs: Vec<TokenStream> = template_attr.extra_fields.iter().map(|(name, regex)| {
+                quote! {
+                    (#name, ::trace_parser::payload_template::FieldSpec::custom(#regex))
+                }
+            }).collect();
+
             quote! {
                 static #template_name: ::std::sync::LazyLock<::trace_parser::payload_template::PayloadTemplate> =
                     ::std::sync::LazyLock::new(|| {
                         ::trace_parser::payload_template::PayloadTemplate::new(
                             #template_str,
-                            &[#(#field_specs),*]
+                            &[#(#field_specs),*, #(#extra_field_specs),*]
                         )
                     });
             }
@@ -572,6 +579,7 @@ mod tests {
                 template: format!("field{}={{field{}}}", i, i),
                 id: *id,
                 detect: vec![],
+                extra_fields: vec![],
             })
             .collect();
 
@@ -617,6 +625,7 @@ mod tests {
             aliases: vec!["sched_sw".to_string()],
             generate_pymethods: true,
             skip_registration: false,
+            mark_type: None,
         };
 
         let output = generate_event_type_impl(&struct_name, &event_attr);
@@ -676,6 +685,7 @@ mod tests {
             aliases: vec![],
             generate_pymethods: true,
             skip_registration: false,
+            mark_type: None,
         };
 
         let output = generate_registration(&struct_name, &event_attr, false);
@@ -693,6 +703,7 @@ mod tests {
             aliases: vec!["exit2".to_string()],
             generate_pymethods: true,
             skip_registration: false,
+            mark_type: None,
         };
 
         let output = generate_registration(&struct_name, &event_attr, false);
@@ -711,6 +722,7 @@ mod tests {
             aliases: vec![],
             generate_pymethods: false,
             skip_registration: false,
+            mark_type: None,
         };
 
         let output = generate_registration(&struct_name, &event_attr, true);
@@ -728,6 +740,7 @@ mod tests {
             aliases: vec![],
             generate_pymethods: false,
             skip_registration: true,
+            mark_type: None,
         };
 
         let output = generate_registration(&struct_name, &event_attr, true);
@@ -737,7 +750,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_render() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![] }];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(u32),
@@ -763,7 +776,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_optional() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![] }];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(Option<u32>),
@@ -788,7 +801,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_custom_name() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "state={state}".to_string(), id: None, detect: vec![] }];
+        let templates = vec![DefineTemplateAttr { template: "state={state}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
         let fields = vec![(
             parse_quote!(current_state),
             parse_quote!(u32),
@@ -813,7 +826,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_parse() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![] }];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(u32),
@@ -839,7 +852,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_parse_optional() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![] }];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(Option<u32>),
@@ -866,7 +879,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_parse_bool() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "flag={flag}".to_string(), id: None, detect: vec![] }];
+        let templates = vec![DefineTemplateAttr { template: "flag={flag}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
         let fields = vec![(
             parse_quote!(flag),
             parse_quote!(bool),
@@ -893,8 +906,8 @@ mod tests {
     fn test_generate_template_event_impl_with_multiple_templates() {
         let struct_name: Ident = parse_quote!(TestEvent);
         let templates = vec![
-            DefineTemplateAttr { template: "a={a}".to_string(), id: Some(0), detect: vec![] },
-            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1), detect: vec![] },
+            DefineTemplateAttr { template: "a={a}".to_string(), id: Some(0), detect: vec![], extra_fields: vec![] },
+            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1), detect: vec![], extra_fields: vec![] },
         ];
         let fields = vec![
             (parse_quote!(a), parse_quote!(u32), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false }),
@@ -911,7 +924,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_single_template_detect_format() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![] }];
+        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(u32),
@@ -940,8 +953,8 @@ mod tests {
     fn test_generate_template_event_impl_with_detect_markers() {
         let struct_name: Ident = parse_quote!(TraceSchedWakeup);
         let templates = vec![
-            DefineTemplateAttr { template: "comm={comm} pid={pid}".to_string(), id: Some(0), detect: vec![] },
-            DefineTemplateAttr { template: "comm={comm} pid={pid} reason={reason}".to_string(), id: Some(1), detect: vec!["reason=".to_string()] },
+            DefineTemplateAttr { template: "comm={comm} pid={pid}".to_string(), id: Some(0), detect: vec![], extra_fields: vec![] },
+            DefineTemplateAttr { template: "comm={comm} pid={pid} reason={reason}".to_string(), id: Some(1), detect: vec!["reason=".to_string()], extra_fields: vec![] },
         ];
         let fields = vec![
             (parse_quote!(comm), parse_quote!(String), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false }),
@@ -962,7 +975,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_custom_regex() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "cpu={cpu_id}".to_string(), id: None, detect: vec![] }];
+        let templates = vec![DefineTemplateAttr { template: "cpu={cpu_id}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
         let fields = vec![(
             parse_quote!(cpu_id),
             parse_quote!(u32),
@@ -990,7 +1003,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_format() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "target={target}".to_string(), id: None, detect: vec![] }];
+        let templates = vec![DefineTemplateAttr { template: "target={target}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
         let fields = vec![(
             parse_quote!(target),
             parse_quote!(u32),
@@ -1017,7 +1030,7 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_choice() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "clk={clk}".to_string(), id: None, detect: vec![] }];
+        let templates = vec![DefineTemplateAttr { template: "clk={clk}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
         let fields = vec![(
             parse_quote!(clk),
             parse_quote!(String),
@@ -1039,5 +1052,28 @@ mod tests {
         assert!(output_str.contains("FieldSpec :: choice"));
         assert!(output_str.contains("ddr_devfreq"));
         assert!(output_str.contains("l3c_devfreq"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_with_extra_fields() {
+        let struct_name: Ident = parse_quote!(TraceReceiveVsync);
+        let templates = vec![DefineTemplateAttr {
+            template: "{?ignore:extra_info}ReceiveVsync {frame_number}".to_string(),
+            id: Some(0),
+            detect: vec!["ReceiveVsync".to_string()],
+            extra_fields: vec![("extra_info".to_string(), r"\[[^\]]+\]".to_string())],
+        }];
+        let fields = vec![(
+            parse_quote!(frame_number),
+            parse_quote!(u32),
+            FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false },
+        )];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        // Should include the extra field in PayloadTemplate::new
+        assert!(output_str.contains(r#""\[\[^\]\]+\]""#));
+        assert!(output_str.contains("extra_info"));
     }
 }

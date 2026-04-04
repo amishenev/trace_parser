@@ -205,7 +205,7 @@ struct TraceReceiveVsync {
 
 Опционально: `FastMatch::payload_quick_check` через `contains_any(line, ...)`. Если атрибута нет — только `PAYLOAD_MARKERS` / дефолтная проверка.
 
-### `#[define_template("...", id = N, detect = ["...", ...])]`
+### `#[define_template("...", id = N, detect = ["...", ...], field_name = "...")]`
 
 Шаблон payload. Можно указать несколько для разных форматов.
 
@@ -213,6 +213,13 @@ struct TraceReceiveVsync {
 |----------|--------------|----------|
 | `id` | ❌ | Явный format id (авто-назначение если нет) |
 | `detect` | ❌ | Массив подстрок для SIMD-детекции формата |
+| Extra fields | ❌ | Определения regex для игнорируемых полей (`field_name = r"regex"`) |
+
+Если в шаблоне есть `{?ignore:field_name}`, нужно указать его regex как параметр атрибута:
+```rust
+#[define_template("{?ignore:extra_info}ReceiveVsync {frame_number}", extra_info = r"\[[^\]]+\]")]
+```
+Это нужно чтобы `PayloadTemplate` мог построить regex без паники. Поля структуры создаваться не будет.
 
 Если хотя бы один шаблон имеет `detect` — макрос генерирует SIMD-проверку через `memchr::memmem::find`.
 Если ни один шаблон не имеет `detect` — генерируется `detect_format_override` (inherent method, по умолчанию `0`), которую можно переопределить вручную.
