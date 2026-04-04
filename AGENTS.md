@@ -198,7 +198,7 @@ Optional future work: PyO3 `extends` for shared base fields — [INHERITANCE_PLA
 - `FastMatch::PAYLOAD_MARKERS` — automatic SIMD payload checking with `memmem::find`
 - `FastMatch::payload_quick_check()` — custom complex logic (override when markers aren't enough)
 - `contains_all(line, [...])` and `contains_any(line, [...])` helpers exist for future multi-format heuristics
-- `TraceDevFrequency` uses `#[trace_event(..., payload_contains_any = [...])]` so `payload_quick_check` requires `clk=ddr_devfreq` or `clk=l3c_devfreq`
+- `TraceDevFrequency` uses `#[fast_match(contains_any = ["clk=ddr_devfreq", "clk=l3c_devfreq"])]` so `payload_quick_check` requires one of those substrings
 - `TraceReceiveVsync` uses `PAYLOAD_MARKERS = &[b"B|", b"ReceiveVsync"]`
 - `TraceMarkBegin` uses `PAYLOAD_MARKERS = &[b"B|"]`
 - `TraceMarkEnd` uses `PAYLOAD_MARKERS = &[b"E|"]`
@@ -517,7 +517,7 @@ Python package files live in:
 - **Type inference** — `#[field]` without `ty`, inferred from Rust type
 - **Custom regex** — `#[field(regex = r"...")]`
 - **Zero-padded payload rendering** — `#[field(zero_pad = N)]` for integer fields (e.g. `target_cpu`)
-- **`payload_contains_any`** on `#[trace_event]` → `FastMatch::payload_quick_check` via `contains_any`
+- **`#[fast_match(contains_any = [...])]`** → `FastMatch::payload_quick_check` via `contains_any`
 - **Multi-template `detect_format`** — extra placeholders vs first template (e.g. `reason=`)
 - **`render_payload` uses `format_id`** (multi-format round-trip)
 - **`register_tracing_mark = false`** for Begin/End (inventory registration optional)

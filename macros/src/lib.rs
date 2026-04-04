@@ -11,6 +11,7 @@
 //!
 //! - `#[trace_event(name = "...", aliases = ["..."])]` - event name and aliases
 //! - `#[trace_markers("...", "...")]` - payload markers for FastMatch
+//! - `#[fast_match(contains_any = ["...", ...])]` - optional `payload_quick_check` substrings
 //! - `#[define_template("...")]` - payload template (can be multiple)
 //! - `#[field(ty = "...", name = "...", optional)]` - field attributes
 
@@ -25,12 +26,12 @@ mod generator;
 mod pymethods;
 
 use attrs::{
-    find_trace_event_attr, find_trace_markers_attr, find_define_template_attrs,
-    find_field_attr,
+    find_define_template_attrs, find_fast_match_attr, find_field_attr, find_trace_event_attr,
+    find_trace_markers_attr,
 };
 use enum_gen::{generate_trace_enum, parse_variants};
 use generator::{
-    generate_event_type_impl, generate_fast_match_impl, 
+    generate_event_type_impl, generate_fast_match_impl,
     generate_template_event_impl, generate_registration,
     generate_tracing_mark_registration,
 };
@@ -52,20 +53,25 @@ use syn::{parse_macro_input, DeriveInput, Fields};
 ///     prev_comm: String,
 /// }
 /// ```
-#[proc_macro_derive(TraceEvent, attributes(trace_event, trace_markers, define_template, field))]
+#[proc_macro_derive(TraceEvent, attributes(trace_event, trace_markers, fast_match, define_template, field))]
 pub fn derive_trace_event(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    
+
     // Parse attributes
     let event_attr = match find_trace_event_attr(&input.attrs) {
         Some(attr) => attr,
         None => return syn::Error::new(input.ident.span(), "missing #[trace_event] attribute")
             .to_compile_error().into(),
     };
-    
+
     let markers_attr = find_trace_markers_attr(&input.attrs);
+    let fast_match_attr = find_fast_match_attr(&input.attrs);
+    let contains_any: &[String] = fast_match_attr
+        .as_ref()
+        .map(|a| a.contains_any.as_slice())
+        .unwrap_or(&[]);
     let templates = find_define_template_attrs(&input.attrs);
-    
+
     // Parse fields - only named fields with identifiers
     // Collect (ident, field_type, field_attr)
     let fields = match &input.data {
@@ -88,7 +94,11 @@ pub fn derive_trace_event(input: TokenStream) -> TokenStream {
 
     // Generate code
     let event_type_impl = generate_event_type_impl(&input.ident, &event_attr);
-    let fast_match_impl = generate_fast_match_impl(&input.ident, markers_attr.as_ref());
+    let fast_match_impl = generate_fast_match_impl(
+        &input.ident,
+        markers_attr.as_ref(),
+        contains_any,
+    );
     let template_event_impl = generate_template_event_impl(&input.ident, &templates, &fields);
     let registration = generate_registration(&input.ident, &event_attr);
 
@@ -124,20 +134,25 @@ pub fn derive_trace_event(input: TokenStream) -> TokenStream {
 ///     trace_mark_tgid: u32,
 /// }
 /// ```
-#[proc_macro_derive(TracingMarkEvent, attributes(trace_event, trace_markers, define_template, field))]
+#[proc_macro_derive(TracingMarkEvent, attributes(trace_event, trace_markers, fast_match, define_template, field))]
 pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    
+
     // Parse attributes
     let event_attr = match find_trace_event_attr(&input.attrs) {
         Some(attr) => attr,
         None => return syn::Error::new(input.ident.span(), "missing #[trace_event] attribute")
             .to_compile_error().into(),
     };
-    
+
     let markers_attr = find_trace_markers_attr(&input.attrs);
+    let fast_match_attr = find_fast_match_attr(&input.attrs);
+    let contains_any: &[String] = fast_match_attr
+        .as_ref()
+        .map(|a| a.contains_any.as_slice())
+        .unwrap_or(&[]);
     let templates = find_define_template_attrs(&input.attrs);
-    
+
     // Parse fields - only named fields with identifiers
     // Collect (ident, field_type, field_attr)
     let fields = match &input.data {
@@ -160,7 +175,11 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
 
     // Generate code
     let event_type_impl = generate_event_type_impl(&input.ident, &event_attr);
-    let fast_match_impl = generate_fast_match_impl(&input.ident, markers_attr.as_ref());
+    let fast_match_impl = generate_fast_match_impl(
+        &input.ident,
+        markers_attr.as_ref(),
+        contains_any,
+    );
     let template_event_impl = generate_template_event_impl(&input.ident, &templates, &fields);
     let registration = generate_tracing_mark_registration(&input.ident);
 

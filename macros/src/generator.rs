@@ -226,27 +226,31 @@ pub fn generate_event_type_impl(
 pub fn generate_fast_match_impl(
     struct_name: &Ident,
     markers_attr: Option<&TraceMarkersAttr>,
+    payload_contains_any: &[String],
 ) -> TokenStream {
-    if let Some(attr) = markers_attr {
-        let markers = &attr.0;
-        // Convert string markers to byte slices
-        let marker_bytes: Vec<TokenStream> = markers
-            .iter()
-            .map(|m| {
-                let bytes = m.as_bytes();
-                quote! { &[#(#bytes),*] }
-            })
-            .collect();
+    let markers = markers_attr.map(|a| a.0.as_slice()).unwrap_or(&[]);
+    let marker_bytes: Vec<TokenStream> = markers
+        .iter()
+        .map(|m| {
+            let bytes = m.as_bytes();
+            quote! { &[#(#bytes),*] }
+        })
+        .collect();
 
+    let quick_check = if payload_contains_any.is_empty() {
+        quote! {}
+    } else {
         quote! {
-            impl ::trace_parser::common::FastMatch for #struct_name {
-                const PAYLOAD_MARKERS: &'static [&'static [u8]] = &[#(#marker_bytes),*];
+            fn payload_quick_check(line: &str) -> bool {
+                ::trace_parser::common::contains_any(line, &[#(#payload_contains_any),*])
             }
         }
-    } else {
-        // No markers - use default empty implementation
-        quote! {
-            impl ::trace_parser::common::FastMatch for #struct_name {}
+    };
+
+    quote! {
+        impl ::trace_parser::common::FastMatch for #struct_name {
+            const PAYLOAD_MARKERS: &'static [&'static [u8]] = &[#(#marker_bytes),*];
+            #quick_check
         }
     }
 }
@@ -343,8 +347,8 @@ pub fn generate_template_event_impl(
     // For multiple templates: check for unique fields
     let detect_format_impl = if templates.len() == 1 {
         quote! {
-            fn detect_format(_payload: &str) -> u8 {
-                0
+        fn detect_format(_payload: &str) -> u8 {
+            0
             }
         }
     } else {
@@ -370,7 +374,7 @@ pub fn generate_template_event_impl(
                 }
             })
             .collect();
-        
+
         if checks.is_empty() {
             quote! {
                 fn detect_format(_payload: &str) -> u8 {
@@ -493,7 +497,7 @@ pub fn generate_template_event_impl(
 /// Generate registration code for regular trace events
 pub fn generate_registration(struct_name: &Ident, event_attr: &TraceEventAttr) -> TokenStream {
     let name = &event_attr.name;
-    
+
     quote! {
         ::trace_parser::register_parser!(#name, #struct_name);
     }
@@ -526,7 +530,7 @@ mod tests {
         #[case] expected: Vec<u8>,
     ) {
         let struct_name: Ident = parse_quote!(TestEvent);
-        
+
         // Build templates from input ids
         let templates: Vec<DefineTemplateAttr> = ids
             .iter()
@@ -536,7 +540,7 @@ mod tests {
                 id: *id,
             })
             .collect();
-        
+
         // Build fields
         let fields: Vec<(Ident, Type, FieldAttr)> = (0..ids.len())
             .map(|i| {
@@ -596,7 +600,7 @@ mod tests {
         let struct_name: Ident = parse_quote!(TraceMarkBegin);
         let markers_attr = Some(TraceMarkersAttr(vec!["B|".to_string()]));
 
-        let output = generate_fast_match_impl(&struct_name, markers_attr.as_ref());
+        let output = generate_fast_match_impl(&struct_name, markers_attr.as_ref(), &[]);
         let output_str = output.to_string();
 
         assert!(output_str.contains("FastMatch"));
@@ -608,7 +612,7 @@ mod tests {
         let struct_name: Ident = parse_quote!(TraceSchedSwitch);
         let markers_attr: Option<TraceMarkersAttr> = None;
 
-        let output = generate_fast_match_impl(&struct_name, markers_attr.as_ref());
+        let output = generate_fast_match_impl(&struct_name, markers_attr.as_ref(), &[]);
         let output_str = output.to_string();
 
         assert!(output_str.contains("FastMatch"));

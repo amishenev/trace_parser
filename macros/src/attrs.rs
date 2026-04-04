@@ -47,6 +47,38 @@ impl Parse for TraceEventAttr {
     }
 }
 
+/// Parsed `#[fast_match(contains_any = ["...", ...])]` — `FastMatch::payload_quick_check` via `contains_any`.
+#[derive(Debug, Clone)]
+pub struct FastMatchAttr {
+    pub contains_any: Vec<String>,
+}
+
+impl Parse for FastMatchAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut contains_any = Vec::new();
+
+        while !input.is_empty() {
+            let key: Ident = input.parse()?;
+            input.parse::<Token![=]>()?;
+
+            if key == "contains_any" {
+                let content;
+                syn::bracketed!(content in input);
+                let list = content.parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
+                contains_any = list.iter().map(|s| s.value()).collect();
+            } else {
+                return Err(syn::Error::new(key.span(), "expected contains_any"));
+            }
+
+            if !input.is_empty() {
+                input.parse::<Token![,]>()?;
+            }
+        }
+
+        Ok(Self { contains_any })
+    }
+}
+
 /// Parsed `#[trace_markers("...", "...")]` attribute
 #[derive(Debug, Clone)]
 pub struct TraceMarkersAttr(pub Vec<String>);
@@ -72,7 +104,7 @@ pub struct DefineTemplateAttr {
 impl Parse for DefineTemplateAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let template: LitStr = input.parse()?;
-        
+
         let id = if input.peek(Token![,]) {
             input.parse::<Token![,]>()?;
             // Check for `id = N`
@@ -91,7 +123,7 @@ impl Parse for DefineTemplateAttr {
         } else {
             None
         };
-        
+
         Ok(Self { template: template.value(), id })
     }
 }
@@ -172,6 +204,13 @@ pub fn find_trace_event_attr(attrs: &[Attribute]) -> Option<TraceEventAttr> {
 pub fn find_trace_markers_attr(attrs: &[Attribute]) -> Option<TraceMarkersAttr> {
     attrs.iter()
         .find(|attr| attr.path().is_ident("trace_markers"))
+        .and_then(|attr| attr.parse_args().ok())
+}
+
+/// Extract `#[fast_match(...)]` attribute from a list of attributes
+pub fn find_fast_match_attr(attrs: &[Attribute]) -> Option<FastMatchAttr> {
+    attrs.iter()
+        .find(|attr| attr.path().is_ident("fast_match"))
         .and_then(|attr| attr.parse_args().ok())
 }
 

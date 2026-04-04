@@ -98,6 +98,7 @@ struct TraceCustomEvent {
 
 ```rust
 #[trace_event(name = "clock_set_rate")]
+#[fast_match(contains_any = ["clk=ddr_devfreq", "clk=l3c_devfreq"])]
 #[define_template("clk={clk} state={state} cpu_id={cpu_id}")]
 #[derive(TraceEvent)]
 struct TraceDevFrequency {
@@ -180,6 +181,10 @@ struct TraceReceiveVsync {
 ### `#[trace_markers("...", "...")]`
 
 Маркеры для быстрой проверки payload через SIMD.
+
+### `#[fast_match(contains_any = ["...", ...])]`
+
+Опционально: `FastMatch::payload_quick_check` через `contains_any(line, ...)`. Если атрибута нет — только `PAYLOAD_MARKERS` / дефолтная проверка.
 
 ### `#[define_template("...")]`
 

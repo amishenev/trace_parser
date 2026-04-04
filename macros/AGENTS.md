@@ -24,6 +24,7 @@ macros/src/
 
 Парсинг атрибутов:
 - `TraceEventAttr` — `#[trace_event(name, aliases)]`
+- `FastMatchAttr` — `#[fast_match(contains_any = [...])]`
 - `TraceMarkersAttr` — `#[trace_markers(...)]`
 - `DefineTemplateAttr` — `#[define_template("...")]`
 - `FieldAttr` — `#[field(name, regex, choice, optional, readonly, private)]`
