@@ -212,7 +212,7 @@ fn generate_template() -> TokenStream {
 mod tests {
     use super::*;
     use crate::attrs::FieldAttr;
-    use syn::{parse_quote, Ident};
+    use syn::parse_quote;
 
     #[test]
     fn test_generate_new() {

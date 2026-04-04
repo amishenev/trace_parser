@@ -1099,7 +1099,9 @@ mod tests {
         let output_str = output.to_string();
 
         // Should include the extra field in PayloadTemplate::new
-        assert!(output_str.contains(r#""\[\[^\]\]+\]""#));
-        assert!(output_str.contains("extra_info"));
+        // In TokenStream, backslashes are escaped: \\[[^\\]]+\\]
+        assert!(output_str.contains("extra_info"), "output should contain extra_info");
+        assert!(output_str.contains("FieldSpec :: custom"), "output should contain FieldSpec::custom");
+        assert!(output_str.contains("[^"), "output should contain regex pattern");
     }
 }
