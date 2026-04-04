@@ -79,6 +79,7 @@ impl Trace {
 /// Helper для извлечения base полей из BaseTraceParts
 /// Возвращает кортеж: (thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, payload_raw)
 #[inline]
+#[allow(dead_code)]
 pub fn extract_base_fields(parts: &BaseTraceParts) -> (
     String, u32, u32, u32, String, f64, String, String,
 ) {
