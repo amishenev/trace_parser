@@ -25,6 +25,12 @@ jobs:
         with:
           tool: cargo-llvm-cov
 
+      - name: Run main crate tests
+        run: cargo test -q
+
+      - name: Run macro crate tests
+        run: cargo test -p trace_parser_macros -q
+
       - name: Generate coverage (lcov)
         run: cargo llvm-cov --workspace --lcov --output-path lcov.info
 

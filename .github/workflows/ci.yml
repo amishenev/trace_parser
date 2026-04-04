@@ -54,6 +54,9 @@ jobs:
       - name: Run Rust tests
         run: cargo test -q
 
+      - name: Run macro crate tests
+        run: cargo test -p trace_parser_macros -q
+
       - name: Run cargo clippy
         run: cargo clippy --all-targets -- -D warnings
 
@@ -99,6 +102,9 @@ jobs:
 
       - name: Run Rust tests
         run: cargo test -q
+
+      - name: Run macro crate tests
+        run: cargo test -p trace_parser_macros -q
 
       - name: Run cargo clippy
         run: cargo clippy --all-targets -- -D warnings
