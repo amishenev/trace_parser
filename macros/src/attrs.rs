@@ -1,6 +1,6 @@
 //! Attribute parsing for trace_event macros.
 
-use syn::{parse::{Parse, ParseStream}, Attribute, Ident, LitStr, Result, Token};
+use syn::{parse::{Parse, ParseStream}, ext::IdentExt, Attribute, Ident, LitStr, Result, Token};
 
 /// Parsed `#[trace_event(name = "...", aliases = ["...", ...])]` attribute
 #[derive(Debug, Clone)]
@@ -128,7 +128,7 @@ impl Parse for DefineTemplateAttr {
     }
 }
 
-/// Parsed `#[field(name = "...", regex = "...", choice = ["a", "b"], optional, readonly, private)]` attribute
+/// Parsed `#[field(name = "...", regex = "...", choice = ["a", "b"], format = "...", optional, readonly, private)]` attribute
 ///
 /// Field attributes control how struct fields are exposed to Python.
 /// Type is inferred from the Rust field type (String, u32, i32, f64, bool).
@@ -138,6 +138,8 @@ pub struct FieldAttr {
     pub name: Option<String>,
     pub regex: Option<String>,
     pub choice: Vec<String>,
+    /// Custom format string for rendering (e.g. `"{:03}"`).
+    pub format: Option<String>,
     pub optional: bool,
     pub readonly: bool,
     pub private: bool,
@@ -148,15 +150,32 @@ impl Parse for FieldAttr {
         let mut name = None;
         let mut regex = None;
         let mut choice = Vec::new();
+        let mut format = None;
         let mut optional = false;
         let mut readonly = false;
         let mut private = false;
 
         // Parse comma-separated key-value pairs
         while !input.is_empty() {
-            let key: Ident = input.parse()?;
+            let key: Ident = input.call(Ident::parse_any)?;
 
-            if key == "optional" || key == "readonly" || key == "private" {
+            if key == "format" {
+                let _: Token![=] = input.parse()?;
+                let value: LitStr = input.parse()?;
+                format = Some(value.value());
+            } else if key == "choice" {
+                // Parse array: ["val1", "val2"] or [11, 12]
+                let content;
+                syn::bracketed!(content in input);
+                let list = content.parse_terminated(|input: ParseStream| input.parse::<syn::Lit>(), Token![,])?;
+                for lit in list {
+                    match lit {
+                        syn::Lit::Str(s) => choice.push(s.value()),
+                        syn::Lit::Int(i) => choice.push(i.base10_digits().to_string()),
+                        _ => {}
+                    }
+                }
+            } else if key == "optional" || key == "readonly" || key == "private" {
                 if key == "optional" { optional = true; }
                 else if key == "readonly" { readonly = true; }
                 else if key == "private" { private = true; }
@@ -169,18 +188,6 @@ impl Parse for FieldAttr {
                 } else if key == "regex" {
                     let value: LitStr = input.parse()?;
                     regex = Some(value.value());
-                } else if key == "choice" {
-                    // Parse array: ["val1", "val2"] or [11, 12]
-                    let content;
-                    syn::bracketed!(content in input);
-                    let list = content.parse_terminated(|input: ParseStream| input.parse::<syn::Lit>(), Token![,])?;
-                    for lit in list {
-                        match lit {
-                            syn::Lit::Str(s) => choice.push(s.value()),
-                            syn::Lit::Int(i) => choice.push(i.base10_digits().to_string()),
-                            _ => {}
-                        }
-                    }
                 }
             }
 
@@ -189,7 +196,7 @@ impl Parse for FieldAttr {
             }
         }
 
-        Ok(Self { name, regex, choice, optional, readonly, private })
+        Ok(Self { name, regex, choice, optional, readonly, private, format })
     }
 }
 
@@ -238,6 +245,7 @@ pub fn find_field_attr(attrs: &[Attribute]) -> Option<FieldAttr> {
                     name: None,
                     regex: None,
                     choice: Vec::new(),
+                    format: None,
                     optional: false,
                     readonly: false,
                     private: false,
@@ -336,6 +344,13 @@ mod tests {
         let tokens = quote! { private };
         let attr: FieldAttr = syn::parse2(tokens).unwrap();
         assert!(attr.private);
+    }
+
+    #[test]
+    fn test_field_attr_format() {
+        let tokens = quote! { format = "{:03}" };
+        let attr: FieldAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.format, Some("{:03}".to_string()));
     }
 
     #[test]

@@ -402,6 +402,15 @@ pub fn generate_template_event_impl(
             let name_str = field_attr.name.clone()
                 .unwrap_or_else(|| field_name.to_string());
 
+            if let Some(fmt) = &field_attr.format {
+                let render_expr = inferred.render_value(field_name);
+                return quote! {
+                    (#name_str, Some(::trace_parser::payload_template::TemplateValue::Str(
+                        &::std::format!(#fmt, #render_expr)
+                    )))
+                };
+            }
+
             if field_attr.optional {
                 let render = inferred.render_optional_value(field_name);
                 quote! {
@@ -551,6 +560,7 @@ mod tests {
                         name: None,
                         choice: vec![],
                         regex: None,
+                        format: None,
                         optional: false,
                         readonly: false,
                         private: false,
@@ -654,8 +664,9 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: None,
-                        choice: vec![],
+                choice: vec![],
                 regex: None,
+                format: None,
                 optional: false,
                 readonly: false,
                 private: false,
@@ -679,8 +690,9 @@ mod tests {
             parse_quote!(Option<u32>),
             FieldAttr {
                 name: None,
-                        choice: vec![],
+                choice: vec![],
                 regex: None,
+                format: None,
                 optional: true,
                 readonly: false,
                 private: false,
@@ -703,8 +715,9 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: Some("state".to_string()),
-                regex: None,
                 choice: vec![],
+                regex: None,
+                format: None,
                 optional: false,
                 readonly: false,
                 private: false,
@@ -727,8 +740,9 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: None,
-                        choice: vec![],
+                choice: vec![],
                 regex: None,
+                format: None,
                 optional: false,
                 readonly: false,
                 private: false,
@@ -752,8 +766,9 @@ mod tests {
             parse_quote!(Option<u32>),
             FieldAttr {
                 name: None,
-                        choice: vec![],
+                choice: vec![],
                 regex: None,
+                format: None,
                 optional: true,
                 readonly: false,
                 private: false,
@@ -778,8 +793,9 @@ mod tests {
             parse_quote!(bool),
             FieldAttr {
                 name: None,
-                        choice: vec![],
+                choice: vec![],
                 regex: None,
+                format: None,
                 optional: false,
                 readonly: false,
                 private: false,
@@ -802,8 +818,8 @@ mod tests {
             DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1) },
         ];
         let fields = vec![
-            (parse_quote!(a), parse_quote!(u32), FieldAttr { name: None, choice: vec![], regex: None, optional: false, readonly: false, private: false }),
-            (parse_quote!(b), parse_quote!(Option<u32>), FieldAttr { name: None, choice: vec![], regex: None, optional: true, readonly: false, private: false }),
+            (parse_quote!(a), parse_quote!(u32), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false }),
+            (parse_quote!(b), parse_quote!(Option<u32>), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: true, readonly: false, private: false }),
         ];
 
         let output = generate_template_event_impl(&struct_name, &templates, &fields);
@@ -822,8 +838,9 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: None,
-                        choice: vec![],
+                choice: vec![],
                 regex: None,
+                format: None,
                 optional: false,
                 readonly: false,
                 private: false,
@@ -846,8 +863,9 @@ mod tests {
             parse_quote!(u32),
             FieldAttr {
                 name: None,
-                        choice: vec![],
+                choice: vec![],
                 regex: Some(r"\d{3}".to_string()),
+                format: None,
                 optional: false,
                 readonly: false,
                 private: false,
@@ -873,8 +891,9 @@ mod tests {
             parse_quote!(String),
             FieldAttr {
                 name: None,
-                regex: None,
                 choice: vec!["ddr_devfreq".to_string(), "l3c_devfreq".to_string()],
+                regex: None,
+                format: None,
                 optional: false,
                 readonly: false,
                 private: false,
