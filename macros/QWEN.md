@@ -145,9 +145,9 @@ struct TraceSchedSwitch {
 ```rust
 use trace_parser_macros::TracingMarkEvent;
 
-#[trace_event(name = "tracing_mark_write")]
-#[trace_markers("B|")]
-#[define_template("B|{trace_mark_tgid}|{message}")]
+// Begin маркер — префикс B|{trace_mark_tgid}| добавляется автоматически
+#[trace_event(name = "tracing_mark_write", begin, skip_registration)]
+#[define_template("{message}")]
 #[derive(TracingMarkEvent)]
 struct TraceMarkBegin {
     #[field]
@@ -157,8 +157,21 @@ struct TraceMarkBegin {
     message: String,
 }
 
-#[trace_event(name = "tracing_mark_write")]
-#[trace_markers("B|", "ReceiveVsync")]
+// End маркер — префикс E|{trace_mark_tgid}| добавляется автоматически
+#[trace_event(name = "tracing_mark_write", end, skip_registration)]
+#[define_template("{message}")]
+#[derive(TracingMarkEvent)]
+struct TraceMarkEnd {
+    #[field]
+    trace_mark_tgid: u32,
+
+    #[field]
+    message: String,
+}
+
+// Специфичный подтип — маркеры объединяются: ["B|", "ReceiveVsync"]
+#[trace_event(name = "tracing_mark_write", begin)]
+#[trace_markers("ReceiveVsync")]
 #[define_template("{?ignore:extra_info}ReceiveVsync {frame_number}")]
 #[derive(TracingMarkEvent)]
 struct TraceReceiveVsync {
@@ -171,7 +184,7 @@ struct TraceReceiveVsync {
 
 ## Атрибуты
 
-### `#[trace_event(name, aliases, skip_registration)]`
+### `#[trace_event(name, aliases, skip_registration, begin, end)]`
 
 | Параметр | Обязательный | Описание |
 |----------|--------------|----------|
@@ -179,10 +192,14 @@ struct TraceReceiveVsync {
 | `aliases` | ❌ | Алиасы для event_name |
 | `skip_registration` | ❌ | Пропустить регистрацию — для событий, обрабатываемых явно (TraceMarkBegin/End) |
 | `generate_pymethods` | ❌ | Генерировать `#[pymethods]` (default: `true`) |
+| `begin` | ❌ | TracingMarkEvent: автоматически добавляет маркер `B|` и префикс `B|{trace_mark_tgid}|` к шаблонам |
+| `end` | ❌ | TracingMarkEvent: автоматически добавляет маркер `E|` и префикс `E|{trace_mark_tgid}|` к шаблонам |
 
 ### `#[trace_markers("...", "...")]`
 
 Маркеры для быстрой проверки payload через SIMD.
+
+**Для TracingMarkEvent с `begin`/`end`:** маркеры объединяются — `B|` или `E|` добавляется перед пользовательскими маркерами.
 
 ### `#[fast_match(contains_any = ["...", ...])]`
 

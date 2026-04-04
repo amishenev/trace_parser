@@ -23,7 +23,8 @@ macros/src/
 ### `attrs.rs`
 
 Парсинг атрибутов:
-- `TraceEventAttr` — `#[trace_event(name, aliases)]`
+- `TraceEventAttr` — `#[trace_event(name, aliases, skip_registration, begin, end)]`
+- `MarkType` — `Begin` / `End` для TracingMarkEvent
 - `FastMatchAttr` — `#[fast_match(contains_any = [...])]`
 - `TraceMarkersAttr` — `#[trace_markers(...)]`
 - `DefineTemplateAttr` — `#[define_template("...")]`
@@ -124,9 +125,32 @@ macros/src/
    - FromStr — парсинг обратно в enum
    - TraceEnum trait — values() метод
 
-4. **Регистрация**
-   - `register_parser!` — для обычных событий
-   - `register_tracing_mark_parser!` — для tracing_mark
+### TracingMarkEvent derive
+
+Специальная обработка для `tracing_mark_write` событий:
+
+1. **Флаги `begin`/`end`** — определяют тип маркера
+2. **Авто-префикс шаблонов** — `B|{trace_mark_tgid}|` или `E|{trace_mark_tgid}|`
+3. **Объединение маркеров** — `["B|", ...user_markers]`
+4. **Регистрация** — `TracingMarkEntry` или пропуск через `skip_registration`
+
+```rust
+// Begin: маркеры ["B|"], шаблон "B|{trace_mark_tgid}|{message}"
+#[trace_event(name = "tracing_mark_write", begin, skip_registration)]
+#[define_template("{message}")]
+
+// End: маркеры ["E|"], шаблон "E|{trace_mark_tgid}|{message}"
+#[trace_event(name = "tracing_mark_write", end, skip_registration)]
+#[define_template("{message}")]
+
+// Специфичный: маркеры ["B|", "ReceiveVsync"], шаблон "B|{trace_mark_tgid}|..."
+#[trace_event(name = "tracing_mark_write", begin)]
+#[trace_markers("ReceiveVsync")]
+#[define_template("{message}")]
+```
+
+### Регистрация
+Макрос генерирует `inventory::submit!` напрямую — обёрточные макросы `register_parser!` и `register_tracing_mark_parser!` удалены.
 
 ### Примеры тестов
 

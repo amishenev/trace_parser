@@ -5,10 +5,9 @@
 ```rust
 use trace_parser_macros::TracingMarkEvent;
 
-// Базовая метка начала
-#[trace_event(name = "tracing_mark_write")]
-#[trace_markers("B|")]
-#[define_template("B|{trace_mark_tgid}|{message}")]
+// Базовая метка начала — префикс B|{trace_mark_tgid}| добавляется автоматически
+#[trace_event(name = "tracing_mark_write", begin, skip_registration, generate_pymethods = false)]
+#[define_template("{message}")]
 #[derive(TracingMarkEvent)]
 struct TraceMarkBegin {
     #[field]
@@ -18,9 +17,21 @@ struct TraceMarkBegin {
     message: String,
 }
 
-// Специфичная метка ReceiveVsync
-#[trace_event(name = "tracing_mark_write")]
-#[trace_markers("B|", "ReceiveVsync")]
+// Базовая метка конца — префикс E|{trace_mark_tgid}| добавляется автоматически
+#[trace_event(name = "tracing_mark_write", end, skip_registration, generate_pymethods = false)]
+#[define_template("{message}")]
+#[derive(TracingMarkEvent)]
+struct TraceMarkEnd {
+    #[field]
+    trace_mark_tgid: u32,
+
+    #[field]
+    message: String,
+}
+
+// Специфичная метка ReceiveVsync — маркеры объединяются: ["B|", "ReceiveVsync"]
+#[trace_event(name = "tracing_mark_write", begin)]
+#[trace_markers("ReceiveVsync")]
 #[define_template("{?ignore:extra_info}ReceiveVsync {frame_number}")]
 #[derive(TracingMarkEvent)]
 struct TraceReceiveVsync {

@@ -7,9 +7,8 @@ use crate::trace::format_trace_header;
 #[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug, PartialEq)]
 #[derive(TracingMarkEvent)]
-#[trace_event(name = "tracing_mark_write", skip_registration, generate_pymethods = false)]
-#[trace_markers("E|")]
-#[define_template("E|{trace_mark_tgid}|{message}")]
+#[trace_event(name = "tracing_mark_write", end, skip_registration, generate_pymethods = false)]
+#[define_template("{message}")]
 pub struct TraceMarkEnd {
     #[field]
     format_id: u8,

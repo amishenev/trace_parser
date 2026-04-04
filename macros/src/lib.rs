@@ -27,7 +27,7 @@ mod pymethods;
 
 use attrs::{
     find_define_template_attrs, find_fast_match_attr, find_field_attr, find_trace_event_attr,
-    find_trace_markers_attr,
+    find_trace_markers_attr, MarkType,
 };
 use enum_gen::{generate_trace_enum, parse_variants};
 use generator::{
@@ -144,13 +144,42 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
             .to_compile_error().into(),
     };
 
-    let markers_attr = find_trace_markers_attr(&input.attrs);
     let fast_match_attr = find_fast_match_attr(&input.attrs);
     let contains_any: &[String] = fast_match_attr
         .as_ref()
         .map(|a| a.contains_any.as_slice())
         .unwrap_or(&[]);
-    let templates = find_define_template_attrs(&input.attrs);
+    
+    // Determine markers and template prefix from mark_type
+    let (markers_attr, templates) = if let Some(mark_type) = event_attr.mark_type {
+        let (prefix, marker) = match mark_type {
+            MarkType::Begin => ("B|{trace_mark_tgid}|", "B|"),
+            MarkType::End => ("E|{trace_mark_tgid}|", "E|"),
+        };
+
+        // Wrap templates with prefix
+        let wrapped_templates: Vec<_> = find_define_template_attrs(&input.attrs)
+            .into_iter()
+            .map(|t| {
+                let wrapped_template = format!("{}{}", prefix, t.template);
+                crate::attrs::DefineTemplateAttr {
+                    template: wrapped_template,
+                    id: t.id,
+                    detect: t.detect,
+                }
+            })
+            .collect();
+
+        // Merge B|/E| with user-provided trace_markers (if any)
+        let mut all_markers = vec![marker.to_string()];
+        if let Some(user_markers) = find_trace_markers_attr(&input.attrs) {
+            all_markers.extend(user_markers.0);
+        }
+        let markers = crate::attrs::TraceMarkersAttr(all_markers);
+        (Some(markers), wrapped_templates)
+    } else {
+        (find_trace_markers_attr(&input.attrs), find_define_template_attrs(&input.attrs))
+    };
 
     // Parse fields - only named fields with identifiers
     // Collect (ident, field_type, field_attr)

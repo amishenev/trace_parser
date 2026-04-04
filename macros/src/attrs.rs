@@ -2,7 +2,14 @@
 
 use syn::{parse::{Parse, ParseStream}, ext::IdentExt, Attribute, Ident, LitStr, Result, Token};
 
-/// Parsed `#[trace_event(name = "...", aliases = ["...", ...], skip_registration)]` attribute
+/// Tracing mark type: begin or end marker
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MarkType {
+    Begin,
+    End,
+}
+
+/// Parsed `#[trace_event(name = "...", aliases = ["...", ...], skip_registration, begin, end)]` attribute
 #[derive(Debug, Clone)]
 pub struct TraceEventAttr {
     pub name: String,
@@ -10,6 +17,8 @@ pub struct TraceEventAttr {
     pub generate_pymethods: bool,
     /// Skip automatic registration — used for events handled explicitly (e.g. TraceMarkBegin/End).
     pub skip_registration: bool,
+    /// This is a tracing_mark begin/end marker — used by TracingMarkEvent derive.
+    pub mark_type: Option<MarkType>,
 }
 
 impl Parse for TraceEventAttr {
@@ -18,6 +27,7 @@ impl Parse for TraceEventAttr {
         let mut aliases = Vec::new();
         let mut generate_pymethods = true;
         let mut skip_registration = false;
+        let mut mark_type = None;
 
         // Parse comma-separated key-value pairs
         while !input.is_empty() {
@@ -25,6 +35,10 @@ impl Parse for TraceEventAttr {
 
             if key == "skip_registration" {
                 skip_registration = true;
+            } else if key == "begin" {
+                mark_type = Some(MarkType::Begin);
+            } else if key == "end" {
+                mark_type = Some(MarkType::End);
             } else if key == "name" {
                 input.parse::<Token![=]>()?;
                 let value: LitStr = input.parse()?;
@@ -52,7 +66,7 @@ impl Parse for TraceEventAttr {
 
         let name = name.ok_or_else(|| syn::Error::new(input.span(), "missing 'name' attribute"))?;
 
-        Ok(Self { name, aliases, generate_pymethods, skip_registration })
+        Ok(Self { name, aliases, generate_pymethods, skip_registration, mark_type })
     }
 }
 
