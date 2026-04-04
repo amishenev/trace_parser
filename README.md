@@ -152,18 +152,20 @@ print(vsync.frame_number)
 
 ```text
 src/                          # Rust source
-  trace.rs                    # Base Trace class
+  trace.rs                    # Base Trace class (hand-written, fallback)
   common.rs                   # Shared traits & utilities
   payload_template.rs         # Payload template system
   format_registry.rs          # Multi-format registry
   registry.rs                 # Event parser registry
   sched_switch.rs             # sched_switch (macro-generated)
   sched_wakeup.rs             # sched_wakeup / sched_wakeup_new (macro-generated)
-  sched_process_exit.rs       # sched_process_exit
+  sched_process_exit.rs       # sched_process_exit (macro-generated)
   frequency.rs                # cpu_frequency / clock_set_rate (macro-generated)
-  trace_exit.rs               # exit1 / exit2
-  tracing_mark/               # Tracing mark events
-    base.rs                   # TracingMark, TraceMarkBegin, TraceMarkEnd
+  trace_exit.rs               # exit1 / exit2 (macro-generated)
+  tracing_mark/               # Tracing mark events (macro-generated)
+    base.rs                   # TracingMark
+    begin.rs                  # TraceMarkBegin
+    end.rs                    # TraceMarkEnd
     receive_vsync.rs          # TraceReceiveVsync
   tracing_mark_registry.rs    # Tracing mark dispatch
 
@@ -199,13 +201,15 @@ benches/                      # Rust benchmarks
 
 ### Proc-macro system
 
-Most typed events are generated via `#[derive(TraceEvent)]` or `#[derive(TracingMarkEvent)]` from the `trace_parser_macros` crate. The macro generates:
+**All typed events are generated** via `#[derive(TraceEvent)]` or `#[derive(TracingMarkEvent)]` from the `trace_parser_macros` crate. The only hand-written event is `Trace` (generic fallback).
+
+The macro generates:
 
 - `impl EventType` — event name and aliases
 - `impl FastMatch` — SIMD-based quick checks
 - `impl TemplateEvent` — payload parsing and rendering
 - `#[pymethods]` — Python API (constructor, parse, to_string, etc.)
-- Parser registration via `register_parser!`
+- Parser registration via `inventory::submit!`
 
 See `macros/QWEN.md` for the full macro syntax reference.
 

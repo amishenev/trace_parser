@@ -379,15 +379,18 @@ pub struct TraceMyEvent {
 
 ## События на макросах
 
-Следующие события используют макросы:
+Все типовые события используют макросы:
 
 - `TraceSchedSwitch` — `#[derive(TraceEvent)]`
 - `TraceSchedWakeup` — `#[derive(TraceEvent)]` (multi-template)
 - `TraceSchedWakeupNew` — `#[derive(TraceEvent)]`
+- `TraceSchedProcessExit` — `#[derive(TraceEvent)]`
+- `TraceExit` — `#[derive(TraceEvent)]` (aliases: exit1, exit2)
 - `TraceCpuFrequency` — `#[derive(TraceEvent)]`
 - `TraceDevFrequency` — `#[derive(TraceEvent)]` (fast_match + choice)
+- `TracingMark` — `#[derive(TraceEvent)]`
 - `TraceMarkBegin` — `#[derive(TracingMarkEvent)]` (skip_registration)
 - `TraceMarkEnd` — `#[derive(TracingMarkEvent)]` (skip_registration)
-- `TracingMark` — `#[derive(TraceEvent)]`
+- `TraceReceiveVsync` — `#[derive(TracingMarkEvent)]`
 
-Остались ручными: `Trace`, `TraceReceiveVsync`, `TraceExit`, `TraceSchedProcessExit`.
+Единственное ручное событие: `Trace` (базовый fallback класс, не `TemplateEvent`)

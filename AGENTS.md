@@ -158,18 +158,18 @@ Base fields (Rust / Python use `thread_tid` and `thread_tgid`; trace line still 
 
 Current typed classes:
 
-- `Trace` (generic fallback)
+- `Trace` (generic fallback, hand-written)
 - `TraceSchedSwitch` (macro-generated)
 - `TraceSchedWakeup` (macro-generated)
 - `TraceSchedWakeupNew` (macro-generated)
-- `TraceSchedProcessExit`
-- `TraceExit` (exit1, exit2)
+- `TraceSchedProcessExit` (macro-generated)
+- `TraceExit` (exit1, exit2, macro-generated)
 - `TraceCpuFrequency` (macro-generated)
 - `TraceDevFrequency` (macro-generated)
 - `TracingMark` (macro-generated)
 - `TraceMarkBegin` (macro-generated)
 - `TraceMarkEnd` (macro-generated)
-- `TraceReceiveVsync`
+- `TraceReceiveVsync` (macro-generated)
 
 ### Flat typed events + proc-macro authoring
 
@@ -183,7 +183,7 @@ Boilerplate for `EventType`, `FastMatch`, `TemplateEvent`, parser registration, 
 
 Use `#[trace_event(..., generate_pymethods = false)]` when the type needs a hand-written `#[pymethods]` block (custom `new`, extra methods, or tracing-mark helpers like `payload_to_string`).
 
-`TracingMark` (fallback, raw payload only) is **not** `TemplateEvent` and stays hand-written. `TraceReceiveVsync` keeps custom two-stage parsing and stays hand-written.
+**All typed events are now macro-generated.** The only hand-written event is `Trace` (generic fallback, not `TemplateEvent`).
 
 For `TraceMarkBegin` / `TraceMarkEnd`, use `#[trace_event(..., register_tracing_mark = false)]` — the factory calls those parsers explicitly after the inventory pass, so they must not register into the tracing-mark inventory.
 
@@ -506,8 +506,8 @@ Python package files live in:
 
 ## Current priorities
 
-1. Migrate remaining hand-written typed events fully onto `TraceEvent` / `TracingMarkEvent` where templates match (keep bespoke parsers like `TraceReceiveVsync` manual)
-2. Add more kernel event families
+1. ✅ Migrate all typed events onto `TraceEvent` / `TracingMarkEvent` — COMPLETED
+2. Add more kernel event families (sched_migrate, sched_waking, etc.)
 3. Keep event modules small and avoid unnecessary internal helper structs
 4. E2E integration tests with real trace lines (see [macros/AGENTS.md](macros/AGENTS.md))
 
@@ -525,11 +525,11 @@ Python package files live in:
 - **`skip_registration`** for Begin/End (explicit registration)
 - **TraceEnum derive** — `#[derive(TraceEnum)]`
 
-**In use in `src/`:** `TraceSchedSwitch`, `TraceSchedWakeup`, `TraceSchedWakeupNew`, `TraceCpuFrequency`, `TraceDevFrequency`, `TraceMarkBegin`, `TraceMarkEnd`, `TracingMark` (see source). **Still manual:** `Trace`, `TraceReceiveVsync`, `TraceExit`, `TraceSchedProcessExit`
+**In use in `src/`:** ALL typed events — `TraceSchedSwitch`, `TraceSchedWakeup`, `TraceSchedWakeupNew`, `TraceSchedProcessExit`, `TraceExit`, `TraceCpuFrequency`, `TraceDevFrequency`, `TracingMark`, `TraceMarkBegin`, `TraceMarkEnd`, `TraceReceiveVsync` (see source). **Only hand-written:** `Trace` (generic fallback)
 
 **Planned:**
 - PyO3 `extends` (see INHERITANCE_PLAN.md)
-- Broader E2E tests
+- E2E integration tests with real trace lines (see [macros/AGENTS.md](macros/AGENTS.md))
 
 ## Deferred design issue
 

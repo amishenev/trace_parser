@@ -558,14 +558,14 @@ TracingMark (базовый)
 - `#[derive(TraceEnum)]` — генерация Display, FromStr, TraceEnum trait
 - `skip_registration` для TraceMarkBegin/End (регистрируются явно)
 
-**В работе через макрос:** `TraceSchedSwitch`, `TraceSchedWakeup`, `TraceSchedWakeupNew`, `TraceCpuFrequency`, `TraceDevFrequency`, `TraceMarkBegin`, `TraceMarkEnd`, `TracingMark`
+**Все типовые события на макросах:** `TraceSchedSwitch`, `TraceSchedWakeup`, `TraceSchedWakeupNew`, `TraceSchedProcessExit`, `TraceExit`, `TraceCpuFrequency`, `TraceDevFrequency`, `TracingMark`, `TraceMarkBegin`, `TraceMarkEnd`, `TraceReceiveVsync`
 
-**Остались ручными:** `Trace`, `TraceReceiveVsync`, `TraceExit`, `TraceSchedProcessExit`
+**Единственное ручное событие:** `Trace` (базовый fallback класс, не `TemplateEvent`)
 
-**Что остаётся (не связано с полями):**
+**Что остаётся (не связано с миграцией):**
 - Наследование через PyO3 `extends` — см. INHERITANCE_PLAN.md
-- Миграция всех событий на макрос
 - E2E интеграционные тесты
+- Генерация Python type stubs (.pyi) из макросов
 
 ## Ссылки
 
