@@ -410,10 +410,9 @@ pub fn generate_template_event_impl(
                 .unwrap_or_else(|| field_name.to_string());
 
             if let Some(fmt) = &field_attr.format {
-                let render_expr = inferred.render_value(field_name);
                 return quote! {
                     (#name_str, Some(::trace_parser::payload_template::TemplateValue::Str(
-                        &::std::format!(#fmt, #render_expr)
+                        &::std::format!(#fmt, self.#field_name)
                     )))
                 };
             }
@@ -638,6 +637,20 @@ mod tests {
         let output_str = output.to_string();
 
         assert!(output_str.contains("FastMatch"));
+    }
+
+    #[test]
+    fn test_generate_fast_match_impl_with_contains_any() {
+        let struct_name: Ident = parse_quote!(TraceDevFrequency);
+        let markers_attr: Option<TraceMarkersAttr> = None;
+        let contains_any = vec!["clk=ddr_devfreq".to_string(), "clk=l3c_devfreq".to_string()];
+
+        let output = generate_fast_match_impl(&struct_name, markers_attr.as_ref(), &contains_any);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("payload_quick_check"));
+        assert!(output_str.contains("clk=ddr_devfreq"));
+        assert!(output_str.contains("clk=l3c_devfreq"));
     }
 
     #[test]
@@ -939,6 +952,33 @@ mod tests {
         assert!(output_str.contains("\\d{3}"));
         // Parse via cap_str (not cap_parse) because custom regex
         assert!(output_str.contains("cap_str"));
+    }
+
+    #[test]
+    fn test_generate_template_event_impl_with_format() {
+        let struct_name: Ident = parse_quote!(TestEvent);
+        let templates = vec![DefineTemplateAttr { template: "target={target}".to_string(), id: None, detect: vec![] }];
+        let fields = vec![(
+            parse_quote!(target),
+            parse_quote!(u32),
+            FieldAttr {
+                name: None,
+                choice: vec![],
+                regex: None,
+                format: Some("{:03}".to_string()),
+                optional: false,
+                readonly: false,
+                private: false,
+            },
+        )];
+
+        let output = generate_template_event_impl(&struct_name, &templates, &fields);
+        let output_str = output.to_string();
+
+        // Should use format! for rendering
+        assert!(output_str.contains("format"));
+        assert!(output_str.contains("03"));
+        assert!(output_str.contains("TemplateValue :: Str"));
     }
 
     #[test]

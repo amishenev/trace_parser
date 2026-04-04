@@ -178,6 +178,7 @@ struct TraceReceiveVsync {
 | `name` | ✅ | Имя события (event_name) |
 | `aliases` | ❌ | Алиасы для event_name |
 | `skip_registration` | ❌ | Пропустить регистрацию — для событий, обрабатываемых явно (TraceMarkBegin/End) |
+| `generate_pymethods` | ❌ | Генерировать `#[pymethods]` (default: `true`) |
 
 ### `#[trace_markers("...", "...")]`
 

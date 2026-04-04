@@ -181,6 +181,7 @@ impl Parse for FieldAttr {
                 format = Some(value.value());
             } else if key == "choice" {
                 // Parse array: ["val1", "val2"] or [11, 12]
+                input.parse::<Token![=]>()?;
                 let content;
                 syn::bracketed!(content in input);
                 let list = content.parse_terminated(|input: ParseStream| input.parse::<syn::Lit>(), Token![,])?;
@@ -400,6 +401,28 @@ mod tests {
         let tokens = quote! { format = "{:03}" };
         let attr: FieldAttr = syn::parse2(tokens).unwrap();
         assert_eq!(attr.format, Some("{:03}".to_string()));
+    }
+
+    #[test]
+    fn test_field_attr_with_regex() {
+        let tokens = quote! { regex = r"\d{3}" };
+        let attr: FieldAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.regex, Some(r"\d{3}".to_string()));
+    }
+
+    #[test]
+    fn test_field_attr_with_choice() {
+        let tokens = quote! { choice = ["ddr_devfreq", "l3c_devfreq"] };
+        let attr: FieldAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.choice, vec!["ddr_devfreq", "l3c_devfreq"]);
+    }
+
+    #[test]
+    fn test_trace_event_attr_generate_pymethods() {
+        let tokens = quote! { name = "sched_switch", generate_pymethods = false };
+        let attr: TraceEventAttr = syn::parse2(tokens).unwrap();
+        assert_eq!(attr.name, "sched_switch");
+        assert!(!attr.generate_pymethods);
     }
 
     #[test]

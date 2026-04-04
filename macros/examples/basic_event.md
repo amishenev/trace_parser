@@ -11,25 +11,25 @@ use trace_parser_macros::TraceEvent;
 )]
 #[derive(TraceEvent)]
 struct TraceSchedSwitch {
-    #[field(ty = "string")]
+    #[field]
     prev_comm: String,
 
-    #[field(ty = "u32")]
+    #[field]
     prev_pid: u32,
 
-    #[field(ty = "i32")]
+    #[field]
     prev_prio: i32,
 
-    #[field(ty = "string")]
+    #[field]
     prev_state: String,
 
-    #[field(ty = "string")]
+    #[field]
     next_comm: String,
 
-    #[field(ty = "u32")]
+    #[field]
     next_pid: u32,
 
-    #[field(ty = "i32")]
+    #[field]
     next_prio: i32,
 }
 ```

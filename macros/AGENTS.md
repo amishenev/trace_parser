@@ -27,7 +27,7 @@ macros/src/
 - `FastMatchAttr` — `#[fast_match(contains_any = [...])]`
 - `TraceMarkersAttr` — `#[trace_markers(...)]`
 - `DefineTemplateAttr` — `#[define_template("...")]`
-- `FieldAttr` — `#[field(name, regex, choice, optional, readonly, private)]`
+- `FieldAttr` — `#[field(name, regex, choice, format, optional, readonly, private)]`
 
 ### `generator.rs`
 
@@ -35,8 +35,7 @@ macros/src/
 - `generate_event_type_impl` — `impl EventType`
 - `generate_fast_match_impl` — `impl FastMatch`
 - `generate_template_event_impl` — `impl TemplateEvent`
-- `generate_registration` — регистрация через `register_parser!`
-- `generate_tracing_mark_registration` — регистрация через `register_tracing_mark_parser!`
+- `generate_registration` — регистрация через `register_parser!` или `register_tracing_mark_parser!`
 - `InferredType` — вывод типов из Rust-типа
 
 ### `pymethods.rs`

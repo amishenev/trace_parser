@@ -1,40 +1,29 @@
-# Пример: Несколько темплейтов с `detect_format`
+# Пример: Несколько темплейтов с SIMD-детекцией
 
-Использование нескольких `#[define_template]` с кастомной логикой выбора формата.
+Использование нескольких `#[define_template]` с автоматической детекцией формата через `detect = [...]`.
 
 ```rust
 use trace_parser_macros::TraceEvent;
 
 #[trace_event(name = "sched_wakeup")]
 #[define_template("comm={comm} pid={pid} prio={prio} target_cpu={target_cpu}")]
-#[define_template("comm={comm} pid={pid} prio={prio} target_cpu={target_cpu} reason={reason}")]
+#[define_template("comm={comm} pid={pid} prio={prio} target_cpu={target_cpu} reason={reason}", detect = ["reason="])]
 #[derive(TraceEvent)]
 struct TraceSchedWakeup {
-    #[field(ty = "string")]
+    #[field]
     comm: String,
 
-    #[field(ty = "u32")]
+    #[field]
     pid: u32,
 
-    #[field(ty = "i32")]
+    #[field]
     prio: i32,
 
-    #[field(ty = "u32")]
+    #[field(format = "{:03}")]
     target_cpu: u32,
 
-    #[field(ty = "u32", optional)]
+    #[field(optional)]
     reason: Option<u32>,
-}
-
-// Кастомная логика выбора формата
-impl ::trace_parser::common::TemplateEvent for TraceSchedWakeup {
-    fn detect_format(payload: &str) -> u8 {
-        if payload.contains("reason=") {
-            1  // Второй темплейт (с reason)
-        } else {
-            0  // Первый темплейт (без reason)
-        }
-    }
 }
 ```
 
@@ -44,25 +33,20 @@ impl ::trace_parser::common::TemplateEvent for TraceSchedWakeup {
    - `kind = 0` → `"comm={comm} pid={pid} prio={prio} target_cpu={target_cpu}"`
    - `kind = 1` → `"comm={comm} pid={pid} prio={prio} target_cpu={target_cpu} reason={reason}"`
 
-2. При парсинге вызывается `detect_format(payload)`:
-   - Если payload содержит `"reason="` → возвращается `1`
-   - Иначе → возвращается `0`
+2. При парсинге вызывается `detect_format(payload)` с SIMD-проверкой:
+   ```rust
+   fn detect_format(payload: &str) -> u8 {
+       const MARKERS: &'static [(&[u8], u8)] = &[(b"reason=", 1)];
+       for (marker, id) in MARKERS {
+           if memchr::memmem::find(payload.as_bytes(), *marker).is_some() {
+               return *id;
+           }
+       }
+       0
+   }
+   ```
 
 3. `parse_payload()` использует темплейт с нужным `format_id`
-
-## Проблема текущего дизайна
-
-**Сейчас:** `detect_format()` по умолчанию возвращает `0`. Нужно переопределять вручную.
-
-**План:** Автоматическая детекция по наличию полей в payload (TODO).
-
-```rust
-// Будущая автоматическая детекция
-fn detect_format(payload: &str) -> u8 {
-    // Если есть "reason=" → формат 1, иначе → формат 0
-    if payload.contains("reason=") { 1 } else { 0 }
-}
-```
 
 ## Использование
 

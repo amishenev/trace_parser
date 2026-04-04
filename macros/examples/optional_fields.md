@@ -1,36 +1,29 @@
-# Пример: Опциональные поля
+# Пример: Опциональные поля и multi-template
 
-Использование `#[field(optional)]` для полей, которые могут отсутствовать.
+Использование `#[field(optional)]` и `detect = [...]` для событий с несколькими форматами.
 
 ```rust
 use trace_parser_macros::TraceEvent;
 
 #[trace_event(name = "sched_wakeup")]
 #[define_template("comm={comm} pid={pid} prio={prio} target_cpu={target_cpu}")]
-#[define_template("comm={comm} pid={pid} prio={prio} target_cpu={target_cpu} reason={reason}")]
+#[define_template("comm={comm} pid={pid} prio={prio} target_cpu={target_cpu} reason={reason}", detect = ["reason="])]
 #[derive(TraceEvent)]
 struct TraceSchedWakeup {
-    #[field(ty = "string")]
+    #[field]
     comm: String,
 
-    #[field(ty = "u32")]
+    #[field]
     pid: u32,
 
-    #[field(ty = "i32")]
+    #[field]
     prio: i32,
 
-    #[field(ty = "u32")]
+    #[field(format = "{:03}")]
     target_cpu: u32,
 
-    #[field(ty = "u32", optional)]
+    #[field(optional)]
     reason: Option<u32>,  // ← опциональное поле
-}
-
-// Кастомная проверка для детекции формата с reason
-impl ::trace_parser::common::FastMatch for TraceSchedWakeup {
-    fn payload_quick_check(line: &str) -> bool {
-        line.contains("reason=")
-    }
 }
 ```
 
@@ -39,6 +32,7 @@ impl ::trace_parser::common::FastMatch for TraceSchedWakeup {
 - `reason` имеет тип `Option<u32>` в Rust
 - В Python поле может быть `None`
 - Конструктор принимает `Option<u32>` для `reason`
+- `detect_format` через SIMD `memmem::find` ищет `"reason="`
 
 ## Использование
 

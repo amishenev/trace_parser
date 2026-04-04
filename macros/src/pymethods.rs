@@ -207,3 +207,54 @@ fn generate_template() -> TokenStream {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::attrs::FieldAttr;
+    use syn::{parse_quote, Ident};
+
+    #[test]
+    fn test_generate_new() {
+        let code = generate_new(&[
+            (parse_quote!(name), parse_quote!(String), FieldAttr {
+                name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false,
+            }),
+            (parse_quote!(value), parse_quote!(u32), FieldAttr {
+                name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false,
+            }),
+        ]);
+        let code_str = code.to_string();
+        assert!(code_str.contains("# [new]"));
+        assert!(code_str.contains("fn new"));
+        assert!(code_str.contains("name"));
+        assert!(code_str.contains("value"));
+    }
+
+    #[test]
+    fn test_generate_can_be_parsed() {
+        let code = generate_can_be_parsed();
+        let code_str = code.to_string();
+        assert!(code_str.contains("# [staticmethod]"));
+        assert!(code_str.contains("fn can_be_parsed"));
+        assert!(code_str.contains("quick_check"));
+    }
+
+    #[test]
+    fn test_generate_payload() {
+        let code = generate_payload();
+        let code_str = code.to_string();
+        assert!(code_str.contains("# [getter]"));
+        assert!(code_str.contains("fn payload"));
+        assert!(code_str.contains("render_payload"));
+    }
+
+    #[test]
+    fn test_generate_template() {
+        let code = generate_template();
+        let code_str = code.to_string();
+        assert!(code_str.contains("# [getter]"));
+        assert!(code_str.contains("fn template"));
+        assert!(code_str.contains("template_str"));
+    }
+}

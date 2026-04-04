@@ -11,10 +11,10 @@ use trace_parser_macros::TracingMarkEvent;
 #[define_template("B|{trace_mark_tgid}|{message}")]
 #[derive(TracingMarkEvent)]
 struct TraceMarkBegin {
-    #[field(ty = "u32")]
+    #[field]
     trace_mark_tgid: u32,
 
-    #[field(ty = "string")]
+    #[field]
     message: String,
 }
 
@@ -24,7 +24,7 @@ struct TraceMarkBegin {
 #[define_template("{?ignore:extra_info}ReceiveVsync {frame_number}")]
 #[derive(TracingMarkEvent)]
 struct TraceReceiveVsync {
-    #[field(ty = "u32")]
+    #[field]
     frame_number: u32,
 }
 ```

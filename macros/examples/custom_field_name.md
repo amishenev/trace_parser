@@ -9,10 +9,10 @@ use trace_parser_macros::TraceEvent;
 #[define_template("state={state} cpu_id={cpu_id}")]
 #[derive(TraceEvent)]
 struct TraceCpuFrequency {
-    #[field(ty = "u32", name = "state")]
+    #[field(name = "state")]
     current_state: u32,  // ← имя переменной != имя в payload
 
-    #[field(ty = "u32")]
+    #[field]
     cpu_id: u32,  // ← имя совпадает
 }
 ```
