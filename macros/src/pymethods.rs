@@ -82,7 +82,7 @@ fn generate_new(fields: &[(Ident, Type, FieldAttr)]) -> TokenStream {
 
     let field_inits: Vec<TokenStream> = fields.iter().map(|(field_name, _field_ty, field_attr)| {
         if field_attr.optional {
-            quote! { #field_name: #field_name.unwrap_or_default() }
+            quote! { #field_name: #field_name }
         } else {
             quote! { #field_name }
         }
