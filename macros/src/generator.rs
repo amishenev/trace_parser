@@ -522,8 +522,15 @@ pub fn generate_registration(struct_name: &Ident, event_attr: &TraceEventAttr, i
         }
     } else {
         let name = &event_attr.name;
+        let aliases = &event_attr.aliases;
+        let alias_registrations = aliases.iter().map(|alias| {
+            quote! {
+                ::trace_parser::register_parser!(#alias, #struct_name);
+            }
+        });
         quote! {
             ::trace_parser::register_parser!(#name, #struct_name);
+            #(#alias_registrations)*
         }
     }
 }
@@ -668,6 +675,24 @@ mod tests {
 
         assert!(output_str.contains("register_parser"));
         assert!(output_str.contains("TraceSchedSwitch"));
+    }
+
+    #[test]
+    fn test_generate_registration_with_aliases() {
+        let struct_name: Ident = parse_quote!(TraceExit);
+        let event_attr = TraceEventAttr {
+            name: "exit1".to_string(),
+            aliases: vec!["exit2".to_string()],
+            generate_pymethods: true,
+            skip_registration: false,
+        };
+
+        let output = generate_registration(&struct_name, &event_attr, false);
+        let output_str = output.to_string();
+
+        assert!(output_str.contains("exit1"));
+        assert!(output_str.contains("exit2"));
+        assert!(output_str.contains("TraceExit"));
     }
 
     #[test]
