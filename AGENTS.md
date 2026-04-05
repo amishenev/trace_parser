@@ -589,6 +589,35 @@ And for fast-match changes:
 cargo bench --bench can_be_parsed --quiet
 ```
 
+For end-to-end parser throughput on real offline AOSP traces:
+
+```bash
+# Extract ftrace text lines from AOSP systrace HTML (one-time refresh)
+python3 benches/extract_aosp_ftrace.py \
+  --input-glob '.benchmarks/aosp-traces/*.html' \
+  --output-dir datasets/aosp/ftrace
+
+# Run offline benchmark on repository datasets
+uv run python benches/aosp_benchmark.py --mode file
+
+# Optional: include line-by-line API benchmark and persist reports
+uv run python benches/aosp_benchmark.py --mode both \
+  --json-out .benchmarks/aosp-bench/results.json \
+  --csv-out .benchmarks/aosp-bench/results.csv
+```
+
+Offline AOSP trace dataset location:
+
+- `datasets/aosp/ftrace/*.trace`
+
+Benchmark outputs include:
+
+- `total_lines`
+- `parsed_lines`
+- `parse_rate`
+- `lines_per_sec`
+- `bytes_per_sec`
+
 Recent benchmark reference points for `sched_switch` on this machine:
 
 - positive case:

@@ -156,6 +156,40 @@ trace_parser/
 └── benches/                      # Бенчмарки
 ```
 
+### Офлайн бенчмаркинг на AOSP трейсах
+
+В репозитории есть готовый офлайн-набор:
+
+- `datasets/aosp/ftrace/*.trace`
+
+Если нужно пересобрать `.trace` из AOSP HTML:
+
+```bash
+python3 benches/extract_aosp_ftrace.py \
+  --input-glob '.benchmarks/aosp-traces/*.html' \
+  --output-dir datasets/aosp/ftrace
+```
+
+Запуск бенчмарка:
+
+```bash
+# Быстрый throughput/parse-rate только file API
+uv run python benches/aosp_benchmark.py --mode file
+
+# Полный прогон: line API + file API с сохранением отчета
+uv run python benches/aosp_benchmark.py --mode both \
+  --json-out .benchmarks/aosp-bench/results.json \
+  --csv-out .benchmarks/aosp-bench/results.csv
+```
+
+Ключевые метрики в отчете:
+
+- `total_lines`
+- `parsed_lines`
+- `parse_rate`
+- `lines_per_sec`
+- `bytes_per_sec`
+
 ### Архитектурные принципы
 
 #### Плоская структура полей
