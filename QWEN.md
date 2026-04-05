@@ -145,7 +145,7 @@ trace_parser/
 │   └── py.typed                  # PEP 561 marker
 ├── macros/                       # Proc-macro crate
 │   ├── src/
-│   │   ├── lib.rs                # TraceEvent, TracingMarkEvent, TraceEnum
+│   │   ├── lib.rs                # trace_event_class, tracing_mark_event_class, TraceEvent, TracingMarkEvent, TraceEnum
 │   │   ├── attrs.rs              # Парсинг атрибутов
 │   │   ├── generator.rs          # Генерация trait impl
 │   │   ├── pymethods.rs          # Генерация Python API
@@ -544,10 +544,10 @@ TracingMark (базовый)
 | Формат рендера | `#[field(format = "{:03}")]` | ✅ |
 | Multi-template | несколько `#[define_template(...)]` + `detect = [...]` | ✅ |
 | Fast-match | `#[fast_match(contains_any = [...])]` | ✅ |
-| TracingMark | `#[derive(TracingMarkEvent)]` + `begin`/`end` | ✅ |
+| TracingMark | `#[tracing_mark_event_class]` + `begin`/`end` | ✅ |
 
 **Что работает:**
-- `macros/` crate с `#[derive(TraceEvent)]`, `#[derive(TracingMarkEvent)]` и `#[derive(TraceEnum)]`
+- `macros/` crate с `#[trace_event_class]`, `#[tracing_mark_event_class]`, `#[derive(TraceEvent)]`, `#[derive(TracingMarkEvent)]`, `#[derive(TraceEnum)]`
 - Генерация `EventType`, `FastMatch`, `TemplateEvent`
 - Генерация `#[pymethods]` с `new`, `can_be_parsed`, `parse`, `to_string`, `payload`, `template`
 - Type inference из Rust-типа (String, u8/u16/u32/u64, i8/i16/i32/i64, f32/f64, bool, Option<T>)
@@ -557,6 +557,8 @@ TracingMark (базовый)
 - Multi-template с SIMD-детекцией формата через `detect = ["..."]`
 - `#[derive(TraceEnum)]` — генерация Display, FromStr, TraceEnum trait
 - `skip_registration` для TraceMarkBegin/End (регистрируются явно)
+- `Option<T>` для опциональных полей (без `#[field(optional)]`)
+- Python-доступ по `#[field(...)]`: `readonly`/`private`/обычное поле
 
 **Все типовые события на макросах:** `TraceSchedSwitch`, `TraceSchedWakeup`, `TraceSchedWakeupNew`, `TraceSchedProcessExit`, `TraceExit`, `TraceCpuFrequency`, `TraceDevFrequency`, `TracingMark`, `TraceMarkBegin`, `TraceMarkEnd`, `TraceReceiveVsync`
 

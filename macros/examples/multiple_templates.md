@@ -22,7 +22,7 @@ struct TraceSchedWakeup {
     #[field(format = "{:03}")]
     target_cpu: u32,
 
-    #[field(optional)]
+    #[field]
     reason: Option<u32>,
 }
 ```

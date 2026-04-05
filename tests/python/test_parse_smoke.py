@@ -39,6 +39,30 @@ def test_sched_switch_parse_smoke() -> None:
     assert event is not None
 
 
+def test_macro_generated_field_access_rules() -> None:
+    line = (
+        "bash-1977 (12) [000] .... 12345.678901: sched_switch: "
+        "prev_comm=bash prev_pid=1977 prev_prio=120 prev_state=S ==> "
+        "next_comm=worker next_pid=123 next_prio=120"
+    )
+    event = TraceSchedSwitch.parse(line)
+    assert event is not None
+
+    # regular field: getter + setter
+    event.thread_name = "zsh"
+    assert event.thread_name == "zsh"
+
+    # readonly field: getter only
+    try:
+        event.event_name = "other_event"
+        assert False, "event_name must be readonly"
+    except AttributeError:
+        pass
+
+    # private field: not exported to Python API
+    assert not hasattr(event, "format_id")
+
+
 def test_sched_wakeup_parse_smoke() -> None:
     line = (
         "kworker-123 (123) [000] .... 12345.679001: sched_wakeup: "

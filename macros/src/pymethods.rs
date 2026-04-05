@@ -11,6 +11,7 @@ pub fn generate_pymethods_block(
     struct_name: &Ident,
     fields: &[(Ident, Type, FieldAttr)],
 ) -> TokenStream {
+    let field_accessors = generate_field_accessors(fields);
     let new_fn = generate_new(fields);
     let repr_fn = generate_repr();
     let eq_fn = generate_eq(struct_name, fields);
@@ -26,6 +27,7 @@ pub fn generate_pymethods_block(
     quote! {
         #[pyo3::pymethods]
         impl #struct_name {
+            #(#field_accessors)*
             #new_fn
             #repr_fn
             #eq_fn
@@ -62,6 +64,35 @@ pub fn generate_pymethods_block(
             }
         }
     }
+}
+
+fn generate_field_accessors(fields: &[(Ident, Type, FieldAttr)]) -> Vec<TokenStream> {
+    fields
+        .iter()
+        .filter(|(_, _, field_attr)| !field_attr.private)
+        .flat_map(|(field_name, field_ty, field_attr)| {
+            let setter_name = syn::Ident::new(&format!("set_{}", field_name), field_name.span());
+
+            let getter = quote! {
+                #[getter]
+                fn #field_name(&self) -> #field_ty {
+                    self.#field_name.clone()
+                }
+            };
+
+            if field_attr.readonly {
+                vec![getter]
+            } else {
+                let setter = quote! {
+                    #[setter]
+                    fn #setter_name(&mut self, value: #field_ty) {
+                        self.#field_name = value;
+                    }
+                };
+                vec![getter, setter]
+            }
+        })
+        .collect()
 }
 
 /// Generate `#[new]` constructor
@@ -170,7 +201,7 @@ fn generate_to_string() -> TokenStream {
 fn generate_copy() -> TokenStream {
     quote! {
         fn __copy__(slf: ::pyo3::PyRef<'_, Self>, py: ::pyo3::Python<'_>) -> ::pyo3::PyResult<::pyo3::Py<Self>> {
-            Ok(slf.clone().into_pyobject(py)?.unbind())
+            Ok(::pyo3::IntoPyObject::into_pyobject(slf.clone(), py)?.unbind())
         }
     }
 }
@@ -252,5 +283,54 @@ mod tests {
         assert!(code_str.contains("# [getter]"));
         assert!(code_str.contains("fn template"));
         assert!(code_str.contains("template_str"));
+    }
+
+    #[test]
+    fn test_generate_field_accessors_skips_private() {
+        let accessors = generate_field_accessors(&[(
+            parse_quote!(format_id),
+            parse_quote!(u8),
+            FieldAttr {
+                name: None, choice: vec![], regex: None, format: None, readonly: false, private: true,
+            },
+        )]);
+        assert!(accessors.is_empty());
+    }
+
+    #[test]
+    fn test_generate_field_accessors_readonly_getter_only() {
+        let accessors = generate_field_accessors(&[(
+            parse_quote!(event_name),
+            parse_quote!(String),
+            FieldAttr {
+                name: None, choice: vec![], regex: None, format: None, readonly: true, private: false,
+            },
+        )]);
+        let code = accessors
+            .iter()
+            .map(TokenStream::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(code.contains("# [getter]"));
+        assert!(!code.contains("# [setter]"));
+    }
+
+    #[test]
+    fn test_generate_field_accessors_default_getter_and_setter() {
+        let accessors = generate_field_accessors(&[(
+            parse_quote!(thread_tid),
+            parse_quote!(u32),
+            FieldAttr {
+                name: None, choice: vec![], regex: None, format: None, readonly: false, private: false,
+            },
+        )]);
+        let code = accessors
+            .iter()
+            .map(TokenStream::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(code.contains("# [getter]"));
+        assert!(code.contains("# [setter]"));
+        assert!(code.contains("set_thread_tid"));
     }
 }

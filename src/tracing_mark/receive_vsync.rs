@@ -1,40 +1,28 @@
-use pyo3::prelude::*;
-use trace_parser_macros::TracingMarkEvent;
+use trace_parser_macros::tracing_mark_event_class;
 
-#[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug, PartialEq)]
-#[derive(TracingMarkEvent)]
+#[tracing_mark_event_class]
 #[trace_event(name = "tracing_mark_write", begin, skip_registration)]
 #[trace_markers("ReceiveVsync")]
 #[define_template("{?ignore:extra_info}ReceiveVsync {frame_number}", extra_info = r"\[[^\]]+\]")]
 pub struct TraceReceiveVsync {
-    #[field]
+    #[field(private)]
     format_id: u8,
-    #[pyo3(get, set)]
     #[field]
     pub thread_name: String,
-    #[pyo3(get, set)]
     #[field]
     pub thread_tid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub thread_tgid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub cpu: u32,
-    #[pyo3(get, set)]
     #[field]
     pub flags: String,
-    #[pyo3(get, set)]
     #[field]
     pub timestamp: f64,
-    #[pyo3(get)]
-    #[field]
+    #[field(readonly)]
     pub event_name: String,
-    #[pyo3(get, set)]
     #[field]
     pub trace_mark_tgid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub frame_number: u32,
 }

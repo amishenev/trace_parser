@@ -1,80 +1,56 @@
-use pyo3::prelude::*;
-use trace_parser_macros::TraceEvent;
+use trace_parser_macros::trace_event_class;
 
-#[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug, PartialEq)]
-#[derive(TraceEvent)]
+#[trace_event_class]
 #[trace_event(name = "cpu_frequency")]
 #[define_template("state={state} cpu_id={cpu_id}")]
 pub struct TraceCpuFrequency {
-    #[field]
+    #[field(private)]
     format_id: u8,
-    #[pyo3(get)]
     #[field]
     pub thread_name: String,
-    #[pyo3(get, set)]
     #[field]
     pub thread_tid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub thread_tgid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub cpu: u32,
-    #[pyo3(get, set)]
     #[field]
     pub flags: String,
-    #[pyo3(get, set)]
     #[field]
     pub timestamp: f64,
-    #[pyo3(get)]
-    #[field]
+    #[field(readonly)]
     pub event_name: String,
-    #[pyo3(get, set)]
     #[field]
     pub state: u32,
-    #[pyo3(get, set)]
     #[field]
     pub cpu_id: u32,
 }
 
-#[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug, PartialEq)]
-#[derive(TraceEvent)]
+#[trace_event_class]
 #[trace_event(name = "clock_set_rate")]
 #[fast_match(contains_any = ["clk=ddr_devfreq", "clk=l3c_devfreq"])]
 #[define_template("clk={clk} state={state} cpu_id={cpu_id}")]
 pub struct TraceDevFrequency {
-    #[field]
+    #[field(private)]
     format_id: u8,
-    #[pyo3(get)]
     #[field]
     pub thread_name: String,
-    #[pyo3(get, set)]
     #[field]
     pub thread_tid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub thread_tgid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub cpu: u32,
-    #[pyo3(get, set)]
     #[field]
     pub flags: String,
-    #[pyo3(get, set)]
     #[field]
     pub timestamp: f64,
-    #[pyo3(get)]
-    #[field]
+    #[field(readonly)]
     pub event_name: String,
-    #[pyo3(get, set)]
     #[field(choice = ["ddr_devfreq", "l3c_devfreq"])]
     pub clk: String,
-    #[pyo3(get, set)]
     #[field]
     pub state: u32,
-    #[pyo3(get, set)]
     #[field]
     pub cpu_id: u32,
 }

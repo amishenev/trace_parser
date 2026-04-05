@@ -1,92 +1,64 @@
-use pyo3::prelude::*;
-use trace_parser_macros::TraceEvent;
+use trace_parser_macros::trace_event_class;
 
-#[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug, PartialEq)]
-#[derive(TraceEvent)]
+#[trace_event_class]
 #[trace_event(name = "sched_wakeup")]
 #[define_template("comm={comm} pid={pid} prio={prio} target_cpu={target_cpu}")]
 #[define_template("comm={comm} pid={pid} prio={prio} target_cpu={target_cpu} reason={reason}", detect = ["reason="])]
 pub struct TraceSchedWakeup {
-    #[field]
+    #[field(private)]
     format_id: u8,
-    #[pyo3(get, set)]
     #[field]
     pub thread_name: String,
-    #[pyo3(get, set)]
     #[field]
     pub thread_tid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub thread_tgid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub cpu: u32,
-    #[pyo3(get, set)]
     #[field]
     pub flags: String,
-    #[pyo3(get, set)]
     #[field]
     pub timestamp: f64,
-    #[pyo3(get)]
-    #[field]
+    #[field(readonly)]
     pub event_name: String,
-    #[pyo3(get, set)]
     #[field]
     pub comm: String,
-    #[pyo3(get, set)]
     #[field]
     pub pid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub prio: i32,
-    #[pyo3(get, set)]
     #[field(regex = r"\d{3}", format = "{:03}")]
     pub target_cpu: u32,
-    #[pyo3(get, set)]
     #[field]
     pub reason: Option<u32>,
 }
 
-#[pyclass(skip_from_py_object)]
-#[derive(Clone, Debug, PartialEq)]
-#[derive(TraceEvent)]
+#[trace_event_class]
 #[trace_event(name = "sched_wakeup_new")]
 #[define_template("comm={comm} pid={pid} prio={prio} target_cpu={target_cpu}")]
 pub struct TraceSchedWakeupNew {
-    #[field]
+    #[field(private)]
     format_id: u8,
-    #[pyo3(get, set)]
     #[field]
     pub thread_name: String,
-    #[pyo3(get, set)]
     #[field]
     pub thread_tid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub thread_tgid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub cpu: u32,
-    #[pyo3(get, set)]
     #[field]
     pub flags: String,
-    #[pyo3(get, set)]
     #[field]
     pub timestamp: f64,
-    #[pyo3(get)]
-    #[field]
+    #[field(readonly)]
     pub event_name: String,
-    #[pyo3(get, set)]
     #[field]
     pub comm: String,
-    #[pyo3(get, set)]
     #[field]
     pub pid: u32,
-    #[pyo3(get, set)]
     #[field]
     pub prio: i32,
-    #[pyo3(get, set)]
     #[field(regex = r"\d{3}", format = "{:03}")]
     pub target_cpu: u32,
 }

@@ -36,8 +36,32 @@ use generator::{
 };
 use pymethods::generate_pymethods_block;
 use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Fields};
+use syn::{parse_macro_input, DeriveInput, Fields, ItemStruct};
+
+fn build_pyclass_attr(attr_tokens: TokenStream2) -> TokenStream2 {
+    if attr_tokens.is_empty() {
+        return quote! { #[pyo3::pyclass(skip_from_py_object)] };
+    }
+
+    let attr_text = attr_tokens.to_string();
+    if attr_text.contains("skip_from_py_object") || attr_text.contains("from_py_object") {
+        quote! { #[pyo3::pyclass(#attr_tokens)] }
+    } else {
+        quote! { #[pyo3::pyclass(skip_from_py_object, #attr_tokens)] }
+    }
+}
+
+fn expand_event_class(item: ItemStruct, pyclass_attr: TokenStream2, derive_macro: TokenStream2) -> TokenStream {
+    let expanded = quote! {
+        #pyclass_attr
+        #[derive(Clone, Debug, PartialEq)]
+        #[derive(#derive_macro)]
+        #item
+    };
+    expanded.into()
+}
 
 /// Derive macro for regular trace events.
 ///
@@ -117,6 +141,20 @@ pub fn derive_trace_event(input: TokenStream) -> TokenStream {
     };
 
     expanded.into()
+}
+
+/// Attribute macro wrapper for regular trace events.
+/// Adds `#[pyclass(skip_from_py_object)]`, `#[derive(Clone, Debug, PartialEq)]`,
+/// and `#[derive(TraceEvent)]` to reduce boilerplate.
+#[proc_macro_attribute]
+pub fn trace_event_class(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(input as ItemStruct);
+    let pyclass_attr = build_pyclass_attr(attr.into());
+    expand_event_class(
+        item,
+        pyclass_attr,
+        quote! { trace_parser_macros::TraceEvent },
+    )
 }
 
 /// Derive macro for tracing_mark_write subtypes.
@@ -230,6 +268,20 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
     expanded.into()
 }
 
+/// Attribute macro wrapper for tracing_mark events.
+/// Adds `#[pyclass(skip_from_py_object)]`, `#[derive(Clone, Debug, PartialEq)]`,
+/// and `#[derive(TracingMarkEvent)]` to reduce boilerplate.
+#[proc_macro_attribute]
+pub fn tracing_mark_event_class(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(input as ItemStruct);
+    let pyclass_attr = build_pyclass_attr(attr.into());
+    expand_event_class(
+        item,
+        pyclass_attr,
+        quote! { trace_parser_macros::TracingMarkEvent },
+    )
+}
+
 /// Derive macro for payload enum types.
 /// Generates Display, FromStr, and TraceEnum implementations.
 /// Use `#[value("...")]` to specify the string representation.
@@ -243,4 +295,44 @@ pub fn derive_trace_enum(input: TokenStream) -> TokenStream {
     };
     let generated = generate_trace_enum(&input.ident, &variants);
     generated.into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_pyclass_attr;
+    use quote::quote;
+
+    #[test]
+    fn build_pyclass_attr_default_skip_from_py_object() {
+        let attr = build_pyclass_attr(quote! {});
+        let code = attr.to_string();
+        assert!(code.contains("pyclass"));
+        assert!(code.contains("skip_from_py_object"));
+    }
+
+    #[test]
+    fn build_pyclass_attr_preserves_explicit_skip() {
+        let attr = build_pyclass_attr(quote! { skip_from_py_object, module = "trace_parser._native" });
+        let code = attr.to_string();
+        assert!(code.contains("skip_from_py_object"));
+        assert!(code.contains("module"));
+        assert_eq!(code.matches("skip_from_py_object").count(), 1);
+    }
+
+    #[test]
+    fn build_pyclass_attr_preserves_explicit_from_py_object() {
+        let attr = build_pyclass_attr(quote! { from_py_object, module = "trace_parser._native" });
+        let code = attr.to_string();
+        assert!(code.contains("from_py_object"));
+        assert!(code.contains("module"));
+        assert!(!code.contains("skip_from_py_object"));
+    }
+
+    #[test]
+    fn build_pyclass_attr_adds_skip_for_other_options() {
+        let attr = build_pyclass_attr(quote! { module = "trace_parser._native" });
+        let code = attr.to_string();
+        assert!(code.contains("skip_from_py_object"));
+        assert!(code.contains("module"));
+    }
 }

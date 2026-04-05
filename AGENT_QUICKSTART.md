@@ -28,7 +28,7 @@ Factory: `parse_trace(line)`. Bulk: `parse_trace_file(...)` (see README).
 | Event families | `src/sched_*.rs`, `src/frequency.rs`, `src/trace_exit.rs`, `src/tracing_mark/` |
 | Payload templates | `src/payload_template.rs` |
 | Format registry | `src/format_registry.rs` |
-| Proc-macros | `macros/` (`TraceEvent`, `TracingMarkEvent`, `TraceEnum`) |
+| Proc-macros | `macros/` (`trace_event_class`, `tracing_mark_event_class`, `TraceEvent`, `TracingMarkEvent`, `TraceEnum`) |
 | Python package | `trace_parser/` (`__init__.py`, `*.pyi`, `_native.pyi`) |
 | Python tests | `tests/python/` |
 
@@ -39,6 +39,8 @@ Factory: `parse_trace(line)`. Bulk: `parse_trace_file(...)` (see README).
 3. **Templates:** simple payloads → `PayloadTemplate` + `FieldSpec`; service tokens `{ws}`, `{?ws}`, `{ignore:…}`, `{?ignore:…}`.
 4. **`tracing_mark_write`:** registry order in `tracing_mark_registry.rs` — specific subtypes → `TraceMarkBegin` → `TraceMarkEnd` → `TracingMark` fallback.
 5. **`TraceDevFrequency`:** only `clock_set_rate` with allowed `clk` via `FieldSpec::choice` (list in `AGENTS.md` / code).
+6. **Field exposure comes from `#[field(...)]`:** `#[field]` => getter+setter, `#[field(readonly)]` => getter only, `#[field(private)]` => not exposed to Python.
+7. **Optional fields:** use `Option<T>`; do not use `#[field(optional)]`.
 
 ## SIMD / parsing habits
 
