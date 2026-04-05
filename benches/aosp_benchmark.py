@@ -36,8 +36,10 @@ def benchmark_line_mode(path: str, max_lines: int | None) -> dict[str, Any]:
 
     total = 0
     parsed = 0
+    errors = 0
     total_bytes = 0
     by_type: Counter[str] = Counter()
+    unsupported_events: Counter[str] = Counter()
 
     start = time.perf_counter()
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
@@ -46,10 +48,24 @@ def benchmark_line_mode(path: str, max_lines: int | None) -> dict[str, Any]:
                 break
             total += 1
             total_bytes += len(line.encode("utf-8", errors="ignore"))
-            event = parse_trace(line.rstrip("\n"))
-            if event is not None:
-                parsed += 1
-                by_type[type(event).__name__] += 1
+            try:
+                event = parse_trace(line.rstrip("\n"))
+                if event is not None:
+                    parsed += 1
+                    by_type[type(event).__name__] += 1
+                else:
+                    errors += 1
+            except ValueError as e:
+                errors += 1
+                # Извлекаем имя события из сообщения об ошибке
+                msg = str(e)
+                if "Unsupported format for event '" in msg:
+                    start_q = msg.find("'") + 1
+                    end_q = msg.find("'", start_q)
+                    if start_q > 0 and end_q > start_q:
+                        unsupported_events[msg[start_q:end_q]] += 1
+                else:
+                    unsupported_events["<unknown>"] += 1
     elapsed = time.perf_counter() - start
 
     return {
@@ -57,11 +73,14 @@ def benchmark_line_mode(path: str, max_lines: int | None) -> dict[str, Any]:
         "file": path,
         "total_lines": total,
         "parsed_lines": parsed,
+        "error_lines": errors,
         "parse_rate": (parsed / total) if total else 0.0,
+        "error_rate": (errors / total) if total else 0.0,
         "elapsed_sec": elapsed,
         "lines_per_sec": (total / elapsed) if elapsed else 0.0,
         "bytes_per_sec": (total_bytes / elapsed) if elapsed else 0.0,
         "top_types": by_type.most_common(10),
+        "unsupported_events": unsupported_events.most_common(10),
     }
 
 
@@ -81,16 +100,20 @@ def benchmark_file_mode(path: str) -> dict[str, Any]:
     by_type: Counter[str] = Counter(type(e).__name__ for e in events)
 
     parsed = len(events)
+    errors = max(0, total - parsed)
     return {
         "mode": "file",
         "file": path,
         "total_lines": total,
         "parsed_lines": parsed,
+        "error_lines": errors,
         "parse_rate": (parsed / total) if total else 0.0,
+        "error_rate": (errors / total) if total else 0.0,
         "elapsed_sec": elapsed,
         "lines_per_sec": (total / elapsed) if elapsed else 0.0,
         "bytes_per_sec": (total_bytes / elapsed) if elapsed else 0.0,
         "top_types": by_type.most_common(10),
+        "unsupported_events": [],
     }
 
 
@@ -112,7 +135,9 @@ def write_csv(path: str | None, rows: list[dict[str, Any]]) -> None:
         "file",
         "total_lines",
         "parsed_lines",
+        "error_lines",
         "parse_rate",
+        "error_rate",
         "elapsed_sec",
         "lines_per_sec",
         "bytes_per_sec",
@@ -125,7 +150,7 @@ def write_csv(path: str | None, rows: list[dict[str, Any]]) -> None:
 
 
 def print_table(rows: list[dict[str, Any]]) -> None:
-    print("mode\tlines\tparsed\trate\tsec\tlines_per_sec\tthroughput\tfile")
+    print("mode\tlines\tparsed\terrors\trate\terror_rate\tsec\tlines_per_sec\tthroughput\tfile")
     for r in rows:
         print(
             "\t".join(
@@ -133,7 +158,9 @@ def print_table(rows: list[dict[str, Any]]) -> None:
                     str(r["mode"]),
                     str(r["total_lines"]),
                     str(r["parsed_lines"]),
+                    str(r.get("error_lines", 0)),
                     f"{float(r['parse_rate']):.2%}",
+                    f"{float(r.get('error_rate', 0.0)):.2%}",
                     f"{float(r['elapsed_sec']):.3f}",
                     f"{float(r['lines_per_sec']):.1f}",
                     human_bps(float(r["bytes_per_sec"])),
@@ -141,6 +168,18 @@ def print_table(rows: list[dict[str, Any]]) -> None:
                 ]
             )
         )
+
+    # Вывод unsupported событий (только из line mode)
+    unsupported_total: Counter[str] = Counter()
+    for r in rows:
+        if r["mode"] == "line" and r.get("unsupported_events"):
+            for name, count in r["unsupported_events"]:
+                unsupported_total[name] += count
+    if unsupported_total:
+        print()
+        print("Unsupported events (line mode only):")
+        for name, count in unsupported_total.most_common(20):
+            print(f"  {name}: {count}")
 
 
 def build_parser() -> argparse.ArgumentParser:

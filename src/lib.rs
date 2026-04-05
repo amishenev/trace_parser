@@ -87,7 +87,8 @@ fn parse_trace_file(
             continue;
         }
 
-        if let Some(event) = parse_trace(py, &line)? {
+        // Tolerant: skip lines that fail to parse (unsupported formats)
+        if let Ok(Some(event)) = parse_trace(py, &line) {
             results.push(event);
         }
     }
