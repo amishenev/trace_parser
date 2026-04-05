@@ -11,7 +11,7 @@ pub struct TraceCpuFrequency {
     #[field]
     pub thread_tid: u32,
     #[field]
-    pub thread_tgid: u32,
+    pub thread_tgid: Option<u32>,
     #[field]
     pub cpu: u32,
     #[field]
@@ -38,7 +38,7 @@ pub struct TraceDevFrequency {
     #[field]
     pub thread_tid: u32,
     #[field]
-    pub thread_tgid: u32,
+    pub thread_tgid: Option<u32>,
     #[field]
     pub cpu: u32,
     #[field]
@@ -65,7 +65,7 @@ mod tests {
         let trace = TraceCpuFrequency::parse(line).expect("cpu_frequency must parse");
         assert_eq!(trace.thread_name, "swapper");
         assert_eq!(trace.thread_tid, 0);
-        assert_eq!(trace.thread_tgid, 0);
+        assert_eq!(trace.thread_tgid, Some(0));
         assert_eq!(trace.cpu, 0);
         assert_eq!(trace.flags, "....");
         assert!((trace.timestamp - 12345.678900).abs() < 1e-9);
@@ -88,7 +88,7 @@ mod tests {
         let trace = TraceDevFrequency::parse(line).expect("clock_set_rate must parse");
         assert_eq!(trace.thread_name, "swapper");
         assert_eq!(trace.thread_tid, 0);
-        assert_eq!(trace.thread_tgid, 0);
+        assert_eq!(trace.thread_tgid, Some(0));
         assert_eq!(trace.cpu, 0);
         assert_eq!(trace.flags, "....");
         assert!((trace.timestamp - 12345.678900).abs() < 1e-9);

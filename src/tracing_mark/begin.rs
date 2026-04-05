@@ -11,7 +11,7 @@ pub struct TraceMarkBegin {
     #[field]
     pub thread_tid: u32,
     #[field]
-    pub thread_tgid: u32,
+    pub thread_tgid: Option<u32>,
     #[field]
     pub cpu: u32,
     #[field]
@@ -48,7 +48,7 @@ mod tests {
             0,
             "task".into(),
             100,
-            100,
+            Some(100),
             0,
             "....".into(),
             1.0,

@@ -15,7 +15,7 @@ pub struct TraceReceiveVsync {
     #[field]
     pub thread_tid: u32,
     #[field]
-    pub thread_tgid: u32,
+    pub thread_tgid: Option<u32>,
     #[field]
     pub cpu: u32,
     #[field]

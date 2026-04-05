@@ -11,7 +11,7 @@ pub struct TraceSchedProcessExit {
     #[field]
     pub thread_tid: u32,
     #[field]
-    pub thread_tgid: u32,
+    pub thread_tgid: Option<u32>,
     #[field]
     pub cpu: u32,
     #[field]
@@ -44,7 +44,7 @@ mod tests {
         assert!(trace.group_dead);
         assert_eq!(trace.thread_name, "bash");
         assert_eq!(trace.thread_tid, 1977);
-        assert_eq!(trace.thread_tgid, 12);
+        assert_eq!(trace.thread_tgid, Some(12));
         assert_eq!(trace.cpu, 0);
         assert_eq!(
             trace.payload().expect("payload must work"),

@@ -12,7 +12,7 @@ pub struct TraceSchedWakeup {
     #[field]
     pub thread_tid: u32,
     #[field]
-    pub thread_tgid: u32,
+    pub thread_tgid: Option<u32>,
     #[field]
     pub cpu: u32,
     #[field]
@@ -44,7 +44,7 @@ pub struct TraceSchedWakeupNew {
     #[field]
     pub thread_tid: u32,
     #[field]
-    pub thread_tgid: u32,
+    pub thread_tgid: Option<u32>,
     #[field]
     pub cpu: u32,
     #[field]
@@ -120,5 +120,17 @@ mod tests {
         let line2 = "kworker-123 (123) [000] .... 12345.679001: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=000 reason=3";
         let trace2 = TraceSchedWakeup::parse(line2).expect("sched_wakeup with reason must parse");
         assert_eq!(trace2.to_string().unwrap(), line2);
+    }
+
+    #[test]
+    fn sched_wakeup_parses_dashed_tgid_as_none() {
+        let line = "<idle>-0 (-----) [001] d..2 2318.330977: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=001";
+        let trace = TraceSchedWakeup::parse(line).expect("sched_wakeup must parse");
+        assert_eq!(trace.thread_tid, 0);
+        assert_eq!(trace.thread_tgid, None);
+        assert_eq!(
+            trace.to_string().unwrap(),
+            "<idle>-0 (-) [001] d..2 2318.330977: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=001"
+        );
     }
 }

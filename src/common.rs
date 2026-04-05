@@ -9,7 +9,7 @@ use crate::format_registry::FormatRegistry;
 
 pub(crate) static BASE_TRACE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"^(?P<thread_name>.+)-(?P<tid>\d+)\s+\(\s*(?P<tgid>\d+)\)\s+\[(?P<cpu>\d+)\]\s+(?P<flags>\S+)\s+(?P<timestamp>\d+(?:\.\d+)?):\s+(?P<event_name>[^:]+):\s*(?P<payload>.*)$",
+        r"^(?P<thread_name>.+)-(?P<tid>\d+)\s+\(\s*(?P<tgid>\d+|-+)\)\s+\[(?P<cpu>\d+)\]\s+(?P<flags>\S+)\s+(?P<timestamp>\d+(?:\.\d+)?):\s+(?P<event_name>[^:]+):\s*(?P<payload>.*)$",
     )
     .expect("base trace regex must compile")
 });
@@ -18,7 +18,7 @@ pub(crate) static BASE_TRACE_RE: LazyLock<Regex> = LazyLock::new(|| {
 pub struct BaseTraceParts {
     pub thread_name: String,
     pub thread_tid: u32,
-    pub thread_tgid: u32,
+    pub thread_tgid: Option<u32>,
     pub cpu: u32,
     pub flags: String,
     pub timestamp: f64,
@@ -32,7 +32,7 @@ impl BaseTraceParts {
         Some(Self {
             thread_name: captures.name("thread_name")?.as_str().to_owned(),
             thread_tid: parse(captures.name("tid")?.as_str().as_bytes()).ok()?,
-            thread_tgid: parse(captures.name("tgid")?.as_str().as_bytes()).ok()?,
+            thread_tgid: parse_thread_tgid_token(captures.name("tgid")?.as_str())?,
             cpu: parse(captures.name("cpu")?.as_str().as_bytes()).ok()?,
             flags: captures.name("flags")?.as_str().to_owned(),
             timestamp: parse(captures.name("timestamp")?.as_str().as_bytes()).ok()?,
@@ -40,6 +40,13 @@ impl BaseTraceParts {
             payload_raw: captures.name("payload")?.as_str().to_owned(),
         })
     }
+}
+
+fn parse_thread_tgid_token(raw: &str) -> Option<Option<u32>> {
+    if raw.bytes().all(|b| b == b'-') {
+        return Some(None);
+    }
+    parse(raw.as_bytes()).ok().map(Some)
 }
 
 pub fn parse_base_parts(line: &str) -> Option<BaseTraceParts> {

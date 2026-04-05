@@ -10,7 +10,7 @@ pub struct Trace {
     #[pyo3(get, set)]
     pub(crate) thread_tid: u32,
     #[pyo3(get, set)]
-    pub(crate) thread_tgid: u32,
+    pub(crate) thread_tgid: Option<u32>,
     #[pyo3(get, set)]
     pub(crate) cpu: u32,
     #[pyo3(get, set)]
@@ -28,7 +28,7 @@ impl Trace {
     pub fn new(
         thread_name: String,
         thread_tid: u32,
-        thread_tgid: u32,
+        thread_tgid: Option<u32>,
         cpu: u32,
         flags: String,
         timestamp: f64,
@@ -62,11 +62,14 @@ impl Trace {
     }
 
     pub fn to_string_with_payload(&self, payload: &str) -> String {
+        let tgid = self
+            .thread_tgid
+            .map_or_else(|| "-".to_string(), |v| v.to_string());
         format!(
             "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
             self.thread_name,
             self.thread_tid,
-            self.thread_tgid,
+            tgid,
             self.cpu,
             self.flags,
             self.timestamp,
@@ -81,16 +84,17 @@ impl Trace {
 pub fn format_trace_header(
     thread_name: &str,
     thread_tid: u32,
-    thread_tgid: u32,
+    thread_tgid: Option<u32>,
     cpu: u32,
     flags: &str,
     timestamp: f64,
     event_name: &str,
     payload: &str,
 ) -> String {
+    let tgid = thread_tgid.map_or_else(|| "-".to_string(), |v| v.to_string());
     format!(
         "{}-{} ({}) [{:03}] {} {:.6}: {}: {}",
-        thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, payload
+        thread_name, thread_tid, tgid, cpu, flags, timestamp, event_name, payload
     )
 }
 
@@ -102,7 +106,7 @@ impl Trace {
     fn py_new(
         thread_name: String,
         thread_tid: u32,
-        thread_tgid: u32,
+        thread_tgid: Option<u32>,
         cpu: u32,
         flags: String,
         timestamp: f64,
@@ -209,7 +213,7 @@ mod tests {
         let trace = Trace::parse(line).expect("trace must parse");
         assert_eq!(trace.thread_name, "bash");
         assert_eq!(trace.thread_tid, 1977);
-        assert_eq!(trace.thread_tgid, 12);
+        assert_eq!(trace.thread_tgid, Some(12));
         assert_eq!(trace.cpu, 0);
         assert_eq!(trace.flags, "....");
         assert!((trace.timestamp - 12345.678901).abs() < 1e-9);
@@ -227,6 +231,19 @@ mod tests {
         assert_eq!(trace.cpu, 10);
         assert_eq!(trace.event_name, "tracing_mark_write");
         assert_eq!(trace.payload_raw, "B|10|some_custom_message");
+    }
+
+    #[test]
+    fn base_trace_parses_dashed_tgid_as_none() {
+        let line = "<idle>-0 (-----) [001] d..2 2318.330977: softirq_raise: vec=9 [action=RCU]";
+        let trace = Trace::parse(line).expect("trace must parse");
+        assert_eq!(trace.thread_name, "<idle>");
+        assert_eq!(trace.thread_tid, 0);
+        assert_eq!(trace.thread_tgid, None);
+        assert_eq!(
+            trace.to_string().expect("to_string must work"),
+            "<idle>-0 (-) [001] d..2 2318.330977: softirq_raise: vec=9 [action=RCU]"
+        );
     }
 
     #[test]
@@ -249,7 +266,7 @@ mod tests {
         let trace = Trace::new(
             "bash".into(),
             1234,
-            1234,
+            Some(1234),
             0,
             "....".into(),
             12345.678901,
@@ -259,7 +276,7 @@ mod tests {
         .unwrap();
         assert_eq!(trace.thread_name, "bash");
         assert_eq!(trace.thread_tid, 1234);
-        assert_eq!(trace.thread_tgid, 1234);
+        assert_eq!(trace.thread_tgid, Some(1234));
         assert_eq!(trace.cpu, 0);
         assert_eq!(trace.flags, "....");
         assert_eq!(trace.timestamp, 12345.678901);
@@ -272,7 +289,7 @@ mod tests {
         let trace = Trace::new(
             "bash".into(),
             1234,
-            1234,
+            Some(1234),
             0,
             "....".into(),
             1.0,
@@ -289,7 +306,7 @@ mod tests {
         let trace = Trace::new(
             "bash".into(),
             1234,
-            1234,
+            Some(1234),
             0,
             "....".into(),
             1.0,
