@@ -649,6 +649,7 @@ pub fn generate_registration(
             inventory::submit! {
                 ::trace_parser::tracing_mark_registry::TracingMarkEntry {
                     parser: |py, line| ::trace_parser::parse_and_wrap(py, line, <#struct_name>::parse),
+                    quick_check: <#struct_name as ::trace_parser::common::FastMatch>::quick_check,
                 }
             }
         }
@@ -660,6 +661,7 @@ pub fn generate_registration(
                 ::trace_parser::registry::RegisteredParser {
                     event_name: #name,
                     parser: |py, line| ::trace_parser::parse_and_wrap(py, line, <#struct_name>::parse),
+                    quick_check: <#struct_name as ::trace_parser::common::FastMatch>::quick_check,
                 }
             }
         };
@@ -669,6 +671,7 @@ pub fn generate_registration(
                     ::trace_parser::registry::RegisteredParser {
                         event_name: #alias,
                         parser: |py, line| ::trace_parser::parse_and_wrap(py, line, <#struct_name>::parse),
+                        quick_check: <#struct_name as ::trace_parser::common::FastMatch>::quick_check,
                     }
                 }
             }

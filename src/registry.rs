@@ -9,6 +9,7 @@ use pyo3::exceptions::PyValueError;
 pub struct RegisteredParser {
     pub event_name: &'static str,
     pub parser: fn(Python<'_>, &str) -> Option<Py<PyAny>>,
+    pub quick_check: fn(&str) -> bool,
 }
 
 // Collect all registered parsers at compile time
@@ -35,9 +36,14 @@ pub fn dispatch_parse(py: Python<'_>, line: &str) -> PyResult<Option<Py<PyAny>>>
         )));
     }
 
-    // Iterate through all registered parsers
+    // Iterate through all registered parsers.
+    // If quick_check fails, try the next registered parser for the same event name.
+    // If quick_check passes but the parser returns None, return an error (broken format).
     for registered in inventory::iter::<RegisteredParser> {
         if registered.event_name == event_name {
+            if !(registered.quick_check)(line) {
+                continue;
+            }
             if let Some(event) = (registered.parser)(py, line) {
                 return Ok(Some(event));
             }

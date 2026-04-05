@@ -216,3 +216,39 @@ def test_known_event_unsupported_format_raises() -> None:
         assert False, "unsupported known event format must raise ValueError"
     except ValueError:
         pass
+
+
+def test_clock_set_rate_unknown_clk_falls_back_to_trace() -> None:
+    """clock_set_rate с неизвестным clk должен fallback к Trace, а не Err."""
+    line = (
+        "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: "
+        "clk=msm_adsp state=500000000 cpu_id=0"
+    )
+    event = parse_trace(line)
+    assert event is not None
+    assert isinstance(event, Trace)
+    assert event.event_name == "clock_set_rate"
+
+
+def test_clock_set_rate_known_clk_parses_as_dev_frequency() -> None:
+    """clock_set_rate с ddr_devfreq/l3c_devfreq должен парситься как TraceDevFrequency."""
+    line = (
+        "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: "
+        "clk=ddr_devfreq state=933000000 cpu_id=0"
+    )
+    event = parse_trace(line)
+    assert event is not None
+    assert isinstance(event, TraceDevFrequency)
+    assert event.clk == "ddr_devfreq"
+
+
+def test_sched_wakeup_with_success_parse_smoke() -> None:
+    line = (
+        "<idle>-0 (-----) [001] dn.4 2318.331005: sched_wakeup: "
+        "comm=ksoftirqd/1 pid=12 prio=120 success=1 target_cpu=001"
+    )
+    event = parse_trace(line)
+    assert event is not None
+    assert isinstance(event, TraceSchedWakeup)
+    assert event.success is True
+    assert event.reason is None
