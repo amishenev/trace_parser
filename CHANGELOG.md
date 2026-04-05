@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-04-05
+
+### Added
+
+- Wrapper attribute macros for typed events:
+  - `#[trace_event_class]`
+  - `#[tracing_mark_event_class]`
+- Wrapper `pyclass` option pass-through with sensible default:
+  - defaults to `skip_from_py_object`
+  - supports explicit `from_py_object` and other `pyclass(...)` options
+- Additional tests for:
+  - type-based optional inference from `Option<T>`
+  - false-positive prevention for optional inference
+  - `pyclass` wrapper option behavior (`skip_from_py_object` vs `from_py_object`)
+  - Python field access rules (`private`, `readonly`, read-write)
+
+### Changed
+
+- Typed event modules migrated to wrapper macro style to reduce per-event boilerplate.
+- Python field property generation is now driven by `#[field(...)]` metadata:
+  - `#[field]` -> getter + setter
+  - `#[field(readonly)]` -> getter only
+  - `#[field(private)]` -> not exposed to Python
+- Optional payload behavior is inferred from Rust field type `Option<T>`; `#[field(optional)]` is no longer needed.
+- Macro examples updated to reflect wrapper macro usage and `Option<T>`-based optional inference.
+- Agent/developer docs updated (`AGENTS.md`, `AGENT_QUICKSTART.md`, `QWEN.md`) for the new macro workflow.
+
+### Migration Notes
+
+- Public runtime Python API remains backward compatible.
+- For new typed events, prefer wrapper macros (`trace_event_class` / `tracing_mark_event_class`) over manual `#[pyclass]` + derive boilerplate.
+
 ## [0.3.0] - 2026-04-04
 
 ### Added
