@@ -20,6 +20,8 @@ __pycache__/
 
 # Trace files for testing
 *.trace
+!datasets/aosp/ftrace/
+!datasets/aosp/ftrace/*.trace
 
 # Qwen Code settings (keep settings.json, ignore backups)
 .qwen/*.orig

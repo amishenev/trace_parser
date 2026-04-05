@@ -12,6 +12,7 @@ repos:
       - id: trailing-whitespace
       - id: mixed-line-ending
       - id: check-added-large-files
+        exclude: ^datasets/aosp/ftrace/
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.0
