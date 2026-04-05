@@ -1,4 +1,6 @@
-from ._native import (
+"""trace_parser — fast ftrace/tracefs log parser."""
+
+from trace_parser._native import (
     Trace,
     TraceCpuFrequency,
     TraceDevFrequency,

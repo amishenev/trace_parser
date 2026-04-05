@@ -144,8 +144,7 @@ mod tests {
 
     #[test]
     fn sched_wakeup_marks_unknown_thread_name() {
-        let line =
-            "<...>-0 (-----) [001] d..2 2318.330977: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=001";
+        let line = "<...>-0 (-----) [001] d..2 2318.330977: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=001";
         let trace = TraceSchedWakeup::parse(line).expect("sched_wakeup must parse");
         assert!(trace.has_unknown_thread());
     }
@@ -153,8 +152,7 @@ mod tests {
     #[test]
     fn sched_wakeup_with_success_format_parses() {
         let line = "<idle>-0     (-----) [001] dn.4  2318.331005: sched_wakeup: comm=ksoftirqd/1 pid=12 prio=120 success=1 target_cpu=001";
-        let trace =
-            TraceSchedWakeup::parse(line).expect("sched_wakeup with success must parse");
+        let trace = TraceSchedWakeup::parse(line).expect("sched_wakeup with success must parse");
         assert_eq!(trace.comm, "ksoftirqd/1");
         assert_eq!(trace.pid, 12);
         assert_eq!(trace.prio, 120);

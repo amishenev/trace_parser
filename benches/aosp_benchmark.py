@@ -150,7 +150,9 @@ def write_csv(path: str | None, rows: list[dict[str, Any]]) -> None:
 
 
 def print_table(rows: list[dict[str, Any]]) -> None:
-    print("mode\tlines\tparsed\terrors\trate\terror_rate\tsec\tlines_per_sec\tthroughput\tfile")
+    print(
+        "mode\tlines\tparsed\terrors\trate\terror_rate\tsec\tlines_per_sec\tthroughput\tfile"
+    )
     for r in rows:
         print(
             "\t".join(

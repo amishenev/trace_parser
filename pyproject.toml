@@ -6,6 +6,9 @@ build-backend = "maturin"
 name = "trace_parser"
 version = "0.3.3"
 requires-python = ">=3.10"
+dependencies = [
+    "typing-extensions>=4.0",
+]
 
 [dependency-groups]
 dev = [
@@ -14,6 +17,7 @@ dev = [
     "pre-commit>=3.6",
     "pytest>=7.0",
     "pytest-benchmark>=4.0",
+    "ruff>=0.4",
 ]
 
 [tool.maturin]

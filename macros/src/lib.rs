@@ -24,6 +24,7 @@ mod attrs;
 mod enum_gen;
 mod generator;
 mod pymethods;
+mod stub_gen;
 
 use attrs::{
     MarkType, find_define_template_attrs, find_fast_match_attr, find_field_attr,
@@ -132,6 +133,7 @@ pub fn derive_trace_event(input: TokenStream) -> TokenStream {
 
     // Generate pymethods only if requested
     let pymethods = if event_attr.generate_pymethods {
+        stub_gen::write_stub_file(&input.ident, &fields, &event_attr);
         generate_pymethods_block(&input.ident, &fields)
     } else {
         quote! {}
@@ -261,6 +263,7 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
 
     // Generate pymethods only if requested
     let pymethods = if event_attr.generate_pymethods {
+        stub_gen::write_stub_file(&input.ident, &fields, &event_attr);
         generate_pymethods_block(&input.ident, &fields)
     } else {
         quote! {}

@@ -83,6 +83,12 @@ Build the extension into the Python package:
 maturin develop
 ```
 
+Regenerate type stubs (auto-generated on build, but can be run manually):
+
+```bash
+python scripts/gen_stubs.py
+```
+
 Run tests:
 
 ```bash

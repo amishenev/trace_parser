@@ -63,6 +63,9 @@ jobs:
       - name: Build editable Python package
         run: uv run maturin develop
 
+      - name: Verify generated stubs are up to date
+        run: uv run python scripts/gen_stubs.py && git diff --exit-code trace_parser/
+
       - name: Run Python smoke tests
         run: uv run pytest -q tests/python
 
@@ -111,6 +114,9 @@ jobs:
 
       - name: Build editable Python package
         run: uv run maturin develop
+
+      - name: Verify generated stubs are up to date
+        run: uv run python scripts/gen_stubs.py && git diff --exit-code trace_parser/
 
       - name: Run Python smoke tests
         run: uv run pytest -q tests/python

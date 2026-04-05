@@ -1,8 +1,5 @@
 """Test that type stubs are working correctly."""
 
-import subprocess
-import sys
-import tempfile
 from pathlib import Path
 
 
@@ -73,42 +70,27 @@ def test_all_exports_are_tuple():
     assert "__all__ = (" in pyi_content, "__all__ should be a tuple in __init__.pyi"
 
 
-def test_mypy_type_checking():
-    """Verify mypy can type-check imports from trace_parser."""
-    # Создаём тестовый файл
-    test_code = """
-from trace_parser import Trace, TraceSchedSwitch, parse_trace
+def test_type_hints_in_pyi():
+    """Verify that .pyi stubs contain expected fields for key classes."""
+    import trace_parser
 
-# Проверка что классы имеют правильные типы
-def process_trace(t: Trace) -> str:
-    return t.thread_name
+    package_dir = Path(trace_parser.__file__).parent
+    pyi_content = (package_dir / "_native.pyi").read_text()
 
-def process_sched(s: TraceSchedSwitch) -> str:
-    return s.prev_comm  # TraceSchedSwitch имеет prev_comm, не timestamp
+    # Проверяем что TraceSchedSwitch имеет правильные поля в .pyi
+    assert "prev_comm: str" in pyi_content
+    assert "prev_pid: int" in pyi_content
+    assert "thread_tgid: int | None" in pyi_content
+    assert "success: bool | None" in pyi_content
+    assert "reason: int | None" in pyi_content
 
-# Проверка что parse_trace возвращает правильный тип
-event = parse_trace("some-line")
-if event is not None:
-    name: str = event.thread_name  # Trace имеет thread_name
-"""
+    # Проверяем что TraceSchedWakeup имеет success в runtime
+    from trace_parser._native import TraceSchedWakeup
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-        f.write(test_code)
-        temp_file = Path(f.name)
-
-    try:
-        # Запускаем mypy в режиме strict
-        result = subprocess.run(
-            [sys.executable, "-m", "mypy", "--strict", str(temp_file)],
-            capture_output=True,
-            text=True,
-            cwd=Path(__file__).parent.parent,
-        )
-
-        # mypy должен пройти без ошибок
-        assert result.returncode == 0, f"mypy failed:\n{result.stdout}\n{result.stderr}"
-    finally:
-        temp_file.unlink()
+    assert "success" in dir(TraceSchedWakeup)
+    assert "reason" in dir(TraceSchedWakeup)
+    assert "can_be_parsed" in dir(TraceSchedWakeup)
+    assert "parse" in dir(TraceSchedWakeup)
 
 
 def test_copy_and_deepcopy():

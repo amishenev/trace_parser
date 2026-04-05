@@ -2,8 +2,8 @@
 //!
 //! Uses the `inventory` crate for compile-time registration without runtime overhead.
 
-use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
 
 /// A registered parser for a specific event name
 pub struct RegisteredParser {

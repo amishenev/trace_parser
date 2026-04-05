@@ -1,9 +1,12 @@
 """Type stubs for trace_parser._native native extension."""
 
+from __future__ import annotations
+from typing_extensions import Self
+
 class Trace:
     thread_name: str
-    thread_thread_tid: int
-    thread_thread_tgid: int
+    thread_tid: int
+    thread_tgid: int | None
     cpu: int
     flags: str
     timestamp: float
@@ -12,8 +15,8 @@ class Trace:
     def __init__(
         self,
         thread_name: str,
-        thread_thread_tid: int,
-        thread_thread_tgid: int,
+        thread_tid: int,
+        thread_tgid: int | None,
         cpu: int,
         flags: str,
         timestamp: float,
@@ -44,15 +47,281 @@ class Trace:
     def __copy__(self) -> Trace: ...
     def __deepcopy__(self, memo: object) -> Trace: ...
 
-class TraceSchedSwitch:
+class TraceCpuFrequency:
     thread_name: str
-    thread_thread_tid: int
-    thread_thread_tgid: int
+    thread_tid: int
+    thread_tgid: int | None
     cpu: int
     flags: str
     timestamp: float
     event_name: str
-    payload_raw: str
+    state: int
+    cpu_id: int
+    def __init__(
+        self,
+        thread_name: str,
+        thread_tid: int,
+        thread_tgid: int | None,
+        cpu: int,
+        flags: str,
+        timestamp: float,
+        event_name: str,
+        state: int,
+        cpu_id: int,
+    ) -> None: ...
+    @staticmethod
+    def can_be_parsed(line: str) -> bool: ...
+    @staticmethod
+    def parse(line: str) -> Self | None: ...
+    @property
+    def payload(self) -> str: ...
+    @property
+    def template(self) -> str: ...
+    def to_string(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __str__(self) -> str: ...
+    def __copy__(self) -> Self: ...
+    def __deepcopy__(self, memo: object) -> Self: ...
+
+class TraceDevFrequency:
+    thread_name: str
+    thread_tid: int
+    thread_tgid: int | None
+    cpu: int
+    flags: str
+    timestamp: float
+    event_name: str
+    clk: str
+    state: int
+    cpu_id: int
+    def __init__(
+        self,
+        thread_name: str,
+        thread_tid: int,
+        thread_tgid: int | None,
+        cpu: int,
+        flags: str,
+        timestamp: float,
+        event_name: str,
+        clk: str,
+        state: int,
+        cpu_id: int,
+    ) -> None: ...
+    @staticmethod
+    def can_be_parsed(line: str) -> bool: ...
+    @staticmethod
+    def parse(line: str) -> Self | None: ...
+    @property
+    def payload(self) -> str: ...
+    @property
+    def template(self) -> str: ...
+    def to_string(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __str__(self) -> str: ...
+    def __copy__(self) -> Self: ...
+    def __deepcopy__(self, memo: object) -> Self: ...
+
+class TraceExit:
+    thread_name: str
+    thread_tid: int
+    thread_tgid: int | None
+    cpu: int
+    flags: str
+    timestamp: float
+    event_name: str
+    pid: int
+    comm: str
+    tgid: int
+    def __init__(
+        self,
+        thread_name: str,
+        thread_tid: int,
+        thread_tgid: int | None,
+        cpu: int,
+        flags: str,
+        timestamp: float,
+        event_name: str,
+        pid: int,
+        comm: str,
+        tgid: int,
+    ) -> None: ...
+    @staticmethod
+    def can_be_parsed(line: str) -> bool: ...
+    @staticmethod
+    def parse(line: str) -> Self | None: ...
+    @property
+    def payload(self) -> str: ...
+    @property
+    def template(self) -> str: ...
+    def to_string(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __str__(self) -> str: ...
+    def __copy__(self) -> Self: ...
+    def __deepcopy__(self, memo: object) -> Self: ...
+
+class TraceMarkBegin:
+    thread_name: str
+    thread_tid: int
+    thread_tgid: int | None
+    cpu: int
+    flags: str
+    timestamp: float
+    event_name: str
+    trace_mark_tgid: int
+    message: str
+    def __init__(
+        self,
+        thread_name: str,
+        thread_tid: int,
+        thread_tgid: int | None,
+        cpu: int,
+        flags: str,
+        timestamp: float,
+        event_name: str,
+        trace_mark_tgid: int,
+        message: str,
+    ) -> None: ...
+    @staticmethod
+    def can_be_parsed(line: str) -> bool: ...
+    @staticmethod
+    def parse(line: str) -> Self | None: ...
+    @property
+    def payload(self) -> str: ...
+    @property
+    def template(self) -> str: ...
+    def to_string(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __str__(self) -> str: ...
+    def __copy__(self) -> Self: ...
+    def __deepcopy__(self, memo: object) -> Self: ...
+
+class TraceMarkEnd:
+    thread_name: str
+    thread_tid: int
+    thread_tgid: int | None
+    cpu: int
+    flags: str
+    timestamp: float
+    event_name: str
+    trace_mark_tgid: int
+    message: str
+    def __init__(
+        self,
+        thread_name: str,
+        thread_tid: int,
+        thread_tgid: int | None,
+        cpu: int,
+        flags: str,
+        timestamp: float,
+        event_name: str,
+        trace_mark_tgid: int,
+        message: str,
+    ) -> None: ...
+    @staticmethod
+    def can_be_parsed(line: str) -> bool: ...
+    @staticmethod
+    def parse(line: str) -> Self | None: ...
+    @property
+    def payload(self) -> str: ...
+    @property
+    def template(self) -> str: ...
+    def to_string(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __str__(self) -> str: ...
+    def __copy__(self) -> Self: ...
+    def __deepcopy__(self, memo: object) -> Self: ...
+
+class TraceReceiveVsync:
+    thread_name: str
+    thread_tid: int
+    thread_tgid: int | None
+    cpu: int
+    flags: str
+    timestamp: float
+    event_name: str
+    trace_mark_tgid: int
+    frame_number: int
+    def __init__(
+        self,
+        thread_name: str,
+        thread_tid: int,
+        thread_tgid: int | None,
+        cpu: int,
+        flags: str,
+        timestamp: float,
+        event_name: str,
+        trace_mark_tgid: int,
+        frame_number: int,
+    ) -> None: ...
+    @staticmethod
+    def can_be_parsed(line: str) -> bool: ...
+    @staticmethod
+    def parse(line: str) -> Self | None: ...
+    @property
+    def payload(self) -> str: ...
+    @property
+    def template(self) -> str: ...
+    def to_string(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __str__(self) -> str: ...
+    def __copy__(self) -> Self: ...
+    def __deepcopy__(self, memo: object) -> Self: ...
+
+class TraceSchedProcessExit:
+    thread_name: str
+    thread_tid: int
+    thread_tgid: int | None
+    cpu: int
+    flags: str
+    timestamp: float
+    event_name: str
+    comm: str
+    pid: int
+    prio: int
+    group_dead: bool
+    def __init__(
+        self,
+        thread_name: str,
+        thread_tid: int,
+        thread_tgid: int | None,
+        cpu: int,
+        flags: str,
+        timestamp: float,
+        event_name: str,
+        comm: str,
+        pid: int,
+        prio: int,
+        group_dead: bool,
+    ) -> None: ...
+    @staticmethod
+    def can_be_parsed(line: str) -> bool: ...
+    @staticmethod
+    def parse(line: str) -> Self | None: ...
+    @property
+    def payload(self) -> str: ...
+    @property
+    def template(self) -> str: ...
+    def to_string(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __str__(self) -> str: ...
+    def __copy__(self) -> Self: ...
+    def __deepcopy__(self, memo: object) -> Self: ...
+
+class TraceSchedSwitch:
+    thread_name: str
+    thread_tid: int
+    thread_tgid: int | None
+    cpu: int
+    flags: str
+    timestamp: float
+    event_name: str
     prev_comm: str
     prev_pid: int
     prev_prio: int
@@ -63,13 +332,12 @@ class TraceSchedSwitch:
     def __init__(
         self,
         thread_name: str,
-        thread_thread_tid: int,
-        thread_thread_tgid: int,
+        thread_tid: int,
+        thread_tgid: int | None,
         cpu: int,
         flags: str,
         timestamp: float,
         event_name: str,
-        payload_raw: str,
         prev_comm: str,
         prev_pid: int,
         prev_prio: int,
@@ -81,28 +349,26 @@ class TraceSchedSwitch:
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
-    def parse(line: str) -> TraceSchedSwitch | None: ...
+    def parse(line: str) -> Self | None: ...
     @property
     def payload(self) -> str: ...
     @property
     def template(self) -> str: ...
-    def payload_to_string(self) -> str: ...
     def to_string(self) -> str: ...
     def __repr__(self) -> str: ...
     def __eq__(self, other: object) -> bool: ...
     def __str__(self) -> str: ...
-    def __copy__(self) -> TraceSchedSwitch: ...
-    def __deepcopy__(self, memo: object) -> TraceSchedSwitch: ...
+    def __copy__(self) -> Self: ...
+    def __deepcopy__(self, memo: object) -> Self: ...
 
 class TraceSchedWakeup:
     thread_name: str
-    thread_thread_tid: int
-    thread_thread_tgid: int
+    thread_tid: int
+    thread_tgid: int | None
     cpu: int
     flags: str
     timestamp: float
     event_name: str
-    payload_raw: str
     comm: str
     pid: int
     prio: int
@@ -112,13 +378,12 @@ class TraceSchedWakeup:
     def __init__(
         self,
         thread_name: str,
-        thread_thread_tid: int,
-        thread_thread_tgid: int,
+        thread_tid: int,
+        thread_tgid: int | None,
         cpu: int,
         flags: str,
         timestamp: float,
         event_name: str,
-        payload_raw: str,
         comm: str,
         pid: int,
         prio: int,
@@ -129,28 +394,26 @@ class TraceSchedWakeup:
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
-    def parse(line: str) -> TraceSchedWakeup | None: ...
+    def parse(line: str) -> Self | None: ...
     @property
     def payload(self) -> str: ...
     @property
     def template(self) -> str: ...
-    def payload_to_string(self) -> str: ...
     def to_string(self) -> str: ...
     def __repr__(self) -> str: ...
     def __eq__(self, other: object) -> bool: ...
     def __str__(self) -> str: ...
-    def __copy__(self) -> TraceSchedWakeup: ...
-    def __deepcopy__(self, memo: object) -> TraceSchedWakeup: ...
+    def __copy__(self) -> Self: ...
+    def __deepcopy__(self, memo: object) -> Self: ...
 
 class TraceSchedWakeupNew:
     thread_name: str
-    thread_thread_tid: int
-    thread_thread_tgid: int
+    thread_tid: int
+    thread_tgid: int | None
     cpu: int
     flags: str
     timestamp: float
     event_name: str
-    payload_raw: str
     comm: str
     pid: int
     prio: int
@@ -158,13 +421,12 @@ class TraceSchedWakeupNew:
     def __init__(
         self,
         thread_name: str,
-        thread_thread_tid: int,
-        thread_thread_tgid: int,
+        thread_tid: int,
+        thread_tgid: int | None,
         cpu: int,
         flags: str,
         timestamp: float,
         event_name: str,
-        payload_raw: str,
         comm: str,
         pid: int,
         prio: int,
@@ -173,90 +435,7 @@ class TraceSchedWakeupNew:
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
-    def parse(line: str) -> TraceSchedWakeupNew | None: ...
-    @property
-    def payload(self) -> str: ...
-    @property
-    def template(self) -> str: ...
-    def payload_to_string(self) -> str: ...
-    def to_string(self) -> str: ...
-    def __repr__(self) -> str: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __str__(self) -> str: ...
-    def __copy__(self) -> TraceSchedWakeupNew: ...
-    def __deepcopy__(self, memo: object) -> TraceSchedWakeupNew: ...
-
-class TraceSchedProcessExit:
-    thread_name: str
-    thread_thread_tid: int
-    thread_thread_tgid: int
-    cpu: int
-    flags: str
-    timestamp: float
-    event_name: str
-    payload_raw: str
-    comm: str
-    pid: int
-    prio: int
-    group_dead: bool
-    def __init__(
-        self,
-        thread_name: str,
-        thread_thread_tid: int,
-        thread_thread_tgid: int,
-        cpu: int,
-        flags: str,
-        timestamp: float,
-        event_name: str,
-        payload_raw: str,
-        comm: str,
-        pid: int,
-        prio: int,
-        group_dead: bool,
-    ) -> None: ...
-    @staticmethod
-    def can_be_parsed(line: str) -> bool: ...
-    @staticmethod
-    def parse(line: str) -> TraceSchedProcessExit | None: ...
-    @property
-    def payload(self) -> str: ...
-    @property
-    def template(self) -> str: ...
-    def payload_to_string(self) -> str: ...
-    def to_string(self) -> str: ...
-    def __repr__(self) -> str: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __str__(self) -> str: ...
-    def __copy__(self) -> TraceSchedProcessExit: ...
-    def __deepcopy__(self, memo: object) -> TraceSchedProcessExit: ...
-
-class TraceExit:
-    thread_name: str
-    thread_thread_tid: int
-    thread_thread_tgid: int
-    cpu: int
-    flags: str
-    timestamp: float
-    event_name: str
-    pid: int
-    comm: str
-    exit_thread_thread_tgid: int
-    def __init__(
-        self,
-        thread_name: str,
-        thread_thread_tid: int,
-        thread_thread_tgid: int,
-        cpu: int,
-        flags: str,
-        timestamp: float,
-        pid: int,
-        comm: str,
-        exit_thread_thread_tgid: int,
-    ) -> None: ...
-    @staticmethod
-    def can_be_parsed(line: str) -> bool: ...
-    @staticmethod
-    def parse(line: str) -> TraceExit | None: ...
+    def parse(line: str) -> Self | None: ...
     @property
     def payload(self) -> str: ...
     @property
@@ -265,155 +444,31 @@ class TraceExit:
     def __repr__(self) -> str: ...
     def __eq__(self, other: object) -> bool: ...
     def __str__(self) -> str: ...
-    def __copy__(self) -> TraceExit: ...
-    def __deepcopy__(self, memo: object) -> TraceExit: ...
-
-class TraceCpuFrequency:
-    thread_name: str
-    thread_thread_tid: int
-    thread_thread_tgid: int
-    cpu: int
-    flags: str
-    timestamp: float
-    event_name: str
-    payload_raw: str
-    state: int
-    cpu_id: int
-    def __init__(
-        self,
-        thread_name: str,
-        thread_thread_tid: int,
-        thread_thread_tgid: int,
-        cpu: int,
-        flags: str,
-        timestamp: float,
-        event_name: str,
-        payload_raw: str,
-        state: int,
-        cpu_id: int,
-    ) -> None: ...
-    @staticmethod
-    def can_be_parsed(line: str) -> bool: ...
-    @staticmethod
-    def parse(line: str) -> TraceCpuFrequency | None: ...
-    @property
-    def payload(self) -> str: ...
-    @property
-    def template(self) -> str: ...
-    def payload_to_string(self) -> str: ...
-    def to_string(self) -> str: ...
-    def __repr__(self) -> str: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __str__(self) -> str: ...
-    def __copy__(self) -> TraceCpuFrequency: ...
-    def __deepcopy__(self, memo: object) -> TraceCpuFrequency: ...
-
-class TraceDevFrequency:
-    thread_name: str
-    thread_thread_tid: int
-    thread_thread_tgid: int
-    cpu: int
-    flags: str
-    timestamp: float
-    event_name: str
-    payload_raw: str
-    clk: str
-    state: int
-    cpu_id: int
-    def __init__(
-        self,
-        thread_name: str,
-        thread_thread_tid: int,
-        thread_thread_tgid: int,
-        cpu: int,
-        flags: str,
-        timestamp: float,
-        event_name: str,
-        payload_raw: str,
-        clk: str,
-        state: int,
-        cpu_id: int,
-    ) -> None: ...
-    @staticmethod
-    def can_be_parsed(line: str) -> bool: ...
-    @staticmethod
-    def parse(line: str) -> TraceDevFrequency | None: ...
-    @property
-    def payload(self) -> str: ...
-    @property
-    def template(self) -> str: ...
-    def payload_to_string(self) -> str: ...
-    def to_string(self) -> str: ...
-    def __repr__(self) -> str: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __str__(self) -> str: ...
-    def __copy__(self) -> TraceDevFrequency: ...
-    def __deepcopy__(self, memo: object) -> TraceDevFrequency: ...
+    def __copy__(self) -> Self: ...
+    def __deepcopy__(self, memo: object) -> Self: ...
 
 class TracingMark:
     thread_name: str
-    thread_thread_tid: int
-    thread_thread_tgid: int
+    thread_tid: int
+    thread_tgid: int | None
     cpu: int
     flags: str
     timestamp: float
     event_name: str
-    payload_raw: str
     def __init__(
         self,
         thread_name: str,
-        thread_thread_tid: int,
-        thread_thread_tgid: int,
+        thread_tid: int,
+        thread_tgid: int | None,
         cpu: int,
         flags: str,
         timestamp: float,
         event_name: str,
-        payload_raw: str,
     ) -> None: ...
     @staticmethod
     def can_be_parsed(line: str) -> bool: ...
     @staticmethod
-    def parse(line: str) -> TracingMark | None: ...
-    @property
-    def payload(self) -> str: ...
-    @property
-    def template(self) -> str: ...
-    def payload_to_string(self) -> str: ...
-    def to_string(self) -> str: ...
-    def __repr__(self) -> str: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __str__(self) -> str: ...
-    def __copy__(self) -> TracingMark: ...
-    def __deepcopy__(self, memo: object) -> TracingMark: ...
-
-class TraceMarkBegin:
-    thread_name: str
-    thread_thread_tid: int
-    thread_thread_tgid: int
-    cpu: int
-    flags: str
-    timestamp: float
-    event_name: str
-    payload_raw: str
-    trace_mark_thread_thread_tgid: int
-    message: str
-    def __init__(
-        self,
-        thread_name: str,
-        thread_thread_tid: int,
-        thread_thread_tgid: int,
-        cpu: int,
-        flags: str,
-        timestamp: float,
-        event_name: str,
-        payload_raw: str,
-        trace_mark_thread_thread_tgid: int,
-        message: str,
-    ) -> None: ...
-    @staticmethod
-    def can_be_parsed(line: str) -> bool: ...
-    @staticmethod
-    def parse(line: str) -> TraceMarkBegin | None: ...
+    def parse(line: str) -> Self | None: ...
     @property
     def payload(self) -> str: ...
     @property
@@ -422,85 +477,8 @@ class TraceMarkBegin:
     def __repr__(self) -> str: ...
     def __eq__(self, other: object) -> bool: ...
     def __str__(self) -> str: ...
-    def __copy__(self) -> TraceMarkBegin: ...
-    def __deepcopy__(self, memo: object) -> TraceMarkBegin: ...
-
-class TraceMarkEnd:
-    thread_name: str
-    thread_thread_tid: int
-    thread_thread_tgid: int
-    cpu: int
-    flags: str
-    timestamp: float
-    event_name: str
-    payload_raw: str
-    trace_mark_thread_thread_tgid: int
-    message: str
-    def __init__(
-        self,
-        thread_name: str,
-        thread_thread_tid: int,
-        thread_thread_tgid: int,
-        cpu: int,
-        flags: str,
-        timestamp: float,
-        event_name: str,
-        payload_raw: str,
-        trace_mark_thread_thread_tgid: int,
-        message: str,
-    ) -> None: ...
-    @staticmethod
-    def can_be_parsed(line: str) -> bool: ...
-    @staticmethod
-    def parse(line: str) -> TraceMarkEnd | None: ...
-    @property
-    def payload(self) -> str: ...
-    @property
-    def template(self) -> str: ...
-    def to_string(self) -> str: ...
-    def __repr__(self) -> str: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __str__(self) -> str: ...
-    def __copy__(self) -> TraceMarkEnd: ...
-    def __deepcopy__(self, memo: object) -> TraceMarkEnd: ...
-
-class TraceReceiveVsync:
-    thread_name: str
-    thread_thread_tid: int
-    thread_thread_tgid: int
-    cpu: int
-    flags: str
-    timestamp: float
-    event_name: str
-    trace_mark_thread_thread_tgid: int
-    message: str
-    frame_number: int
-    def __init__(
-        self,
-        thread_name: str,
-        thread_thread_tid: int,
-        thread_thread_tgid: int,
-        cpu: int,
-        flags: str,
-        timestamp: float,
-        trace_mark_thread_thread_tgid: int,
-        message: str,
-        frame_number: int,
-    ) -> None: ...
-    @staticmethod
-    def can_be_parsed(line: str) -> bool: ...
-    @staticmethod
-    def parse(line: str) -> TraceReceiveVsync | None: ...
-    @property
-    def payload(self) -> str: ...
-    @property
-    def template(self) -> str: ...
-    def to_string(self) -> str: ...
-    def __repr__(self) -> str: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __str__(self) -> str: ...
-    def __copy__(self) -> TraceReceiveVsync: ...
-    def __deepcopy__(self, memo: object) -> TraceReceiveVsync: ...
+    def __copy__(self) -> Self: ...
+    def __deepcopy__(self, memo: object) -> Self: ...
 
 def parse_trace(line: str) -> Trace | None: ...
 def parse_trace_file(path: str, filter_event: str | None = None) -> list[Trace]: ...

@@ -127,25 +127,19 @@ mod tests {
 
     #[test]
     fn dev_frequency_quick_check_passes_for_allowed_devices() {
-        assert!(
-            TraceDevFrequency::can_be_parsed(
-                "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=ddr_devfreq state=933000000 cpu_id=0"
-            )
-        );
-        assert!(
-            TraceDevFrequency::can_be_parsed(
-                "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=l3c_devfreq state=600000000 cpu_id=0"
-            )
-        );
+        assert!(TraceDevFrequency::can_be_parsed(
+            "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=ddr_devfreq state=933000000 cpu_id=0"
+        ));
+        assert!(TraceDevFrequency::can_be_parsed(
+            "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=l3c_devfreq state=600000000 cpu_id=0"
+        ));
     }
 
     #[test]
     fn dev_frequency_quick_check_fails_for_unknown_device() {
         // quick_check returns false when clk is not in the allowed list
-        assert!(
-            !TraceDevFrequency::can_be_parsed(
-                "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=msm_adsp state=500000000 cpu_id=0"
-            )
-        );
+        assert!(!TraceDevFrequency::can_be_parsed(
+            "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=msm_adsp state=500000000 cpu_id=0"
+        ));
     }
 }
