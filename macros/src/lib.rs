@@ -13,7 +13,7 @@
 //! - `#[trace_markers("...", "...")]` - payload markers for FastMatch
 //! - `#[fast_match(contains_any = ["...", ...])]` - optional `payload_quick_check` substrings
 //! - `#[define_template("...")]` - payload template (can be multiple)
-//! - `#[field(ty = "...", name = "...", optional)]` - field attributes
+//! - `#[field(name = "...", regex = "...", choice = [...], format = "...", readonly, private)]` - field attributes
 
 #[cfg(test)]
 pub mod attrs;

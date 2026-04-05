@@ -44,7 +44,7 @@ pub struct TraceSchedWakeup {
     #[field(regex = r"\d{3}", format = "{:03}")]
     pub target_cpu: u32,
     #[pyo3(get, set)]
-    #[field(optional)]
+    #[field]
     pub reason: Option<u32>,
 }
 

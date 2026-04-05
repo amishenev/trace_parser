@@ -1,7 +1,7 @@
 //! Python API generation for trace_event macros.
 
 use crate::attrs::FieldAttr;
-use crate::generator::InferredType;
+use crate::generator::{is_option_type, InferredType};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Ident, Type};
@@ -68,24 +68,20 @@ pub fn generate_pymethods_block(
 fn generate_new(fields: &[(Ident, Type, FieldAttr)]) -> TokenStream {
     let field_names: Vec<&Ident> = fields.iter().map(|(name, _, _)| name).collect();
 
-    let field_params: Vec<TokenStream> = fields.iter().map(|(field_name, field_ty, field_attr)| {
+    let field_params: Vec<TokenStream> = fields.iter().map(|(field_name, field_ty, _field_attr)| {
         let inferred = InferredType::from_syn(field_ty)
             .expect("unsupported field type in constructor");
         let ty = inferred.rust_type_tokens();
 
-        if field_attr.optional {
+        if is_option_type(field_ty) {
             quote! { #field_name: ::std::option::Option<#ty> }
         } else {
             quote! { #field_name: #ty }
         }
     }).collect();
 
-    let field_inits: Vec<TokenStream> = fields.iter().map(|(field_name, _field_ty, field_attr)| {
-        if field_attr.optional {
-            quote! { #field_name: #field_name }
-        } else {
-            quote! { #field_name }
-        }
+    let field_inits: Vec<TokenStream> = fields.iter().map(|(field_name, _field_ty, _field_attr)| {
+        quote! { #field_name }
     }).collect();
 
     quote! {
@@ -218,10 +214,10 @@ mod tests {
     fn test_generate_new() {
         let code = generate_new(&[
             (parse_quote!(name), parse_quote!(String), FieldAttr {
-                name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false,
+                name: None, choice: vec![], regex: None, format: None, readonly: false, private: false,
             }),
             (parse_quote!(value), parse_quote!(u32), FieldAttr {
-                name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false,
+                name: None, choice: vec![], regex: None, format: None, readonly: false, private: false,
             }),
         ]);
         let code_str = code.to_string();

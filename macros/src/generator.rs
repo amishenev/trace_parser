@@ -23,6 +23,17 @@ fn is_base_field(name: &str) -> bool {
     BASE_FIELDS.contains(&name)
 }
 
+pub(crate) fn is_option_type(ty: &Type) -> bool {
+    match ty {
+        Type::Path(tp) => tp
+            .path
+            .segments
+            .last()
+            .is_some_and(|seg| seg.ident == "Option"),
+        _ => false,
+    }
+}
+
 /// Тип поля для генерации кода парсинга/рендера
 pub(crate) enum InferredType {
     String,
@@ -420,7 +431,7 @@ pub fn generate_template_event_impl(
                 .unwrap_or_else(|| field_name.to_string());
 
             if let Some(fmt) = &field_attr.format {
-                if field_attr.optional {
+                if is_option_type(field_ty) {
                     return quote! {
                         (#name_str, self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::Str(
                             &::std::format!(#fmt, v)
@@ -435,7 +446,7 @@ pub fn generate_template_event_impl(
                 }
             }
 
-            if field_attr.optional {
+            if is_option_type(field_ty) {
                 let render = inferred.render_optional_value(field_name);
                 quote! {
                     (#name_str, #render)
@@ -461,7 +472,7 @@ pub fn generate_template_event_impl(
                 .unwrap_or_else(|| field_name.to_string());
             let regex = field_attr.regex.as_deref();
 
-            if field_attr.optional {
+            if is_option_type(field_ty) {
                 let parse = inferred.parse_optional_code(&quote! { captures }, &name_str, regex);
                 quote! {
                     #field_name: #parse
@@ -614,7 +625,6 @@ mod tests {
                         choice: vec![],
                         regex: None,
                         format: None,
-                        optional: false,
                         readonly: false,
                         private: false,
                     },
@@ -785,7 +795,6 @@ mod tests {
                 choice: vec![],
                 regex: None,
                 format: None,
-                optional: false,
                 readonly: false,
                 private: false,
             },
@@ -811,7 +820,6 @@ mod tests {
                 choice: vec![],
                 regex: None,
                 format: None,
-                optional: true,
                 readonly: false,
                 private: false,
             },
@@ -836,7 +844,6 @@ mod tests {
                 choice: vec![],
                 regex: None,
                 format: None,
-                optional: false,
                 readonly: false,
                 private: false,
             },
@@ -861,7 +868,6 @@ mod tests {
                 choice: vec![],
                 regex: None,
                 format: None,
-                optional: false,
                 readonly: false,
                 private: false,
             },
@@ -887,7 +893,6 @@ mod tests {
                 choice: vec![],
                 regex: None,
                 format: None,
-                optional: true,
                 readonly: false,
                 private: false,
             },
@@ -914,7 +919,6 @@ mod tests {
                 choice: vec![],
                 regex: None,
                 format: None,
-                optional: false,
                 readonly: false,
                 private: false,
             },
@@ -936,8 +940,8 @@ mod tests {
             DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1), detect: vec![], extra_fields: vec![] },
         ];
         let fields = vec![
-            (parse_quote!(a), parse_quote!(u32), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false }),
-            (parse_quote!(b), parse_quote!(Option<u32>), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: true, readonly: false, private: false }),
+            (parse_quote!(a), parse_quote!(u32), FieldAttr { name: None, choice: vec![], regex: None, format: None, readonly: false, private: false }),
+            (parse_quote!(b), parse_quote!(Option<u32>), FieldAttr { name: None, choice: vec![], regex: None, format: None, readonly: false, private: false }),
         ];
 
         let output = generate_template_event_impl(&struct_name, &templates, &fields);
@@ -959,7 +963,6 @@ mod tests {
                 choice: vec![],
                 regex: None,
                 format: None,
-                optional: false,
                 readonly: false,
                 private: false,
             },
@@ -983,9 +986,9 @@ mod tests {
             DefineTemplateAttr { template: "comm={comm} pid={pid} reason={reason}".to_string(), id: Some(1), detect: vec!["reason=".to_string()], extra_fields: vec![] },
         ];
         let fields = vec![
-            (parse_quote!(comm), parse_quote!(String), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false }),
-            (parse_quote!(pid), parse_quote!(u32), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false }),
-            (parse_quote!(reason), parse_quote!(Option<u32>), FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: true, readonly: false, private: false }),
+            (parse_quote!(comm), parse_quote!(String), FieldAttr { name: None, choice: vec![], regex: None, format: None, readonly: false, private: false }),
+            (parse_quote!(pid), parse_quote!(u32), FieldAttr { name: None, choice: vec![], regex: None, format: None, readonly: false, private: false }),
+            (parse_quote!(reason), parse_quote!(Option<u32>), FieldAttr { name: None, choice: vec![], regex: None, format: None, readonly: false, private: false }),
         ];
 
         let output = generate_template_event_impl(&struct_name, &templates, &fields);
@@ -1010,7 +1013,6 @@ mod tests {
                 choice: vec![],
                 regex: Some(r"\d{3}".to_string()),
                 format: None,
-                optional: false,
                 readonly: false,
                 private: false,
             },
@@ -1038,7 +1040,6 @@ mod tests {
                 choice: vec![],
                 regex: None,
                 format: Some("{:03}".to_string()),
-                optional: false,
                 readonly: false,
                 private: false,
             },
@@ -1065,7 +1066,6 @@ mod tests {
                 choice: vec!["ddr_devfreq".to_string(), "l3c_devfreq".to_string()],
                 regex: None,
                 format: None,
-                optional: false,
                 readonly: false,
                 private: false,
             },
@@ -1092,7 +1092,7 @@ mod tests {
         let fields = vec![(
             parse_quote!(frame_number),
             parse_quote!(u32),
-            FieldAttr { name: None, choice: vec![], regex: None, format: None, optional: false, readonly: false, private: false },
+            FieldAttr { name: None, choice: vec![], regex: None, format: None, readonly: false, private: false },
         )];
 
         let output = generate_template_event_impl(&struct_name, &templates, &fields);
@@ -1103,5 +1103,27 @@ mod tests {
         assert!(output_str.contains("extra_info"), "output should contain extra_info");
         assert!(output_str.contains("FieldSpec :: custom"), "output should contain FieldSpec::custom");
         assert!(output_str.contains("[^"), "output should contain regex pattern");
+    }
+
+    #[test]
+    fn test_is_option_type_infers_from_type_name() {
+        let ty_option: Type = parse_quote!(Option<u32>);
+        let ty_std_option: Type = parse_quote!(std::option::Option<u32>);
+        let ty_plain: Type = parse_quote!(u32);
+
+        assert!(is_option_type(&ty_option));
+        assert!(is_option_type(&ty_std_option));
+        assert!(!is_option_type(&ty_plain));
+    }
+
+    #[test]
+    fn test_is_option_type_no_false_positives() {
+        let ty_named_like_option: Type = parse_quote!(OptionalU32);
+        let ty_result: Type = parse_quote!(Result<u32, String>);
+        let ty_vec: Type = parse_quote!(Vec<Option<u32>>);
+
+        assert!(!is_option_type(&ty_named_like_option));
+        assert!(!is_option_type(&ty_result));
+        assert!(!is_option_type(&ty_vec));
     }
 }

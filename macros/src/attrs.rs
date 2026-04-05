@@ -166,7 +166,7 @@ impl Parse for DefineTemplateAttr {
     }
 }
 
-/// Parsed `#[field(name = "...", regex = "...", choice = ["a", "b"], format = "...", optional, readonly, private)]` attribute
+/// Parsed `#[field(name = "...", regex = "...", choice = ["a", "b"], format = "...", readonly, private)]` attribute
 ///
 /// Field attributes control how struct fields are exposed to Python.
 /// Type is inferred from the Rust field type (String, u32, i32, f64, bool).
@@ -178,7 +178,6 @@ pub struct FieldAttr {
     pub choice: Vec<String>,
     /// Custom format string for rendering (e.g. `"{:03}"`).
     pub format: Option<String>,
-    pub optional: bool,
     pub readonly: bool,
     pub private: bool,
 }
@@ -189,7 +188,6 @@ impl Parse for FieldAttr {
         let mut regex = None;
         let mut choice = Vec::new();
         let mut format = None;
-        let mut optional = false;
         let mut readonly = false;
         let mut private = false;
 
@@ -214,9 +212,8 @@ impl Parse for FieldAttr {
                         _ => {}
                     }
                 }
-            } else if key == "optional" || key == "readonly" || key == "private" {
-                if key == "optional" { optional = true; }
-                else if key == "readonly" { readonly = true; }
+            } else if key == "readonly" || key == "private" {
+                if key == "readonly" { readonly = true; }
                 else if key == "private" { private = true; }
             } else {
                 input.parse::<Token![=]>()?;
@@ -235,7 +232,7 @@ impl Parse for FieldAttr {
             }
         }
 
-        Ok(Self { name, regex, choice, optional, readonly, private, format })
+        Ok(Self { name, regex, choice, readonly, private, format })
     }
 }
 
@@ -285,7 +282,6 @@ pub fn find_field_attr(attrs: &[Attribute]) -> Option<FieldAttr> {
                     regex: None,
                     choice: Vec::new(),
                     format: None,
-                    optional: false,
                     readonly: false,
                     private: false,
                 })
@@ -395,7 +391,6 @@ mod tests {
         let tokens = quote! {};
         let attr: FieldAttr = syn::parse2(tokens).unwrap();
         assert!(attr.name.is_none());
-        assert!(!attr.optional);
         assert!(!attr.readonly);
         assert!(!attr.private);
     }
@@ -405,13 +400,6 @@ mod tests {
         let tokens = quote! { name = "state" };
         let attr: FieldAttr = syn::parse2(tokens).unwrap();
         assert_eq!(attr.name, Some("state".to_string()));
-    }
-
-    #[test]
-    fn test_field_attr_optional() {
-        let tokens = quote! { optional };
-        let attr: FieldAttr = syn::parse2(tokens).unwrap();
-        assert!(attr.optional);
     }
 
     #[test]
@@ -459,10 +447,9 @@ mod tests {
 
     #[test]
     fn test_field_attr_all_flags() {
-        let tokens = quote! { name = "state", optional, readonly, private };
+        let tokens = quote! { name = "state", readonly, private };
         let attr: FieldAttr = syn::parse2(tokens).unwrap();
         assert_eq!(attr.name, Some("state".to_string()));
-        assert!(attr.optional);
         assert!(attr.readonly);
         assert!(attr.private);
     }
