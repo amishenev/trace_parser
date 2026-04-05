@@ -195,3 +195,24 @@ def test_parse_unknown_thread_placeholder() -> None:
     assert event is not None
     assert event.thread_name == "<...>"
     assert event.has_unknown_thread() is True
+
+
+def test_unknown_event_falls_back_to_trace() -> None:
+    line = "bash-1977 (12) [000] .... 12345.678901: unknown_event: some payload"
+    event = parse_trace(line)
+    assert event is not None
+    assert isinstance(event, Trace)
+    assert event.event_name == "unknown_event"
+    assert event.payload_raw == "some payload"
+
+
+def test_known_event_unsupported_format_raises() -> None:
+    line = (
+        "kworker-123 (123) [000] .... 12345.679001: sched_wakeup: "
+        "comm=bash pid=1977 prio=120"
+    )
+    try:
+        parse_trace(line)
+        assert False, "unsupported known event format must raise ValueError"
+    except ValueError:
+        pass

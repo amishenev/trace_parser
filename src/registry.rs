@@ -3,6 +3,7 @@
 //! Uses the `inventory` crate for compile-time registration without runtime overhead.
 
 use pyo3::prelude::*;
+use pyo3::exceptions::PyValueError;
 
 /// A registered parser for a specific event name
 pub struct RegisteredParser {
@@ -25,13 +26,25 @@ pub fn dispatch_parse(py: Python<'_>, line: &str) -> PyResult<Option<Py<PyAny>>>
 
     // Special handling for tracing_mark_write (multiple subtypes)
     if event_name == "tracing_mark_write" {
-        return Ok(crate::tracing_mark_registry::parse_tracing_mark(py, line));
+        if let Some(event) = crate::tracing_mark_registry::parse_tracing_mark(py, line) {
+            return Ok(Some(event));
+        }
+        return Err(PyValueError::new_err(format!(
+            "Unsupported tracing_mark_write format: {}",
+            line
+        )));
     }
 
     // Iterate through all registered parsers
     for registered in inventory::iter::<RegisteredParser> {
         if registered.event_name == event_name {
-            return Ok((registered.parser)(py, line));
+            if let Some(event) = (registered.parser)(py, line) {
+                return Ok(Some(event));
+            }
+            return Err(PyValueError::new_err(format!(
+                "Unsupported format for event '{}': {}",
+                event_name, line
+            )));
         }
     }
 
