@@ -880,6 +880,7 @@ dependencies = [
  "memchr",
  "pyo3",
  "regex",
+ "rstest",
  "tempfile",
  "trace_parser_macros",
 ]

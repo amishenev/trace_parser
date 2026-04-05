@@ -1,3 +1,4 @@
+mod base_parser;
 mod common;
 mod format_registry;
 mod frequency;

@@ -2,64 +2,16 @@ use lexical_core::parse;
 use memchr::memmem;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use regex::{Captures, Regex};
-use std::sync::LazyLock;
+use regex::Captures;
 
 use crate::format_registry::FormatRegistry;
 
-pub(crate) static BASE_TRACE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"^(?P<thread_name>.+)-(?P<tid>\d+)\s+\(\s*(?P<tgid>\d+|-+)\)\s+\[(?P<cpu>\d+)\]\s+(?P<flags>\S+)\s+(?P<timestamp>\d+(?:\.\d+)?):\s+(?P<event_name>[^:]+):\s*(?P<payload>.*)$",
-    )
-    .expect("base trace regex must compile")
-});
+// Re-export from base_parser (memchr-based, no regex)
+pub(crate) use crate::base_parser::BaseTraceParts;
+pub(crate) use crate::base_parser::extract_event_name;
 
-#[derive(Clone)]
-pub struct BaseTraceParts {
-    pub thread_name: String,
-    pub thread_tid: u32,
-    pub thread_tgid: Option<u32>,
-    pub cpu: u32,
-    pub flags: String,
-    pub timestamp: f64,
-    pub event_name: String,
-    pub payload_raw: String,
-}
-
-impl BaseTraceParts {
-    pub fn parse(line: &str) -> Option<Self> {
-        let captures = BASE_TRACE_RE.captures(line)?;
-        Some(Self {
-            thread_name: captures.name("thread_name")?.as_str().to_owned(),
-            thread_tid: parse(captures.name("tid")?.as_str().as_bytes()).ok()?,
-            thread_tgid: parse_thread_tgid_token(captures.name("tgid")?.as_str())?,
-            cpu: parse(captures.name("cpu")?.as_str().as_bytes()).ok()?,
-            flags: captures.name("flags")?.as_str().to_owned(),
-            timestamp: parse(captures.name("timestamp")?.as_str().as_bytes()).ok()?,
-            event_name: captures.name("event_name")?.as_str().trim().to_owned(),
-            payload_raw: captures.name("payload")?.as_str().to_owned(),
-        })
-    }
-}
-
-fn parse_thread_tgid_token(raw: &str) -> Option<Option<u32>> {
-    if raw.bytes().all(|b| b == b'-') {
-        return Some(None);
-    }
-    parse(raw.as_bytes()).ok().map(Some)
-}
-
-pub fn parse_base_parts(line: &str) -> Option<BaseTraceParts> {
+pub(crate) fn parse_base_parts(line: &str) -> Option<BaseTraceParts> {
     BaseTraceParts::parse(line)
-}
-
-/// Извлечь event_name из строки трассировки
-pub fn extract_event_name(line: &str) -> Option<&str> {
-    // Используем SIMD поиск через memchr
-    let colon_pos = memmem::find(line.as_bytes(), b": ")? + 2;
-    let rest = &line[colon_pos..];
-    let end_pos = memmem::find(rest.as_bytes(), b": ")?;
-    Some(rest[..end_pos].trim())
 }
 
 pub(crate) trait EventType {

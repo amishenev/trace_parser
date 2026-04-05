@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 
-use crate::common::{BASE_TRACE_RE, BaseTraceParts, parse_base_parts, validate_timestamp};
+use crate::common::{BaseTraceParts, extract_event_name, parse_base_parts, validate_timestamp};
 
 #[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug, PartialEq)]
@@ -127,7 +127,7 @@ impl Trace {
 
     #[staticmethod]
     pub fn can_be_parsed(line: &str) -> bool {
-        BASE_TRACE_RE.is_match(line)
+        extract_event_name(line).is_some()
     }
 
     #[staticmethod]

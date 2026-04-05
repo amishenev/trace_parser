@@ -34,6 +34,7 @@ trace_parser_macros = { path = "macros" }
 tempfile = "3"
 criterion = "0.5"
 regex = "1.12"
+rstest = "0.25"
 
 [[bench]]
 name = "can_be_parsed"
