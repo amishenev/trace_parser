@@ -365,6 +365,8 @@ docs: update README with release workflow
 ci: expand Python version matrix
 ```
 
+Проверка commit message теперь делается через `pre-commit` hook типа `commit-msg`.
+
 ### Структура Rust файлов
 
 1. `#[pyclass]` определение класса
@@ -381,6 +383,18 @@ ci: expand Python version matrix
 - `pyo3` использует `abi3-py310` (версия 0.28.2+)
 - Rust edition 2024
 - Native extension: `trace_parser._native`
+
+**Pre-commit hooks (локально):**
+
+```bash
+uv run pre-commit install --hook-type pre-commit --hook-type pre-push --hook-type commit-msg
+```
+
+Рекомендуемая проверка перед push:
+
+```bash
+uv run pre-commit run --all-files
+```
 
 **Артефакты сборки:**
 - `_native.abi3.so` под `python/trace_parser/`
@@ -414,8 +428,10 @@ ci: expand Python version matrix
 - Сборка sdist
 - Публикация в GitHub Releases
 
-**Commitlint:**
-- Проверка формата commit messages
+**Commit message check (`commitlint.yml`):**
+- Триггер: только `pull_request`
+- Выполнение через `uv` + `pre-commit` (`conventional-pre-commit`, stage `commit-msg`)
+- Проверяются все commit messages из диапазона PR (`base..head`)
 
 **Coverage (coverage.yml):**
 - Генерация отчёта покрытия через cargo-llvm-cov

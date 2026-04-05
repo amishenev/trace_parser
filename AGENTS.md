@@ -92,6 +92,8 @@ Current intended dev flow:
 - `uv venv .venv -p 3.10`
 - `source .venv/bin/activate`
 - `uv pip install maturin pytest`
+- `uv pip install pre-commit`
+- `uv run pre-commit install --hook-type pre-commit --hook-type pre-push --hook-type commit-msg`
 - `maturin develop`
 - `pytest tests/python`
 
@@ -125,7 +127,10 @@ Preferred examples:
 
 Do not use free-form commit messages in this repository anymore.
 
-This rule is also enforced in GitHub Actions through a dedicated commitlint workflow.
+This rule is enforced via:
+
+- a PR-only GitHub Actions check (`.github/workflows/commitlint.yml`)
+- local `pre-commit` hooks (commit-msg stage, Conventional Commits check)
 
 ## Base Trace Format
 

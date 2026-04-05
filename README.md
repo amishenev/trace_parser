@@ -73,6 +73,8 @@ Create the environment and install development tools:
 uv venv .venv -p 3.10
 source .venv/bin/activate
 uv pip install maturin pytest
+uv pip install pre-commit
+uv run pre-commit install --hook-type pre-commit --hook-type pre-push --hook-type commit-msg
 ```
 
 Build the extension into the Python package:

@@ -57,6 +57,8 @@ Prefer `into_pyobject(py)?.into_any().unbind()` patterns; `LazyLock` not `once_c
 uv venv .venv -p 3.10
 source .venv/bin/activate
 uv pip install maturin pytest
+uv pip install pre-commit
+uv run pre-commit install --hook-type pre-commit --hook-type pre-push --hook-type commit-msg
 maturin develop
 pytest -q tests/python
 ```
@@ -74,9 +76,9 @@ Do not commit native artifacts under `trace_parser/` (gitignored).
 
 ## Changing the public API (checklist)
 
-1. Rust export + `parse_trace` typing if needed.  
-2. `trace_parser/__init__.py` + matching `__init__.pyi`.  
-3. Submodule `.pyi` files — **stubs are source of truth** for typing.  
+1. Rust export + `parse_trace` typing if needed.
+2. `trace_parser/__init__.py` + matching `__init__.pyi`.
+3. Submodule `.pyi` files — **stubs are source of truth** for typing.
 4. Example under `examples/` and smoke test under `tests/python/`.
 
 ## Git

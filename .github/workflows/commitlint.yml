@@ -1,7 +1,6 @@
 name: Commitlint
 
 on:
-  push:
   pull_request:
 
 permissions:
@@ -9,13 +8,44 @@ permissions:
   pull-requests: read
 
 jobs:
-  commitlint:
-    name: Check commit messages
+  conventional-commits:
+    name: Check commit messages (pre-commit)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-      - name: Lint commit messages
-        uses: wagoid/commitlint-github-action@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install dev dependencies
+        run: uv sync --dev
+
+      - name: Validate PR commit messages via pre-commit hook
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          commits=$(git rev-list --reverse "${BASE_SHA}..${HEAD_SHA}")
+          if [ -z "${commits}" ]; then
+            echo "No commits found in PR range."
+            exit 0
+          fi
+
+          for sha in ${commits}; do
+            echo "Checking commit: ${sha}"
+            git show -s --format=%B "${sha}" > /tmp/commit-msg.txt
+            uv run pre-commit run conventional-pre-commit \
+              --hook-stage commit-msg \
+              --commit-msg-filename /tmp/commit-msg.txt \
+              --verbose
+          done
