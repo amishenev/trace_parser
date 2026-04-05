@@ -107,6 +107,7 @@ class TraceSchedWakeup:
     pid: int
     prio: int
     target_cpu: int
+    success: bool | None
     reason: int | None
     def __init__(
         self,
@@ -122,6 +123,7 @@ class TraceSchedWakeup:
         pid: int,
         prio: int,
         target_cpu: int,
+        success: bool | None,
         reason: int | None,
     ) -> None: ...
     @staticmethod
