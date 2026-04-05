@@ -64,7 +64,7 @@ event = parse_trace(line)
 Requirements:
 
 - Python `3.10+`
-- Rust toolchain (1.83+, edition 2024)
+- Rust toolchain with Edition 2024 support
 - `uv`
 
 Create the environment and install development tools:
@@ -195,7 +195,7 @@ benches/                      # Rust benchmarks
 - `maturin develop` creates local native artifacts under `trace_parser/`
 - those native build artifacts are ignored by git
 - Python smoke tests live in `tests/python/`
-- Minimum Rust version: 1.83 (edition 2024)
+- Rust toolchain should support Edition 2024
 - PyO3 version: 0.28
 - Proc-macros: `trace_parser_macros` crate (see `macros/` directory)
 
@@ -245,7 +245,7 @@ git push origin v0.1.0
 ## Roadmap
 
 - add more typed trace events (sched_migrate, sched_waking, etc.)
-- migrate remaining hand-written events onto proc-macros
+- keep typed events macro-generated; keep `Trace` as the generic hand-written fallback unless a concrete need appears
 - PyO3 `extends` for shared base fields (see INHERITANCE_PLAN.md)
 - E2E integration tests with real trace files
 - stabilize the typed-event authoring pattern

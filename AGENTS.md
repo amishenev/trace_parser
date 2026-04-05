@@ -451,8 +451,8 @@ When adding or changing public event classes, keep Python-facing files in sync.
 
 Required updates:
 
-- update runtime package files under `python/trace_parser/`
-- update package-aligned `.pyi` files under `python/trace_parser/`
+- update runtime package files under `trace_parser/`
+- update package-aligned `.pyi` files under `trace_parser/`
 - update or add Python examples in `examples/`
 - update or add Python smoke tests in `tests/python/`
 
@@ -463,15 +463,15 @@ This is not optional.
 For every new public typed event:
 
 1. export the class from the Rust module and module entrypoint
-2. export it from `python/trace_parser/__init__.py` if it is part of the flat public API
-3. add or update the matching `.pyi` file under `python/trace_parser/`
-4. update `python/trace_parser/__init__.pyi`
+2. export it from `trace_parser/__init__.py` if it is part of the flat public API
+3. add or update the matching `.pyi` file under `trace_parser/`
+4. update `trace_parser/__init__.pyi`
 5. add at least one Python example using the class directly or through `parse_trace(...)`
 6. add at least one Python smoke test that verifies the string parses successfully
 
 Typing quality matters:
 
-- package-local `.pyi` files under `python/trace_parser/` are the current source of truth
+- package-local `.pyi` files under `trace_parser/` are the current source of truth
 - do not reintroduce a separate `stubs/` directory
 - typing should be explicit and convenient
 - include every public class
@@ -502,7 +502,7 @@ Python smoke tests live in:
 
 Python package files live in:
 
-- `python/trace_parser/`
+- `trace_parser/`
 
 ## Current priorities
 
