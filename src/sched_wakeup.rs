@@ -128,9 +128,18 @@ mod tests {
         let trace = TraceSchedWakeup::parse(line).expect("sched_wakeup must parse");
         assert_eq!(trace.thread_tid, 0);
         assert_eq!(trace.thread_tgid, None);
+        assert!(!trace.has_unknown_thread());
         assert_eq!(
             trace.to_string().unwrap(),
             "<idle>-0 (-) [001] d..2 2318.330977: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=001"
         );
+    }
+
+    #[test]
+    fn sched_wakeup_marks_unknown_thread_name() {
+        let line =
+            "<...>-0 (-----) [001] d..2 2318.330977: sched_wakeup: comm=bash pid=1977 prio=120 target_cpu=001";
+        let trace = TraceSchedWakeup::parse(line).expect("sched_wakeup must parse");
+        assert!(trace.has_unknown_thread());
     }
 }

@@ -197,6 +197,10 @@ impl Trace {
         "{payload}"
     }
 
+    pub fn has_unknown_thread(&self) -> bool {
+        self.thread_name.trim() == "<...>"
+    }
+
     pub fn to_string(&self) -> PyResult<String> {
         validate_timestamp(self.timestamp)?;
         Ok(self.to_string_with_payload(self.payload()))
@@ -240,10 +244,18 @@ mod tests {
         assert_eq!(trace.thread_name, "<idle>");
         assert_eq!(trace.thread_tid, 0);
         assert_eq!(trace.thread_tgid, None);
+        assert!(!trace.has_unknown_thread());
         assert_eq!(
             trace.to_string().expect("to_string must work"),
             "<idle>-0 (-) [001] d..2 2318.330977: softirq_raise: vec=9 [action=RCU]"
         );
+    }
+
+    #[test]
+    fn base_trace_marks_unknown_thread_name() {
+        let line = "<...>-0 (-----) [001] d..2 2318.330977: softirq_raise: vec=9 [action=RCU]";
+        let trace = Trace::parse(line).expect("trace must parse");
+        assert!(trace.has_unknown_thread());
     }
 
     #[test]

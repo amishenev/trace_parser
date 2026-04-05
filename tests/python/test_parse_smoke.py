@@ -183,3 +183,15 @@ def test_parse_dashed_tgid_as_none() -> None:
     event = parse_trace(line)
     assert event is not None
     assert event.thread_tgid is None
+    assert event.has_unknown_thread() is False
+
+
+def test_parse_unknown_thread_placeholder() -> None:
+    line = (
+        "<...>-0 (-----) [001] d..2 2318.330977: sched_wakeup: "
+        "comm=bash pid=1977 prio=120 target_cpu=001"
+    )
+    event = parse_trace(line)
+    assert event is not None
+    assert event.thread_name == "<...>"
+    assert event.has_unknown_thread() is True

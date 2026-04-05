@@ -19,6 +19,7 @@ pub fn generate_pymethods_block(
     let can_be_parsed_fn = generate_can_be_parsed();
     let parse_fn = generate_parse();
     let to_string_fn = generate_to_string();
+    let unknown_thread_fn = generate_has_unknown_thread();
     let copy_fn = generate_copy();
     let deepcopy_fn = generate_deepcopy();
     let payload_fn = generate_payload();
@@ -35,6 +36,7 @@ pub fn generate_pymethods_block(
             #can_be_parsed_fn
             #parse_fn
             #to_string_fn
+            #unknown_thread_fn
             #copy_fn
             #deepcopy_fn
             #payload_fn
@@ -202,6 +204,15 @@ fn generate_to_string() -> TokenStream {
                 &self.flags, self.timestamp, &self.event_name,
                 &payload
             ))
+        }
+    }
+}
+
+/// Generate helper to detect unknown thread placeholder `<...>`
+fn generate_has_unknown_thread() -> TokenStream {
+    quote! {
+        pub fn has_unknown_thread(&self) -> bool {
+            self.thread_name.trim() == "<...>"
         }
     }
 }
