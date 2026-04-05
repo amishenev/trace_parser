@@ -105,8 +105,7 @@ def test_sched_process_exit_parse_smoke() -> None:
 
 def test_cpu_frequency_parse_smoke() -> None:
     line = (
-        "swapper-0 (0) [000] .... 12345.678900: cpu_frequency: "
-        "state=933000000 cpu_id=0"
+        "swapper-0 (0) [000] .... 12345.678900: cpu_frequency: state=933000000 cpu_id=0"
     )
     event = TraceCpuFrequency.parse(line)
     assert event is not None

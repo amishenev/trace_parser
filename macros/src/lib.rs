@@ -26,19 +26,19 @@ mod generator;
 mod pymethods;
 
 use attrs::{
-    find_define_template_attrs, find_fast_match_attr, find_field_attr, find_trace_event_attr,
-    find_trace_markers_attr, MarkType,
+    MarkType, find_define_template_attrs, find_fast_match_attr, find_field_attr,
+    find_trace_event_attr, find_trace_markers_attr,
 };
 use enum_gen::{generate_trace_enum, parse_variants};
 use generator::{
-    generate_event_type_impl, generate_fast_match_impl,
-    generate_template_event_impl, generate_registration,
+    generate_event_type_impl, generate_fast_match_impl, generate_registration,
+    generate_template_event_impl,
 };
-use pymethods::generate_pymethods_block;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
+use pymethods::generate_pymethods_block;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Fields, ItemStruct};
+use syn::{DeriveInput, Fields, ItemStruct, parse_macro_input};
 
 fn build_pyclass_attr(attr_tokens: TokenStream2) -> TokenStream2 {
     if attr_tokens.is_empty() {
@@ -53,7 +53,11 @@ fn build_pyclass_attr(attr_tokens: TokenStream2) -> TokenStream2 {
     }
 }
 
-fn expand_event_class(item: ItemStruct, pyclass_attr: TokenStream2, derive_macro: TokenStream2) -> TokenStream {
+fn expand_event_class(
+    item: ItemStruct,
+    pyclass_attr: TokenStream2,
+    derive_macro: TokenStream2,
+) -> TokenStream {
     let expanded = quote! {
         #pyclass_attr
         #[derive(Clone, Debug, PartialEq)]
@@ -76,15 +80,21 @@ fn expand_event_class(item: ItemStruct, pyclass_attr: TokenStream2, derive_macro
 ///     prev_comm: String,
 /// }
 /// ```
-#[proc_macro_derive(TraceEvent, attributes(trace_event, trace_markers, fast_match, define_template, field))]
+#[proc_macro_derive(
+    TraceEvent,
+    attributes(trace_event, trace_markers, fast_match, define_template, field)
+)]
 pub fn derive_trace_event(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     // Parse attributes
     let event_attr = match find_trace_event_attr(&input.attrs) {
         Some(attr) => attr,
-        None => return syn::Error::new(input.ident.span(), "missing #[trace_event] attribute")
-            .to_compile_error().into(),
+        None => {
+            return syn::Error::new(input.ident.span(), "missing #[trace_event] attribute")
+                .to_compile_error()
+                .into();
+        }
     };
 
     let markers_attr = find_trace_markers_attr(&input.attrs);
@@ -98,30 +108,25 @@ pub fn derive_trace_event(input: TokenStream) -> TokenStream {
     // Parse fields - only named fields with identifiers
     // Collect (ident, field_type, field_attr)
     let fields = match &input.data {
-        syn::Data::Struct(data) => {
-            match &data.fields {
-                Fields::Named(fields) => {
-                    fields.named.iter()
-                        .filter_map(|f| {
-                            f.ident.as_ref().and_then(|ident| {
-                                find_field_attr(&f.attrs).map(|attr| (ident.clone(), f.ty.clone(), attr))
-                            })
-                        })
-                        .collect::<Vec<_>>()
-                }
-                _ => Vec::new(),
-            }
-        }
+        syn::Data::Struct(data) => match &data.fields {
+            Fields::Named(fields) => fields
+                .named
+                .iter()
+                .filter_map(|f| {
+                    f.ident.as_ref().and_then(|ident| {
+                        find_field_attr(&f.attrs).map(|attr| (ident.clone(), f.ty.clone(), attr))
+                    })
+                })
+                .collect::<Vec<_>>(),
+            _ => Vec::new(),
+        },
         _ => Vec::new(),
     };
 
     // Generate code
     let event_type_impl = generate_event_type_impl(&input.ident, &event_attr);
-    let fast_match_impl = generate_fast_match_impl(
-        &input.ident,
-        markers_attr.as_ref(),
-        contains_any,
-    );
+    let fast_match_impl =
+        generate_fast_match_impl(&input.ident, markers_attr.as_ref(), contains_any);
     let template_event_impl = generate_template_event_impl(&input.ident, &templates, &fields);
     let registration = generate_registration(&input.ident, &event_attr, false);
 
@@ -171,15 +176,21 @@ pub fn trace_event_class(attr: TokenStream, input: TokenStream) -> TokenStream {
 ///     trace_mark_tgid: u32,
 /// }
 /// ```
-#[proc_macro_derive(TracingMarkEvent, attributes(trace_event, trace_markers, fast_match, define_template, field))]
+#[proc_macro_derive(
+    TracingMarkEvent,
+    attributes(trace_event, trace_markers, fast_match, define_template, field)
+)]
 pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     // Parse attributes
     let event_attr = match find_trace_event_attr(&input.attrs) {
         Some(attr) => attr,
-        None => return syn::Error::new(input.ident.span(), "missing #[trace_event] attribute")
-            .to_compile_error().into(),
+        None => {
+            return syn::Error::new(input.ident.span(), "missing #[trace_event] attribute")
+                .to_compile_error()
+                .into();
+        }
     };
 
     let fast_match_attr = find_fast_match_attr(&input.attrs);
@@ -187,7 +198,7 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
         .as_ref()
         .map(|a| a.contains_any.as_slice())
         .unwrap_or(&[]);
-    
+
     // Determine markers and template prefix from mark_type
     let (markers_attr, templates) = if let Some(mark_type) = event_attr.mark_type {
         let (prefix, marker) = match mark_type {
@@ -217,36 +228,34 @@ pub fn derive_tracing_mark_event(input: TokenStream) -> TokenStream {
         let markers = crate::attrs::TraceMarkersAttr(all_markers);
         (Some(markers), wrapped_templates)
     } else {
-        (find_trace_markers_attr(&input.attrs), find_define_template_attrs(&input.attrs))
+        (
+            find_trace_markers_attr(&input.attrs),
+            find_define_template_attrs(&input.attrs),
+        )
     };
 
     // Parse fields - only named fields with identifiers
     // Collect (ident, field_type, field_attr)
     let fields = match &input.data {
-        syn::Data::Struct(data) => {
-            match &data.fields {
-                Fields::Named(fields) => {
-                    fields.named.iter()
-                        .filter_map(|f| {
-                            f.ident.as_ref().and_then(|ident| {
-                                find_field_attr(&f.attrs).map(|attr| (ident.clone(), f.ty.clone(), attr))
-                            })
-                        })
-                        .collect::<Vec<_>>()
-                }
-                _ => Vec::new(),
-            }
-        }
+        syn::Data::Struct(data) => match &data.fields {
+            Fields::Named(fields) => fields
+                .named
+                .iter()
+                .filter_map(|f| {
+                    f.ident.as_ref().and_then(|ident| {
+                        find_field_attr(&f.attrs).map(|attr| (ident.clone(), f.ty.clone(), attr))
+                    })
+                })
+                .collect::<Vec<_>>(),
+            _ => Vec::new(),
+        },
         _ => Vec::new(),
     };
 
     // Generate code
     let event_type_impl = generate_event_type_impl(&input.ident, &event_attr);
-    let fast_match_impl = generate_fast_match_impl(
-        &input.ident,
-        markers_attr.as_ref(),
-        contains_any,
-    );
+    let fast_match_impl =
+        generate_fast_match_impl(&input.ident, markers_attr.as_ref(), contains_any);
     let template_event_impl = generate_template_event_impl(&input.ident, &templates, &fields);
     let registration = generate_registration(&input.ident, &event_attr, true);
 
@@ -290,8 +299,11 @@ pub fn derive_trace_enum(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let variants = match &input.data {
         syn::Data::Enum(data) => parse_variants(&data.variants),
-        _ => return syn::Error::new(input.ident.span(), "TraceEnum only works on enums")
-            .to_compile_error().into(),
+        _ => {
+            return syn::Error::new(input.ident.span(), "TraceEnum only works on enums")
+                .to_compile_error()
+                .into();
+        }
     };
     let generated = generate_trace_enum(&input.ident, &variants);
     generated.into()
@@ -312,7 +324,8 @@ mod tests {
 
     #[test]
     fn build_pyclass_attr_preserves_explicit_skip() {
-        let attr = build_pyclass_attr(quote! { skip_from_py_object, module = "trace_parser._native" });
+        let attr =
+            build_pyclass_attr(quote! { skip_from_py_object, module = "trace_parser._native" });
         let code = attr.to_string();
         assert!(code.contains("skip_from_py_object"));
         assert!(code.contains("module"));

@@ -1,6 +1,10 @@
 //! Attribute parsing for trace_event macros.
 
-use syn::{parse::{Parse, ParseStream}, ext::IdentExt, Attribute, Ident, LitStr, Result, Token};
+use syn::{
+    Attribute, Ident, LitStr, Result, Token,
+    ext::IdentExt,
+    parse::{Parse, ParseStream},
+};
 
 /// Tracing mark type: begin or end marker
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -48,7 +52,8 @@ impl Parse for TraceEventAttr {
                 // Parse array: ["alias1", "alias2"]
                 let content;
                 syn::bracketed!(content in input);
-                let list = content.parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
+                let list = content
+                    .parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
                 aliases = list.iter().map(|s| s.value()).collect();
             } else if key == "generate_pymethods" {
                 input.parse::<Token![=]>()?;
@@ -66,7 +71,13 @@ impl Parse for TraceEventAttr {
 
         let name = name.ok_or_else(|| syn::Error::new(input.span(), "missing 'name' attribute"))?;
 
-        Ok(Self { name, aliases, generate_pymethods, skip_registration, mark_type })
+        Ok(Self {
+            name,
+            aliases,
+            generate_pymethods,
+            skip_registration,
+            mark_type,
+        })
     }
 }
 
@@ -87,7 +98,8 @@ impl Parse for FastMatchAttr {
             if key == "contains_any" {
                 let content;
                 syn::bracketed!(content in input);
-                let list = content.parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
+                let list = content
+                    .parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
                 contains_any = list.iter().map(|s| s.value()).collect();
             } else {
                 return Err(syn::Error::new(key.span(), "expected contains_any"));
@@ -108,7 +120,8 @@ pub struct TraceMarkersAttr(pub Vec<String>);
 
 impl Parse for TraceMarkersAttr {
     fn parse(input: ParseStream) -> Result<Self> {
-        let list = input.parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
+        let list =
+            input.parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
         let markers = list.iter().map(|s| s.value()).collect();
         Ok(Self(markers))
     }
@@ -152,7 +165,8 @@ impl Parse for DefineTemplateAttr {
                 input.parse::<Token![=]>()?;
                 let content;
                 syn::bracketed!(content in input);
-                let list = content.parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
+                let list = content
+                    .parse_terminated(|input: ParseStream| input.parse::<LitStr>(), Token![,])?;
                 detect = list.iter().map(|s| s.value()).collect();
             } else {
                 // Assume it's an extra field: key = "regex"
@@ -162,7 +176,12 @@ impl Parse for DefineTemplateAttr {
             }
         }
 
-        Ok(Self { template: template.value(), id, detect, extra_fields })
+        Ok(Self {
+            template: template.value(),
+            id,
+            detect,
+            extra_fields,
+        })
     }
 }
 
@@ -204,7 +223,8 @@ impl Parse for FieldAttr {
                 input.parse::<Token![=]>()?;
                 let content;
                 syn::bracketed!(content in input);
-                let list = content.parse_terminated(|input: ParseStream| input.parse::<syn::Lit>(), Token![,])?;
+                let list = content
+                    .parse_terminated(|input: ParseStream| input.parse::<syn::Lit>(), Token![,])?;
                 for lit in list {
                     match lit {
                         syn::Lit::Str(s) => choice.push(s.value()),
@@ -213,8 +233,11 @@ impl Parse for FieldAttr {
                     }
                 }
             } else if key == "readonly" || key == "private" {
-                if key == "readonly" { readonly = true; }
-                else if key == "private" { private = true; }
+                if key == "readonly" {
+                    readonly = true;
+                } else if key == "private" {
+                    private = true;
+                }
             } else {
                 input.parse::<Token![=]>()?;
 
@@ -232,34 +255,45 @@ impl Parse for FieldAttr {
             }
         }
 
-        Ok(Self { name, regex, choice, readonly, private, format })
+        Ok(Self {
+            name,
+            regex,
+            choice,
+            readonly,
+            private,
+            format,
+        })
     }
 }
 
 /// Extract `#[trace_event(...)]` attribute from a list of attributes
 pub fn find_trace_event_attr(attrs: &[Attribute]) -> Option<TraceEventAttr> {
-    attrs.iter()
+    attrs
+        .iter()
         .find(|attr| attr.path().is_ident("trace_event"))
         .and_then(|attr| attr.parse_args().ok())
 }
 
 /// Extract `#[trace_markers(...)]` attribute from a list of attributes
 pub fn find_trace_markers_attr(attrs: &[Attribute]) -> Option<TraceMarkersAttr> {
-    attrs.iter()
+    attrs
+        .iter()
         .find(|attr| attr.path().is_ident("trace_markers"))
         .and_then(|attr| attr.parse_args().ok())
 }
 
 /// Extract `#[fast_match(...)]` attribute from a list of attributes
 pub fn find_fast_match_attr(attrs: &[Attribute]) -> Option<FastMatchAttr> {
-    attrs.iter()
+    attrs
+        .iter()
         .find(|attr| attr.path().is_ident("fast_match"))
         .and_then(|attr| attr.parse_args().ok())
 }
 
 /// Extract all `#[define_template(...)]` attributes from a list of attributes
 pub fn find_define_template_attrs(attrs: &[Attribute]) -> Vec<DefineTemplateAttr> {
-    attrs.iter()
+    attrs
+        .iter()
         .filter(|attr| attr.path().is_ident("define_template"))
         .filter_map(|attr| attr.parse_args().ok())
         .collect()
@@ -267,7 +301,8 @@ pub fn find_define_template_attrs(attrs: &[Attribute]) -> Vec<DefineTemplateAttr
 
 /// Extract `#[field(...)]` attribute from a field's attributes
 pub fn find_field_attr(attrs: &[Attribute]) -> Option<FieldAttr> {
-    attrs.iter()
+    attrs
+        .iter()
         .find(|attr| attr.path().is_ident("field"))
         .and_then(|attr| {
             // #[field] без аргументов → пустой FieldAttr
@@ -353,7 +388,8 @@ mod tests {
 
     #[test]
     fn test_define_template_attr_with_extra_fields() {
-        let tokens = quote! { "{?ignore:extra_info}ReceiveVsync {frame}", extra_info = r"\[[^\]]+\]" };
+        let tokens =
+            quote! { "{?ignore:extra_info}ReceiveVsync {frame}", extra_info = r"\[[^\]]+\]" };
         let attr: DefineTemplateAttr = syn::parse2(tokens).unwrap();
         assert_eq!(attr.template, "{?ignore:extra_info}ReceiveVsync {frame}");
         assert_eq!(attr.extra_fields.len(), 1);

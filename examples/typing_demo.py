@@ -4,6 +4,7 @@ Type-safe event handling demo.
 Shows how to use isinstance() checks and type hints
 for working with different trace event types.
 """
+
 from __future__ import annotations
 
 from trace_parser import (
@@ -27,12 +28,16 @@ def handle_line(line: str) -> None:
 
     # Type-safe dispatching via isinstance()
     if isinstance(event, TraceSchedSwitch):
-        print(f"  [sched_switch] {event.prev_comm} (pid={event.prev_pid}) -> {event.next_comm} (pid={event.next_pid})")
+        print(
+            f"  [sched_switch] {event.prev_comm} (pid={event.prev_pid}) -> {event.next_comm} (pid={event.next_pid})"
+        )
         return
 
     if isinstance(event, TraceSchedWakeup):
         reason_str = f" reason={event.reason}" if event.reason is not None else ""
-        print(f"  [sched_wakeup] {event.comm} (pid={event.pid}) cpu={event.target_cpu}{reason_str}")
+        print(
+            f"  [sched_wakeup] {event.comm} (pid={event.pid}) cpu={event.target_cpu}{reason_str}"
+        )
         return
 
     if isinstance(event, TraceDevFrequency):

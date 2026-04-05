@@ -1,9 +1,9 @@
+use lexical_core::parse;
+use memchr::memmem;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use regex::{Captures, Regex};
 use std::sync::LazyLock;
-use lexical_core::parse;
-use memchr::memmem;
 
 use crate::format_registry::FormatRegistry;
 
@@ -81,7 +81,8 @@ pub(crate) trait FastMatch: EventType {
         }
 
         // 2. Проверка payload маркеров (SIMD)
-        if !Self::PAYLOAD_MARKERS.iter()
+        if !Self::PAYLOAD_MARKERS
+            .iter()
             .all(|m| memmem::find(line.as_bytes(), m).is_some())
         {
             return false;
@@ -109,11 +110,7 @@ pub(crate) trait TemplateEvent: EventType {
     }
 
     /// Парсинг полей из captures с учётом формата
-    fn parse_payload(
-        parts: BaseTraceParts,
-        captures: &Captures<'_>,
-        format_id: u8,
-    ) -> Option<Self>
+    fn parse_payload(parts: BaseTraceParts, captures: &Captures<'_>, format_id: u8) -> Option<Self>
     where
         Self: Sized;
 
@@ -134,7 +131,10 @@ pub(crate) fn cap_str(captures: &Captures<'_>, name: &str) -> Option<String> {
     Some(captures.name(name)?.as_str().to_owned())
 }
 
-pub(crate) fn cap_parse<T: lexical_core::FromLexical>(captures: &Captures<'_>, name: &str) -> Option<T> {
+pub(crate) fn cap_parse<T: lexical_core::FromLexical>(
+    captures: &Captures<'_>,
+    name: &str,
+) -> Option<T> {
     parse(captures.name(name)?.as_str().as_bytes()).ok()
 }
 

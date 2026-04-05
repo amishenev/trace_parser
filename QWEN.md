@@ -297,7 +297,7 @@ static FORMATS: LazyLock<FormatRegistry> = LazyLock::new(|| {
 ```rust
 impl TemplateEvent for TraceSchedWakeup {
     fn formats() -> &'static FormatRegistry { &FORMATS }
-    
+
     fn detect_format(payload: &str) -> &'static str {
         if payload.contains("reason=") { "with_reason" } else { "orig" }
     }

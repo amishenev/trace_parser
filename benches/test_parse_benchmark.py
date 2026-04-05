@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tempfile
 import pytest
 from trace_parser import parse_trace, parse_trace_file
 
@@ -10,15 +9,16 @@ from trace_parser import parse_trace, parse_trace_file
 def generate_test_trace(path: str, lines: int = 10000) -> None:
     """Generate a test trace file with mixed events."""
     import random
+
     random.seed(42)
-    
+
     events = [
         "sched_switch",
         "sched_wakeup",
         "sched_process_exit",
         "clock_set_rate",
     ]
-    
+
     with open(path, "w") as f:
         for i in range(lines):
             event = random.choice(events)
@@ -26,7 +26,7 @@ def generate_test_trace(path: str, lines: int = 10000) -> None:
             cpu = i % 4
             tid = 1000 + i % 100
             tgid = 1000 + i % 50
-            
+
             if event == "sched_switch":
                 f.write(
                     f"bash-{tid} ({tgid}) [{cpu:03d}] .... {timestamp:.6f}: sched_switch: "

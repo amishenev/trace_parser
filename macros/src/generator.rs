@@ -37,9 +37,16 @@ pub(crate) fn is_option_type(ty: &Type) -> bool {
 /// Тип поля для генерации кода парсинга/рендера
 pub(crate) enum InferredType {
     String,
-    U8, U16, U32, U64,
-    I8, I16, I32, I64,
-    F32, F64,
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+    F32,
+    F64,
     Bool,
 }
 
@@ -78,7 +85,11 @@ impl InferredType {
         }
     }
 
-    fn field_spec(&self, custom_regex: Option<&str>, choice_values: Option<&[String]>) -> TokenStream {
+    fn field_spec(
+        &self,
+        custom_regex: Option<&str>,
+        choice_values: Option<&[String]>,
+    ) -> TokenStream {
         if let Some(values) = choice_values
             && !values.is_empty()
         {
@@ -103,13 +114,25 @@ impl InferredType {
         }
     }
 
-    fn parse_code(&self, captures: &TokenStream, name: &str, custom_regex: Option<&str>) -> TokenStream {
+    fn parse_code(
+        &self,
+        captures: &TokenStream,
+        name: &str,
+        custom_regex: Option<&str>,
+    ) -> TokenStream {
         let name = name.to_string();
         // Custom regex: always parse as string, then convert
         if custom_regex.is_some() {
             return match self {
                 Self::String => quote! { ::trace_parser::common::cap_str(#captures, #name)? },
-                Self::U8 | Self::U16 | Self::U32 | Self::U64 | Self::I8 | Self::I16 | Self::I32 | Self::I64 => {
+                Self::U8
+                | Self::U16
+                | Self::U32
+                | Self::U64
+                | Self::I8
+                | Self::I16
+                | Self::I32
+                | Self::I64 => {
                     quote! { ::trace_parser::common::cap_str(#captures, #name)?.parse().ok()? }
                 }
                 Self::F32 | Self::F64 => {
@@ -131,22 +154,38 @@ impl InferredType {
             Self::I64 => quote! { ::trace_parser::common::cap_parse::<i64>(#captures, #name)? },
             Self::F32 => quote! { ::trace_parser::common::cap_parse::<f32>(#captures, #name)? },
             Self::F64 => quote! { ::trace_parser::common::cap_parse::<f64>(#captures, #name)? },
-            Self::Bool => quote! { ::trace_parser::common::cap_parse::<u8>(#captures, #name)? == 1 },
+            Self::Bool => {
+                quote! { ::trace_parser::common::cap_parse::<u8>(#captures, #name)? == 1 }
+            }
         }
     }
 
-    fn parse_optional_code(&self, captures: &TokenStream, name: &str, custom_regex: Option<&str>) -> TokenStream {
+    fn parse_optional_code(
+        &self,
+        captures: &TokenStream,
+        name: &str,
+        custom_regex: Option<&str>,
+    ) -> TokenStream {
         let name = name.to_string();
         if custom_regex.is_some() {
             return match self {
                 Self::String => quote! { ::trace_parser::common::cap_str(#captures, #name) },
-                Self::U8 | Self::U16 | Self::U32 | Self::U64 | Self::I8 | Self::I16 | Self::I32 | Self::I64 => {
+                Self::U8
+                | Self::U16
+                | Self::U32
+                | Self::U64
+                | Self::I8
+                | Self::I16
+                | Self::I32
+                | Self::I64 => {
                     quote! { ::trace_parser::common::cap_str(#captures, #name).and_then(|s| s.parse().ok()) }
                 }
                 Self::F32 | Self::F64 => {
                     quote! { ::trace_parser::common::cap_str(#captures, #name).and_then(|s| s.parse().ok()) }
                 }
-                Self::Bool => quote! { ::trace_parser::common::cap_str(#captures, #name).map(|v| v == "1") },
+                Self::Bool => {
+                    quote! { ::trace_parser::common::cap_str(#captures, #name).map(|v| v == "1") }
+                }
             };
         }
         match self {
@@ -161,41 +200,91 @@ impl InferredType {
             Self::I64 => quote! { ::trace_parser::common::cap_parse::<i64>(#captures, #name) },
             Self::F32 => quote! { ::trace_parser::common::cap_parse::<f32>(#captures, #name) },
             Self::F64 => quote! { ::trace_parser::common::cap_parse::<f64>(#captures, #name) },
-            Self::Bool => quote! { ::trace_parser::common::cap_parse::<u8>(#captures, #name).map(|v| v == 1) },
+            Self::Bool => {
+                quote! { ::trace_parser::common::cap_parse::<u8>(#captures, #name).map(|v| v == 1) }
+            }
         }
     }
 
     fn render_value(&self, field_name: &Ident) -> TokenStream {
         match self {
-            Self::String => quote! { Some(::trace_parser::payload_template::TemplateValue::Str(&self.#field_name)) },
-            Self::U8 => quote! { Some(::trace_parser::payload_template::TemplateValue::U32(self.#field_name as u32)) },
-            Self::U16 => quote! { Some(::trace_parser::payload_template::TemplateValue::U32(self.#field_name as u32)) },
-            Self::U32 => quote! { Some(::trace_parser::payload_template::TemplateValue::U32(self.#field_name)) },
-            Self::U64 => quote! { Some(::trace_parser::payload_template::TemplateValue::Str(&self.#field_name.to_string())) },
-            Self::I8 => quote! { Some(::trace_parser::payload_template::TemplateValue::I32(self.#field_name as i32)) },
-            Self::I16 => quote! { Some(::trace_parser::payload_template::TemplateValue::I32(self.#field_name as i32)) },
-            Self::I32 => quote! { Some(::trace_parser::payload_template::TemplateValue::I32(self.#field_name)) },
-            Self::I64 => quote! { Some(::trace_parser::payload_template::TemplateValue::Str(&self.#field_name.to_string())) },
-            Self::F32 => quote! { Some(::trace_parser::payload_template::TemplateValue::F64(self.#field_name as f64)) },
-            Self::F64 => quote! { Some(::trace_parser::payload_template::TemplateValue::F64(self.#field_name)) },
-            Self::Bool => quote! { Some(::trace_parser::payload_template::TemplateValue::BoolInt(self.#field_name)) },
+            Self::String => {
+                quote! { Some(::trace_parser::payload_template::TemplateValue::Str(&self.#field_name)) }
+            }
+            Self::U8 => {
+                quote! { Some(::trace_parser::payload_template::TemplateValue::U32(self.#field_name as u32)) }
+            }
+            Self::U16 => {
+                quote! { Some(::trace_parser::payload_template::TemplateValue::U32(self.#field_name as u32)) }
+            }
+            Self::U32 => {
+                quote! { Some(::trace_parser::payload_template::TemplateValue::U32(self.#field_name)) }
+            }
+            Self::U64 => {
+                quote! { Some(::trace_parser::payload_template::TemplateValue::Str(&self.#field_name.to_string())) }
+            }
+            Self::I8 => {
+                quote! { Some(::trace_parser::payload_template::TemplateValue::I32(self.#field_name as i32)) }
+            }
+            Self::I16 => {
+                quote! { Some(::trace_parser::payload_template::TemplateValue::I32(self.#field_name as i32)) }
+            }
+            Self::I32 => {
+                quote! { Some(::trace_parser::payload_template::TemplateValue::I32(self.#field_name)) }
+            }
+            Self::I64 => {
+                quote! { Some(::trace_parser::payload_template::TemplateValue::Str(&self.#field_name.to_string())) }
+            }
+            Self::F32 => {
+                quote! { Some(::trace_parser::payload_template::TemplateValue::F64(self.#field_name as f64)) }
+            }
+            Self::F64 => {
+                quote! { Some(::trace_parser::payload_template::TemplateValue::F64(self.#field_name)) }
+            }
+            Self::Bool => {
+                quote! { Some(::trace_parser::payload_template::TemplateValue::BoolInt(self.#field_name)) }
+            }
         }
     }
 
     fn render_optional_value(&self, field_name: &Ident) -> TokenStream {
         match self {
-            Self::String => quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::Str(v)) },
-            Self::U8 => quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::U32(*v as u32)) },
-            Self::U16 => quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::U32(*v as u32)) },
-            Self::U32 => quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::U32(*v)) },
-            Self::U64 => quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::Str(&v.to_string())) },
-            Self::I8 => quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::I32(*v as i32)) },
-            Self::I16 => quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::I32(*v as i32)) },
-            Self::I32 => quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::I32(*v)) },
-            Self::I64 => quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::Str(&v.to_string())) },
-            Self::F32 => quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::F64(*v as f64)) },
-            Self::F64 => quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::F64(*v)) },
-            Self::Bool => quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::BoolInt(*v)) },
+            Self::String => {
+                quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::Str(v)) }
+            }
+            Self::U8 => {
+                quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::U32(*v as u32)) }
+            }
+            Self::U16 => {
+                quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::U32(*v as u32)) }
+            }
+            Self::U32 => {
+                quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::U32(*v)) }
+            }
+            Self::U64 => {
+                quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::Str(&v.to_string())) }
+            }
+            Self::I8 => {
+                quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::I32(*v as i32)) }
+            }
+            Self::I16 => {
+                quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::I32(*v as i32)) }
+            }
+            Self::I32 => {
+                quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::I32(*v)) }
+            }
+            Self::I64 => {
+                quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::Str(&v.to_string())) }
+            }
+            Self::F32 => {
+                quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::F64(*v as f64)) }
+            }
+            Self::F64 => {
+                quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::F64(*v)) }
+            }
+            Self::Bool => {
+                quote! { self.#field_name.as_ref().map(|v| ::trace_parser::payload_template::TemplateValue::BoolInt(*v)) }
+            }
         }
     }
 
@@ -218,10 +307,7 @@ impl InferredType {
 }
 
 /// Generate `impl EventType` for the struct
-pub fn generate_event_type_impl(
-    struct_name: &Ident,
-    event_attr: &TraceEventAttr,
-) -> TokenStream {
+pub fn generate_event_type_impl(struct_name: &Ident, event_attr: &TraceEventAttr) -> TokenStream {
     let name = &event_attr.name;
     let aliases = &event_attr.aliases;
 
@@ -251,9 +337,12 @@ pub fn generate_fast_match_impl(
     let quick_check = if payload_contains_any.is_empty() {
         quote! {}
     } else {
-        let checks: Vec<TokenStream> = payload_contains_any.iter().map(|s| {
-            quote! { line.contains(#s) }
-        }).collect();
+        let checks: Vec<TokenStream> = payload_contains_any
+            .iter()
+            .map(|s| {
+                quote! { line.contains(#s) }
+            })
+            .collect();
         quote! {
             fn payload_quick_check(line: &str) -> bool {
                 #(#checks)||*
@@ -300,12 +389,18 @@ pub fn generate_template_event_impl(
         .iter()
         .filter(|(field_name, _, _)| !is_base_field(&field_name.to_string()))
         .map(|(field_name, field_ty, field_attr)| {
-            let inferred = InferredType::from_syn(field_ty)
-                .expect("unsupported field type for template");
-            let name_str = field_attr.name.clone()
+            let inferred =
+                InferredType::from_syn(field_ty).expect("unsupported field type for template");
+            let name_str = field_attr
+                .name
+                .clone()
                 .unwrap_or_else(|| field_name.to_string());
 
-            let choice = if field_attr.choice.is_empty() { None } else { Some(field_attr.choice.as_slice()) };
+            let choice = if field_attr.choice.is_empty() {
+                None
+            } else {
+                Some(field_attr.choice.as_slice())
+            };
             let field_spec = inferred.field_spec(field_attr.regex.as_deref(), choice);
 
             quote! {
@@ -370,9 +465,7 @@ pub fn generate_template_event_impl(
         .iter()
         .zip(template_ids.iter())
         .filter(|(t, _)| !t.detect.is_empty())
-        .flat_map(|(t, &id)| {
-            t.detect.iter().map(move |d| (d.as_bytes().to_vec(), id))
-        })
+        .flat_map(|(t, &id)| t.detect.iter().map(move |d| (d.as_bytes().to_vec(), id)))
         .collect();
 
     let detect_format_impl = if !detect_markers.is_empty() {
@@ -466,9 +559,11 @@ pub fn generate_template_event_impl(
         .iter()
         .filter(|(field_name, _, _)| !is_base_field(&field_name.to_string()))
         .map(|(field_name, field_ty, field_attr)| {
-            let inferred = InferredType::from_syn(field_ty)
-                .expect("unsupported field type for parse");
-            let name_str = field_attr.name.clone()
+            let inferred =
+                InferredType::from_syn(field_ty).expect("unsupported field type for parse");
+            let name_str = field_attr
+                .name
+                .clone()
                 .unwrap_or_else(|| field_name.to_string());
             let regex = field_attr.regex.as_deref();
 
@@ -541,7 +636,11 @@ pub fn generate_template_event_impl(
 }
 
 /// Generate registration code — emits inventory::submit! directly
-pub fn generate_registration(struct_name: &Ident, event_attr: &TraceEventAttr, is_tracing_mark: bool) -> TokenStream {
+pub fn generate_registration(
+    struct_name: &Ident,
+    event_attr: &TraceEventAttr,
+    is_tracing_mark: bool,
+) -> TokenStream {
     if event_attr.skip_registration {
         return quote! {};
     }
@@ -596,10 +695,7 @@ mod tests {
     #[case(vec![None, Some(1), None], vec![0, 1, 2])]
     #[case(vec![Some(0), None, Some(5), None], vec![0, 1, 5, 6])]
     #[case(vec![Some(0), None, Some(5)], vec![0, 1, 5])]
-    fn test_template_id_auto_assign(
-        #[case] ids: Vec<Option<u8>>,
-        #[case] expected: Vec<u8>,
-    ) {
+    fn test_template_id_auto_assign(#[case] ids: Vec<Option<u8>>, #[case] expected: Vec<u8>) {
         let struct_name: Ident = parse_quote!(TestEvent);
 
         // Build templates from input ids
@@ -786,7 +882,12 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_render() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
+        let templates = vec![DefineTemplateAttr {
+            template: "value={value}".to_string(),
+            id: None,
+            detect: vec![],
+            extra_fields: vec![],
+        }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(u32),
@@ -811,7 +912,12 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_optional() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
+        let templates = vec![DefineTemplateAttr {
+            template: "value={value}".to_string(),
+            id: None,
+            detect: vec![],
+            extra_fields: vec![],
+        }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(Option<u32>),
@@ -835,7 +941,12 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_custom_name() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "state={state}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
+        let templates = vec![DefineTemplateAttr {
+            template: "state={state}".to_string(),
+            id: None,
+            detect: vec![],
+            extra_fields: vec![],
+        }];
         let fields = vec![(
             parse_quote!(current_state),
             parse_quote!(u32),
@@ -859,7 +970,12 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_parse() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
+        let templates = vec![DefineTemplateAttr {
+            template: "value={value}".to_string(),
+            id: None,
+            detect: vec![],
+            extra_fields: vec![],
+        }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(u32),
@@ -884,7 +1000,12 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_parse_optional() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
+        let templates = vec![DefineTemplateAttr {
+            template: "value={value}".to_string(),
+            id: None,
+            detect: vec![],
+            extra_fields: vec![],
+        }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(Option<u32>),
@@ -910,7 +1031,12 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_parse_bool() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "flag={flag}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
+        let templates = vec![DefineTemplateAttr {
+            template: "flag={flag}".to_string(),
+            id: None,
+            detect: vec![],
+            extra_fields: vec![],
+        }];
         let fields = vec![(
             parse_quote!(flag),
             parse_quote!(bool),
@@ -936,12 +1062,44 @@ mod tests {
     fn test_generate_template_event_impl_with_multiple_templates() {
         let struct_name: Ident = parse_quote!(TestEvent);
         let templates = vec![
-            DefineTemplateAttr { template: "a={a}".to_string(), id: Some(0), detect: vec![], extra_fields: vec![] },
-            DefineTemplateAttr { template: "a={a} b={b}".to_string(), id: Some(1), detect: vec![], extra_fields: vec![] },
+            DefineTemplateAttr {
+                template: "a={a}".to_string(),
+                id: Some(0),
+                detect: vec![],
+                extra_fields: vec![],
+            },
+            DefineTemplateAttr {
+                template: "a={a} b={b}".to_string(),
+                id: Some(1),
+                detect: vec![],
+                extra_fields: vec![],
+            },
         ];
         let fields = vec![
-            (parse_quote!(a), parse_quote!(u32), FieldAttr { name: None, choice: vec![], regex: None, format: None, readonly: false, private: false }),
-            (parse_quote!(b), parse_quote!(Option<u32>), FieldAttr { name: None, choice: vec![], regex: None, format: None, readonly: false, private: false }),
+            (
+                parse_quote!(a),
+                parse_quote!(u32),
+                FieldAttr {
+                    name: None,
+                    choice: vec![],
+                    regex: None,
+                    format: None,
+                    readonly: false,
+                    private: false,
+                },
+            ),
+            (
+                parse_quote!(b),
+                parse_quote!(Option<u32>),
+                FieldAttr {
+                    name: None,
+                    choice: vec![],
+                    regex: None,
+                    format: None,
+                    readonly: false,
+                    private: false,
+                },
+            ),
         ];
 
         let output = generate_template_event_impl(&struct_name, &templates, &fields);
@@ -954,7 +1112,12 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_single_template_detect_format() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "value={value}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
+        let templates = vec![DefineTemplateAttr {
+            template: "value={value}".to_string(),
+            id: None,
+            detect: vec![],
+            extra_fields: vec![],
+        }];
         let fields = vec![(
             parse_quote!(value),
             parse_quote!(u32),
@@ -982,13 +1145,56 @@ mod tests {
     fn test_generate_template_event_impl_with_detect_markers() {
         let struct_name: Ident = parse_quote!(TraceSchedWakeup);
         let templates = vec![
-            DefineTemplateAttr { template: "comm={comm} pid={pid}".to_string(), id: Some(0), detect: vec![], extra_fields: vec![] },
-            DefineTemplateAttr { template: "comm={comm} pid={pid} reason={reason}".to_string(), id: Some(1), detect: vec!["reason=".to_string()], extra_fields: vec![] },
+            DefineTemplateAttr {
+                template: "comm={comm} pid={pid}".to_string(),
+                id: Some(0),
+                detect: vec![],
+                extra_fields: vec![],
+            },
+            DefineTemplateAttr {
+                template: "comm={comm} pid={pid} reason={reason}".to_string(),
+                id: Some(1),
+                detect: vec!["reason=".to_string()],
+                extra_fields: vec![],
+            },
         ];
         let fields = vec![
-            (parse_quote!(comm), parse_quote!(String), FieldAttr { name: None, choice: vec![], regex: None, format: None, readonly: false, private: false }),
-            (parse_quote!(pid), parse_quote!(u32), FieldAttr { name: None, choice: vec![], regex: None, format: None, readonly: false, private: false }),
-            (parse_quote!(reason), parse_quote!(Option<u32>), FieldAttr { name: None, choice: vec![], regex: None, format: None, readonly: false, private: false }),
+            (
+                parse_quote!(comm),
+                parse_quote!(String),
+                FieldAttr {
+                    name: None,
+                    choice: vec![],
+                    regex: None,
+                    format: None,
+                    readonly: false,
+                    private: false,
+                },
+            ),
+            (
+                parse_quote!(pid),
+                parse_quote!(u32),
+                FieldAttr {
+                    name: None,
+                    choice: vec![],
+                    regex: None,
+                    format: None,
+                    readonly: false,
+                    private: false,
+                },
+            ),
+            (
+                parse_quote!(reason),
+                parse_quote!(Option<u32>),
+                FieldAttr {
+                    name: None,
+                    choice: vec![],
+                    regex: None,
+                    format: None,
+                    readonly: false,
+                    private: false,
+                },
+            ),
         ];
 
         let output = generate_template_event_impl(&struct_name, &templates, &fields);
@@ -1004,7 +1210,12 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_custom_regex() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "cpu={cpu_id}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
+        let templates = vec![DefineTemplateAttr {
+            template: "cpu={cpu_id}".to_string(),
+            id: None,
+            detect: vec![],
+            extra_fields: vec![],
+        }];
         let fields = vec![(
             parse_quote!(cpu_id),
             parse_quote!(u32),
@@ -1031,7 +1242,12 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_format() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "target={target}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
+        let templates = vec![DefineTemplateAttr {
+            template: "target={target}".to_string(),
+            id: None,
+            detect: vec![],
+            extra_fields: vec![],
+        }];
         let fields = vec![(
             parse_quote!(target),
             parse_quote!(u32),
@@ -1057,7 +1273,12 @@ mod tests {
     #[test]
     fn test_generate_template_event_impl_with_choice() {
         let struct_name: Ident = parse_quote!(TestEvent);
-        let templates = vec![DefineTemplateAttr { template: "clk={clk}".to_string(), id: None, detect: vec![], extra_fields: vec![] }];
+        let templates = vec![DefineTemplateAttr {
+            template: "clk={clk}".to_string(),
+            id: None,
+            detect: vec![],
+            extra_fields: vec![],
+        }];
         let fields = vec![(
             parse_quote!(clk),
             parse_quote!(String),
@@ -1092,7 +1313,14 @@ mod tests {
         let fields = vec![(
             parse_quote!(frame_number),
             parse_quote!(u32),
-            FieldAttr { name: None, choice: vec![], regex: None, format: None, readonly: false, private: false },
+            FieldAttr {
+                name: None,
+                choice: vec![],
+                regex: None,
+                format: None,
+                readonly: false,
+                private: false,
+            },
         )];
 
         let output = generate_template_event_impl(&struct_name, &templates, &fields);
@@ -1100,9 +1328,18 @@ mod tests {
 
         // Should include the extra field in PayloadTemplate::new
         // In TokenStream, backslashes are escaped: \\[[^\\]]+\\]
-        assert!(output_str.contains("extra_info"), "output should contain extra_info");
-        assert!(output_str.contains("FieldSpec :: custom"), "output should contain FieldSpec::custom");
-        assert!(output_str.contains("[^"), "output should contain regex pattern");
+        assert!(
+            output_str.contains("extra_info"),
+            "output should contain extra_info"
+        );
+        assert!(
+            output_str.contains("FieldSpec :: custom"),
+            "output should contain FieldSpec::custom"
+        );
+        assert!(
+            output_str.contains("[^"),
+            "output should contain regex pattern"
+        );
     }
 
     #[test]

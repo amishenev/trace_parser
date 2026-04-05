@@ -33,4 +33,3 @@ __all__ = (
     "parse_trace_file",
     "version",
 )
-

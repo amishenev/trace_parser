@@ -47,9 +47,7 @@ fn run_bool_bench(name: &str, line: &str, iterations: usize, f: impl Fn(&str) ->
     }
     let elapsed = start.elapsed();
     let ns_per_iter = elapsed.as_nanos() as f64 / iterations as f64;
-    println!(
-        "{name:<38} {ns_per_iter:>10.1} ns/op  hits={hits}/{iterations}"
-    );
+    println!("{name:<38} {ns_per_iter:>10.1} ns/op  hits={hits}/{iterations}");
 }
 
 fn main() {
@@ -63,26 +61,106 @@ fn main() {
 
     println!("Positive sched_switch case");
     println!("  Fast checks (SIMD vs scalar):");
-    run_bool_bench("    contains() [SIMD memchr]", POSITIVE_LINE, iterations, contains_sched_switch_simd);
-    run_bool_bench("    contains() [scalar find()]", POSITIVE_LINE, iterations, contains_sched_switch_scalar);
-    run_bool_bench("    contains_shape() [SIMD memchr]", POSITIVE_LINE, iterations, contains_sched_switch_shape_simd);
-    run_bool_bench("    contains_shape() [scalar find()]", POSITIVE_LINE, iterations, contains_sched_switch_shape_scalar);
+    run_bool_bench(
+        "    contains() [SIMD memchr]",
+        POSITIVE_LINE,
+        iterations,
+        contains_sched_switch_simd,
+    );
+    run_bool_bench(
+        "    contains() [scalar find()]",
+        POSITIVE_LINE,
+        iterations,
+        contains_sched_switch_scalar,
+    );
+    run_bool_bench(
+        "    contains_shape() [SIMD memchr]",
+        POSITIVE_LINE,
+        iterations,
+        contains_sched_switch_shape_simd,
+    );
+    run_bool_bench(
+        "    contains_shape() [scalar find()]",
+        POSITIVE_LINE,
+        iterations,
+        contains_sched_switch_shape_scalar,
+    );
     println!("  Full parse (typed events):");
-    run_bool_bench("    Trace::can_be_parsed() [SIMD]", POSITIVE_LINE, iterations, Trace::can_be_parsed);
-    run_bool_bench("    Trace::parse() [regex]", POSITIVE_LINE, iterations, |line| Trace::parse(line).is_some());
-    run_bool_bench("    TraceSchedSwitch::can_be_parsed() [SIMD]", POSITIVE_LINE, iterations, TraceSchedSwitch::can_be_parsed);
-    run_bool_bench("    TraceSchedSwitch::parse() [regex]", POSITIVE_LINE, iterations, |line| TraceSchedSwitch::parse(line).is_some());
+    run_bool_bench(
+        "    Trace::can_be_parsed() [SIMD]",
+        POSITIVE_LINE,
+        iterations,
+        Trace::can_be_parsed,
+    );
+    run_bool_bench(
+        "    Trace::parse() [regex]",
+        POSITIVE_LINE,
+        iterations,
+        |line| Trace::parse(line).is_some(),
+    );
+    run_bool_bench(
+        "    TraceSchedSwitch::can_be_parsed() [SIMD]",
+        POSITIVE_LINE,
+        iterations,
+        TraceSchedSwitch::can_be_parsed,
+    );
+    run_bool_bench(
+        "    TraceSchedSwitch::parse() [regex]",
+        POSITIVE_LINE,
+        iterations,
+        |line| TraceSchedSwitch::parse(line).is_some(),
+    );
 
     println!();
     println!("Negative sched_switch case");
     println!("  Fast checks (SIMD vs scalar):");
-    run_bool_bench("    contains() [SIMD memchr]", NEGATIVE_LINE, iterations, contains_sched_switch_simd);
-    run_bool_bench("    contains() [scalar find()]", NEGATIVE_LINE, iterations, contains_sched_switch_scalar);
-    run_bool_bench("    contains_shape() [SIMD memchr]", NEGATIVE_LINE, iterations, contains_sched_switch_shape_simd);
-    run_bool_bench("    contains_shape() [scalar find()]", NEGATIVE_LINE, iterations, contains_sched_switch_shape_scalar);
+    run_bool_bench(
+        "    contains() [SIMD memchr]",
+        NEGATIVE_LINE,
+        iterations,
+        contains_sched_switch_simd,
+    );
+    run_bool_bench(
+        "    contains() [scalar find()]",
+        NEGATIVE_LINE,
+        iterations,
+        contains_sched_switch_scalar,
+    );
+    run_bool_bench(
+        "    contains_shape() [SIMD memchr]",
+        NEGATIVE_LINE,
+        iterations,
+        contains_sched_switch_shape_simd,
+    );
+    run_bool_bench(
+        "    contains_shape() [scalar find()]",
+        NEGATIVE_LINE,
+        iterations,
+        contains_sched_switch_shape_scalar,
+    );
     println!("  Full parse (typed events):");
-    run_bool_bench("    Trace::can_be_parsed() [SIMD]", NEGATIVE_LINE, iterations, Trace::can_be_parsed);
-    run_bool_bench("    Trace::parse() [regex]", NEGATIVE_LINE, iterations, |line| Trace::parse(line).is_some());
-    run_bool_bench("    TraceSchedSwitch::can_be_parsed() [SIMD]", NEGATIVE_LINE, iterations, TraceSchedSwitch::can_be_parsed);
-    run_bool_bench("    TraceSchedSwitch::parse() [regex]", NEGATIVE_LINE, iterations, |line| TraceSchedSwitch::parse(line).is_some());
+    run_bool_bench(
+        "    Trace::can_be_parsed() [SIMD]",
+        NEGATIVE_LINE,
+        iterations,
+        Trace::can_be_parsed,
+    );
+    run_bool_bench(
+        "    Trace::parse() [regex]",
+        NEGATIVE_LINE,
+        iterations,
+        |line| Trace::parse(line).is_some(),
+    );
+    run_bool_bench(
+        "    TraceSchedSwitch::can_be_parsed() [SIMD]",
+        NEGATIVE_LINE,
+        iterations,
+        TraceSchedSwitch::can_be_parsed,
+    );
+    run_bool_bench(
+        "    TraceSchedSwitch::parse() [regex]",
+        NEGATIVE_LINE,
+        iterations,
+        |line| TraceSchedSwitch::parse(line).is_some(),
+    );
 }

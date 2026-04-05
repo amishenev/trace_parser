@@ -102,7 +102,10 @@ mod tests {
     fn dev_frequency_payload_and_template() {
         let line = "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: clk=ddr_devfreq state=933000000 cpu_id=0";
         let trace = TraceDevFrequency::parse(line).expect("clock_set_rate must parse");
-        assert_eq!(trace.payload().unwrap(), "clk=ddr_devfreq state=933000000 cpu_id=0");
+        assert_eq!(
+            trace.payload().unwrap(),
+            "clk=ddr_devfreq state=933000000 cpu_id=0"
+        );
         assert_eq!(trace.template(), "clk={clk} state={state} cpu_id={cpu_id}");
     }
 

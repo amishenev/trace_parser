@@ -76,7 +76,10 @@ mod tests {
         assert_eq!(trace.prio, 120);
         assert_eq!(trace.target_cpu, 0);
         assert_eq!(trace.reason, None);
-        assert_eq!(trace.payload().unwrap(), "comm=bash pid=1977 prio=120 target_cpu=000");
+        assert_eq!(
+            trace.payload().unwrap(),
+            "comm=bash pid=1977 prio=120 target_cpu=000"
+        );
     }
 
     #[test]
@@ -88,7 +91,10 @@ mod tests {
         assert_eq!(trace.prio, 120);
         assert_eq!(trace.target_cpu, 0);
         assert_eq!(trace.reason, Some(3));
-        assert_eq!(trace.payload().unwrap(), "comm=bash pid=1977 prio=120 target_cpu=000 reason=3");
+        assert_eq!(
+            trace.payload().unwrap(),
+            "comm=bash pid=1977 prio=120 target_cpu=000 reason=3"
+        );
     }
 
     #[test]
@@ -99,7 +105,10 @@ mod tests {
         assert_eq!(trace.pid, 1977);
         assert_eq!(trace.prio, 120);
         assert_eq!(trace.target_cpu, 0);
-        assert_eq!(trace.payload().unwrap(), "comm=bash pid=1977 prio=120 target_cpu=000");
+        assert_eq!(
+            trace.payload().unwrap(),
+            "comm=bash pid=1977 prio=120 target_cpu=000"
+        );
     }
 
     #[test]

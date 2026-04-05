@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 
-use crate::common::{parse_base_parts, validate_timestamp, BaseTraceParts, BASE_TRACE_RE};
+use crate::common::{BASE_TRACE_RE, BaseTraceParts, parse_base_parts, validate_timestamp};
 
 #[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug, PartialEq)]
@@ -109,7 +109,16 @@ impl Trace {
         event_name: String,
         payload_raw: String,
     ) -> PyResult<Self> {
-        Self::new(thread_name, thread_tid, thread_tgid, cpu, flags, timestamp, event_name, payload_raw)
+        Self::new(
+            thread_name,
+            thread_tid,
+            thread_tgid,
+            cpu,
+            flags,
+            timestamp,
+            event_name,
+            payload_raw,
+        )
     }
 
     #[staticmethod]
@@ -238,8 +247,16 @@ mod tests {
     #[test]
     fn trace_new_and_repr() {
         let trace = Trace::new(
-            "bash".into(), 1234, 1234, 0, "....".into(), 12345.678901, "test".into(), "payload".into()
-        ).unwrap();
+            "bash".into(),
+            1234,
+            1234,
+            0,
+            "....".into(),
+            12345.678901,
+            "test".into(),
+            "payload".into(),
+        )
+        .unwrap();
         assert_eq!(trace.thread_name, "bash");
         assert_eq!(trace.thread_tid, 1234);
         assert_eq!(trace.thread_tgid, 1234);
@@ -253,8 +270,16 @@ mod tests {
     #[test]
     fn trace_copy_and_clone() {
         let trace = Trace::new(
-            "bash".into(), 1234, 1234, 0, "....".into(), 1.0, "test".into(), "payload".into()
-        ).unwrap();
+            "bash".into(),
+            1234,
+            1234,
+            0,
+            "....".into(),
+            1.0,
+            "test".into(),
+            "payload".into(),
+        )
+        .unwrap();
         let copy = trace.clone();
         assert_eq!(trace, copy);
     }
@@ -262,8 +287,16 @@ mod tests {
     #[test]
     fn trace_template() {
         let trace = Trace::new(
-            "bash".into(), 1234, 1234, 0, "....".into(), 1.0, "test".into(), "payload".into()
-        ).unwrap();
+            "bash".into(),
+            1234,
+            1234,
+            0,
+            "....".into(),
+            1.0,
+            "test".into(),
+            "payload".into(),
+        )
+        .unwrap();
         assert_eq!(trace.template(), "{payload}");
     }
 }

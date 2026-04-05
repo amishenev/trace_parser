@@ -3,7 +3,10 @@ use trace_parser_macros::tracing_mark_event_class;
 #[tracing_mark_event_class]
 #[trace_event(name = "tracing_mark_write", begin, skip_registration)]
 #[trace_markers("ReceiveVsync")]
-#[define_template("{?ignore:extra_info}ReceiveVsync {frame_number}", extra_info = r"\[[^\]]+\]")]
+#[define_template(
+    "{?ignore:extra_info}ReceiveVsync {frame_number}",
+    extra_info = r"\[[^\]]+\]"
+)]
 pub struct TraceReceiveVsync {
     #[field(private)]
     format_id: u8,

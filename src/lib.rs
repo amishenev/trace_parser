@@ -23,8 +23,8 @@ pub use trace::Trace;
 pub use trace_exit::TraceExit;
 pub use tracing_mark::{TraceMarkBegin, TraceMarkEnd, TraceReceiveVsync, TracingMark};
 
-use pyo3::prelude::*;
 use pyo3::BoundObject;
+use pyo3::prelude::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 

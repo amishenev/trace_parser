@@ -30,7 +30,8 @@ mod tests {
 
     #[test]
     fn tracing_mark_accepts_any_payload() {
-        let line = "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: anything at all";
+        let line =
+            "any_thread-232 (10) [010] .... 12345.678900: tracing_mark_write: anything at all";
         let mark = TracingMark::parse(line).expect("tracing mark must parse");
         assert_eq!(mark.event_name, "tracing_mark_write");
         assert_eq!(mark.payload().unwrap(), "anything at all");

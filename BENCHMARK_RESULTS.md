@@ -2,7 +2,7 @@
 
 ## Python бенчмарки (pytest-benchmark)
 
-**Платформа:** macOS (Darwin-CPython-64bit)  
+**Платформа:** macOS (Darwin-CPython-64bit)
 **Файл:** 1,000 строк
 
 ### SIMD vs Без SIMD (Python 3.14)
@@ -27,8 +27,8 @@
 
 ## Rust бенчмарки (cargo bench)
 
-**Дата:** 29 марта 2026  
-**Платформа:** macOS (Darwin-CPython-3.14-64bit)  
+**Дата:** 29 марта 2026
+**Платформа:** macOS (Darwin-CPython-3.14-64bit)
 **Итераций:** 300,000
 
 ### Positive case (sched_switch)
@@ -75,8 +75,8 @@
 
 ## Python бенчмарки (pytest-benchmark)
 
-**Дата:** 29 марта 2026  
-**Платформа:** macOS  
+**Дата:** 29 марта 2026
+**Платформа:** macOS
 **Файл:** 10,000 строк
 
 ### Python 3.14

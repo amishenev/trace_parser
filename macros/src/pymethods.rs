@@ -1,7 +1,7 @@
 //! Python API generation for trace_event macros.
 
 use crate::attrs::FieldAttr;
-use crate::generator::{is_option_type, InferredType};
+use crate::generator::{InferredType, is_option_type};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Ident, Type};
@@ -99,21 +99,27 @@ fn generate_field_accessors(fields: &[(Ident, Type, FieldAttr)]) -> Vec<TokenStr
 fn generate_new(fields: &[(Ident, Type, FieldAttr)]) -> TokenStream {
     let field_names: Vec<&Ident> = fields.iter().map(|(name, _, _)| name).collect();
 
-    let field_params: Vec<TokenStream> = fields.iter().map(|(field_name, field_ty, _field_attr)| {
-        let inferred = InferredType::from_syn(field_ty)
-            .expect("unsupported field type in constructor");
-        let ty = inferred.rust_type_tokens();
+    let field_params: Vec<TokenStream> = fields
+        .iter()
+        .map(|(field_name, field_ty, _field_attr)| {
+            let inferred =
+                InferredType::from_syn(field_ty).expect("unsupported field type in constructor");
+            let ty = inferred.rust_type_tokens();
 
-        if is_option_type(field_ty) {
-            quote! { #field_name: ::std::option::Option<#ty> }
-        } else {
-            quote! { #field_name: #ty }
-        }
-    }).collect();
+            if is_option_type(field_ty) {
+                quote! { #field_name: ::std::option::Option<#ty> }
+            } else {
+                quote! { #field_name: #ty }
+            }
+        })
+        .collect();
 
-    let field_inits: Vec<TokenStream> = fields.iter().map(|(field_name, _field_ty, _field_attr)| {
-        quote! { #field_name }
-    }).collect();
+    let field_inits: Vec<TokenStream> = fields
+        .iter()
+        .map(|(field_name, _field_ty, _field_attr)| {
+            quote! { #field_name }
+        })
+        .collect();
 
     quote! {
         #[new]
@@ -139,9 +145,12 @@ fn generate_repr() -> TokenStream {
 
 /// Generate `__eq__` method
 fn generate_eq(struct_name: &Ident, fields: &[(Ident, Type, FieldAttr)]) -> TokenStream {
-    let field_comparisons: Vec<TokenStream> = fields.iter().map(|(field_name, _, _)| {
-        quote! { self.#field_name == other.#field_name }
-    }).collect();
+    let field_comparisons: Vec<TokenStream> = fields
+        .iter()
+        .map(|(field_name, _, _)| {
+            quote! { self.#field_name == other.#field_name }
+        })
+        .collect();
 
     quote! {
         fn __eq__(&self, other: &#struct_name) -> bool {
@@ -244,12 +253,30 @@ mod tests {
     #[test]
     fn test_generate_new() {
         let code = generate_new(&[
-            (parse_quote!(name), parse_quote!(String), FieldAttr {
-                name: None, choice: vec![], regex: None, format: None, readonly: false, private: false,
-            }),
-            (parse_quote!(value), parse_quote!(u32), FieldAttr {
-                name: None, choice: vec![], regex: None, format: None, readonly: false, private: false,
-            }),
+            (
+                parse_quote!(name),
+                parse_quote!(String),
+                FieldAttr {
+                    name: None,
+                    choice: vec![],
+                    regex: None,
+                    format: None,
+                    readonly: false,
+                    private: false,
+                },
+            ),
+            (
+                parse_quote!(value),
+                parse_quote!(u32),
+                FieldAttr {
+                    name: None,
+                    choice: vec![],
+                    regex: None,
+                    format: None,
+                    readonly: false,
+                    private: false,
+                },
+            ),
         ]);
         let code_str = code.to_string();
         assert!(code_str.contains("# [new]"));
@@ -291,7 +318,12 @@ mod tests {
             parse_quote!(format_id),
             parse_quote!(u8),
             FieldAttr {
-                name: None, choice: vec![], regex: None, format: None, readonly: false, private: true,
+                name: None,
+                choice: vec![],
+                regex: None,
+                format: None,
+                readonly: false,
+                private: true,
             },
         )]);
         assert!(accessors.is_empty());
@@ -303,7 +335,12 @@ mod tests {
             parse_quote!(event_name),
             parse_quote!(String),
             FieldAttr {
-                name: None, choice: vec![], regex: None, format: None, readonly: true, private: false,
+                name: None,
+                choice: vec![],
+                regex: None,
+                format: None,
+                readonly: true,
+                private: false,
             },
         )]);
         let code = accessors
@@ -321,7 +358,12 @@ mod tests {
             parse_quote!(thread_tid),
             parse_quote!(u32),
             FieldAttr {
-                name: None, choice: vec![], regex: None, format: None, readonly: false, private: false,
+                name: None,
+                choice: vec![],
+                regex: None,
+                format: None,
+                readonly: false,
+                private: false,
             },
         )]);
         let code = accessors

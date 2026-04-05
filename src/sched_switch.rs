@@ -1,9 +1,10 @@
-
 use trace_parser_macros::trace_event_class;
 
 #[trace_event_class]
 #[trace_event(name = "sched_switch")]
-#[define_template("prev_comm={prev_comm} prev_pid={prev_pid} prev_prio={prev_prio} prev_state={prev_state} ==> next_comm={next_comm} next_pid={next_pid} next_prio={next_prio}")]
+#[define_template(
+    "prev_comm={prev_comm} prev_pid={prev_pid} prev_prio={prev_prio} prev_state={prev_state} ==> next_comm={next_comm} next_pid={next_pid} next_prio={next_prio}"
+)]
 pub struct TraceSchedSwitch {
     #[field(private)]
     format_id: u8,

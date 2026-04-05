@@ -49,9 +49,18 @@ mod tests {
     #[test]
     fn trace_mark_end_new_and_methods() {
         let mark = TraceMarkEnd::new(
-            0, "task".into(), 100, 100, 0, "....".into(), 1.0, "tracing_mark_write".into(),
-            100, "done".into(),
-        ).unwrap();
+            0,
+            "task".into(),
+            100,
+            100,
+            0,
+            "....".into(),
+            1.0,
+            "tracing_mark_write".into(),
+            100,
+            "done".into(),
+        )
+        .unwrap();
         assert_eq!(mark.thread_name, "task");
         assert_eq!(mark.message, "done");
     }
