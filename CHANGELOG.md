@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-04-06
+
+### Added
+
+- Unified benchmark framework:
+  - `benches/benchmark.py` — single entry point for Rust + Python benchmarks
+  - `benches/throughput.rs` — core and event benchmark families
+  - Results saved per commit to `.benchmarks/results/{commit}.json`
+  - `--compare <c1> <c2>` for diffing two runs
+  - `--list` to show available results
+- Auto-generated `.pyi` type stubs from proc-macros (`scripts/gen_stubs.py`)
+- Pre-commit hook for stub synchronization
+- Parameterized tests for `BaseTraceParts` via `rstest` (14 corner cases)
+
+### Changed
+
+- Replaced regex-based header parsing with SIMD-optimized `memchr`/`memrchr`:
+  - **core/rust_trace_parse**: +541% (5.96 → 0.93 µs/line)
+  - **TraceSchedSwitch/positive**: +154% (103K → 262K l/s)
+  - **TraceDevFrequency/positive**: +310% (171K → 704K l/s)
+  - **AOSP File API**: +255–297% (11K → 39–43K l/s)
+- Quick-check rejection regressed slightly (−10–27%) due to different dispatch path
+
 ## [0.3.3] - 2026-04-05
 
 ### Changed

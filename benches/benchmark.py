@@ -7,6 +7,7 @@ Runs all benchmark families and produces:
 - .benchmarks/report.md
 """
 
+import argparse
 import json
 import os
 import re
@@ -201,8 +202,157 @@ def print_report(cargo_results: list[dict], python_results: list[dict]):
     print("\n" + "=" * 70)
 
 
+def fmt_lines(val: float | None) -> str:
+    if val is None:
+        return "N/A"
+    if val >= 1_000_000:
+        return f"{val / 1_000_000:,.0f}M"
+    if val >= 1000:
+        return f"{val / 1000:,.0f}K"
+    return f"{val:,.0f}"
+
+
+def fmt_speed(val: float | None) -> str:
+    """Format lines/sec in a human-readable way."""
+    if val is None:
+        return "N/A"
+    if val >= 1_000_000:
+        return f"{val / 1_000_000:,.1f}M l/s"
+    if val >= 1000:
+        return f"{val / 1000:,.0f}K l/s"
+    return f"{val:,.0f} l/s"
+
+
+def compare_results(c1: str, c2: str):
+    """Compare two benchmark results and print diff."""
+    r1 = json.loads((BENCH_DIR / f"{c1}.json").read_text())
+    r2 = json.loads((BENCH_DIR / f"{c2}.json").read_text())
+
+    print(f"\n{'=' * 78}")
+    print(f"BENCHMARK COMPARISON: {c1} → {c2}")
+    print(f"{'=' * 78}\n")
+    print(f"{'Metric':<35} {'Before':>12} {'After':>12} {'Change':>10} {'Status':>8}")
+    print("-" * 78)
+
+    b1 = next((b for b in r1["benchmarks"] if b["name"] == "rust_trace_parse"), None)
+    b2 = next((b for b in r2["benchmarks"] if b["name"] == "rust_trace_parse"), None)
+    if b1 and b2:
+        change = (b2["lines_per_sec"] - b1["lines_per_sec"]) / b1["lines_per_sec"] * 100
+        status = "✅" if change > 5 else "❌" if change < -5 else "➖"
+        print(
+            f"{'core/rust_trace_parse':<35} {fmt_speed(b1['lines_per_sec']):>12} {fmt_speed(b2['lines_per_sec']):>12} {change:>+9.1f}% {status:>8}"
+        )
+        print(
+            f"  µs/line:{'':<26} {b1['ns_per_line'] / 1000:>11.2f} {b2['ns_per_line'] / 1000:>11.2f}"
+        )
+        print()
+
+    print(
+        f"{'Event (full parse — higher is better)':<35} {'Before':>12} {'After':>12} {'Change':>10} {'Status':>8}"
+    )
+    print("-" * 78)
+    for name in [
+        "TraceSchedSwitch/positive",
+        "TraceSchedWakeup/positive",
+        "TraceDevFrequency/positive",
+        "TraceMarkBegin/positive",
+        "TraceReceiveVsync/positive",
+    ]:
+        b1 = next((b for b in r1["benchmarks"] if b["name"] == name), None)
+        b2 = next((b for b in r2["benchmarks"] if b["name"] == name), None)
+        if b1 and b2:
+            change = (
+                (b2["lines_per_sec"] - b1["lines_per_sec"]) / b1["lines_per_sec"] * 100
+            )
+            short = name.replace("/positive", "")
+            status = "✅" if change > 5 else "❌" if change < -5 else "➖"
+            print(
+                f"{short:<35} {fmt_speed(b1['lines_per_sec']):>12} {fmt_speed(b2['lines_per_sec']):>12} {change:>+9.1f}% {status:>8}"
+            )
+
+    print(
+        f"\n{'Quick-check rejection — higher is better':<35} {'Before':>12} {'After':>12} {'Change':>10} {'Status':>8}"
+    )
+    print("-" * 78)
+    for name in [
+        "TraceSchedSwitch/negative",
+        "TraceSchedWakeup/negative",
+        "TraceDevFrequency/negative",
+        "TraceMarkBegin/negative",
+        "TraceReceiveVsync/negative",
+    ]:
+        b1 = next((b for b in r1["benchmarks"] if b["name"] == name), None)
+        b2 = next((b for b in r2["benchmarks"] if b["name"] == name), None)
+        if b1 and b2:
+            change = (
+                (b2["lines_per_sec"] - b1["lines_per_sec"]) / b1["lines_per_sec"] * 100
+            )
+            short = name.replace("/negative", "")
+            # Negative benchmarks: lower rejection speed means slower, but we want fast
+            status = "✅" if change > 5 else "❌" if change < -5 else "➖"
+            print(
+                f"{short:<35} {fmt_speed(b1['lines_per_sec']):>12} {fmt_speed(b2['lines_per_sec']):>12} {change:>+9.1f}% {status:>8}"
+            )
+
+    aosp_files = [
+        "systrace_tutorial",
+        "trace_30293222",
+        "trace_30898724",
+        "trace_30905547",
+    ]
+    has_aosp1 = any(b["family"] == "aosp" for b in r1["benchmarks"])
+    has_aosp2 = any(b["family"] == "aosp" for b in r2["benchmarks"])
+    if has_aosp1 and has_aosp2:
+        print(
+            f"\n{'AOSP File API — higher is better':<35} {'Before':>12} {'After':>12} {'Change':>10} {'Status':>8}"
+        )
+        print("-" * 78)
+        for name in aosp_files:
+            b1 = next((b for b in r1["benchmarks"] if b["name"] == name), None)
+            b2 = next((b for b in r2["benchmarks"] if b["name"] == name), None)
+            if b1 and b2:
+                change = (
+                    (b2["lines_per_sec"] - b1["lines_per_sec"])
+                    / b1["lines_per_sec"]
+                    * 100
+                )
+                status = "✅" if change > 5 else "❌" if change < -5 else "➖"
+                print(
+                    f"{name:<35} {fmt_speed(b1['lines_per_sec']):>12} {fmt_speed(b2['lines_per_sec']):>12} {change:>+9.1f}% {status:>8}"
+                )
+
+    print(f"\n{'=' * 78}")
+    print("Legend: ✅ improved (>5%)  ❌ regressed (<-5%)  ➖ stable")
+    print(f"{'=' * 78}\n")
+
+
 def main():
-    log(f"Benchmark run started (commit: {get_commit_info()})")
+    parser = argparse.ArgumentParser(
+        description="Unified benchmark runner for trace_parser"
+    )
+    parser.add_argument(
+        "--compare",
+        nargs=2,
+        metavar=("COMMIT1", "COMMIT2"),
+        help="Compare results between two commits",
+    )
+    parser.add_argument(
+        "--list", action="store_true", help="List available benchmark results"
+    )
+    args = parser.parse_args()
+
+    if args.compare:
+        compare_results(args.compare[0], args.compare[1])
+        return
+
+    if args.list:
+        print("Available benchmark results:")
+        for f in sorted(BENCH_DIR.glob("*.json")):
+            if f.name == "latest.json":
+                continue
+            print(f"  {f.stem}")
+        return
+
     overall_start = time.perf_counter()
 
     # Check Python module first (fail fast)
