@@ -228,7 +228,8 @@ fn bench_event_access<T: BenchEvent>(
         b.iter(|| {
             for line in &lines {
                 if let Some(event) = T::parse(black_box(line)) {
-                    black_box(event.access_1());
+                    let _: () = event.access_1();
+                    black_box(());
                 }
             }
         });
@@ -238,7 +239,8 @@ fn bench_event_access<T: BenchEvent>(
         b.iter(|| {
             for line in &lines {
                 if let Some(event) = T::parse(black_box(line)) {
-                    black_box(event.access_2());
+                    let _: () = event.access_2();
+                    black_box(());
                 }
             }
         });
@@ -248,7 +250,8 @@ fn bench_event_access<T: BenchEvent>(
         b.iter(|| {
             for line in &lines {
                 if let Some(event) = T::parse(black_box(line)) {
-                    black_box(event.access_all());
+                    let _: () = event.access_all();
+                    black_box(());
                 }
             }
         });
