@@ -589,45 +589,39 @@ And for fast-match changes:
 cargo bench --bench can_be_parsed --quiet
 ```
 
-For end-to-end parser throughput on real offline AOSP traces:
+## Unified Benchmark
+
+Single entry point — `benches/benchmark.py`:
 
 ```bash
-# Extract ftrace text lines from AOSP systrace HTML (one-time refresh)
-python3 benches/extract_aosp_ftrace.py \
-  --input-glob '.benchmarks/aosp-traces/*.html' \
-  --output-dir datasets/aosp/ftrace
-
-# Run offline benchmark on repository datasets
-uv run python benches/aosp_benchmark.py --mode file
-
-# Optional: include line-by-line API benchmark and persist reports
-uv run python benches/aosp_benchmark.py --mode both \
-  --json-out .benchmarks/aosp-bench/results.json \
-  --csv-out .benchmarks/aosp-bench/results.csv
+source .venv/bin/activate
+python benches/benchmark.py
 ```
 
-Offline AOSP trace dataset location:
+This runs:
+1. `cargo bench --bench throughput` (core + event families)
+2. Python AOSP file API benchmark
+3. Saves results to `.benchmarks/results/{commit}.json`
 
-- `datasets/aosp/ftrace/*.trace`
+### Benchmark families
 
-Benchmark outputs include:
+| Family | What it measures | Output |
+|--------|-----------------|--------|
+| `core/rust_trace_parse` | 5000 lines → `Trace::parse` | µs/line, lines/sec |
+| `event/<Type>/positive` | Full parse of specific event type | µs/line, lines/sec |
+| `event/<Type>/negative` | Quick-check rejection cost | µs/line, lines/sec |
+| `aosp/<file>` | Real files via `parse_trace_file` | µs/line, lines/sec, MiB/s |
 
-- `total_lines`
-- `parsed_lines`
-- `parse_rate`
-- `lines_per_sec`
-- `bytes_per_sec`
+### Comparing commits
 
-Recent benchmark reference points for `sched_switch` on this machine:
+Results are saved per commit hash:
 
-- positive case:
-  - `Trace::can_be_parsed` about `319 ns/op`
-  - `TraceSchedSwitch::can_be_parsed` about `116 ns/op`
-  - `TraceSchedSwitch::parse().is_some()` about `9.7 us/op`
-- negative case:
-  - `Trace::can_be_parsed` about `194 ns/op`
-  - `TraceSchedSwitch::can_be_parsed` about `111 ns/op`
-  - `TraceSchedSwitch::parse().is_some()` about `147 ns/op`
+```bash
+cat .benchmarks/results/08672e6.json | python -m json.tool
+cat .benchmarks/results/latest.json | python -m json.tool
+```
+
+`latest.json` is a symlink to the most recent run.
 
 ## Codacy Coverage
 

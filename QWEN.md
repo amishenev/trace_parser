@@ -156,39 +156,41 @@ trace_parser/
 └── benches/                      # Бенчмарки
 ```
 
-### Офлайн бенчмаркинг на AOSP трейсах
+### Бенчмарки
 
-В репозитории есть готовый офлайн-набор:
-
-- `datasets/aosp/ftrace/*.trace`
-
-Если нужно пересобрать `.trace` из AOSP HTML:
+Единая точка запуска — `benches/benchmark.py`:
 
 ```bash
-python3 benches/extract_aosp_ftrace.py \
-  --input-glob '.benchmarks/aosp-traces/*.html' \
-  --output-dir datasets/aosp/ftrace
+# Полный запуск: Rust (cargo bench) + Python (inline)
+source .venv/bin/activate
+python benches/benchmark.py
 ```
 
-Запуск бенчмарка:
+Скрипт проверяет импорт `trace_parser` перед запуском, затем:
+1. Запускает `cargo bench --bench throughput` (core + event)
+2. Запускает Python AOSP file API benchmark
+3. Сохраняет результаты в `.benchmarks/results/{commit}.json`
+4. Выводит таблицы с результатами
+
+**Структура бенчмарков:**
+
+| Семейство | Что измеряет | Метрики |
+|-----------|-------------|---------|
+| `core/rust_trace_parse` | 5000 строк → `Trace::parse` | µs/line, lines/sec |
+| `event/<Type>/positive` | Полный парсинг конкретного события | µs/line, lines/sec |
+| `event/<Type>/negative` | Быстрый отсев (quick_check) | µs/line, lines/sec |
+| `aosp/<file>` | Реальные файлы через `parse_trace_file` | µs/line, lines/sec, MiB/s |
+
+**Сравнение двух коммитов:**
 
 ```bash
-# Быстрый throughput/parse-rate только file API
-uv run python benches/aosp_benchmark.py --mode file
-
-# Полный прогон: line API + file API с сохранением отчета
-uv run python benches/aosp_benchmark.py --mode both \
-  --json-out .benchmarks/aosp-bench/results.json \
-  --csv-out .benchmarks/aosp-bench/results.csv
+# Результаты сохранены по commit hash
+cat .benchmarks/results/08672e6.json | python -m json.tool
+cat .benchmarks/results/latest.json | python -m json.tool
 ```
 
-Ключевые метрики в отчете:
-
-- `total_lines`
-- `parsed_lines`
-- `parse_rate`
-- `lines_per_sec`
-- `bytes_per_sec`
+Результаты для каждого запуска сохраняются в `.benchmarks/results/{commit_hash}.json`.
+Файл `latest.json` — symlink на последний запуск.
 
 ### Архитектурные принципы
 
