@@ -25,6 +25,110 @@ pub struct BaseTraceParts {
     pub payload_raw: String,
 }
 
+/// Find the header/event_name boundary by validating FLAGS + TIMESTAMP.
+///
+/// This handles thread names containing `: `, `[`, `]`, `)`, etc.
+/// Returns the offset of the `: ` that precedes the event_name.
+fn find_header_boundary(bytes: &[u8]) -> Option<usize> {
+    // Iterate through all ": " positions
+    let mut pos = 0;
+    loop {
+        let colon_offset = memchr::memmem::find(&bytes[pos..], b": ")?;
+        let absolute = pos + colon_offset;
+
+        if validate_header(bytes, absolute) {
+            return Some(absolute);
+        }
+
+        // Try next ": "
+        pos = absolute + 2;
+    }
+}
+
+/// Validate that the position before ": " is preceded by FLAGS + TIMESTAMP.
+///
+/// Expected pattern: `] FLAGS TIMESTAMP: `
+/// where FLAGS = 3-6 chars (letters, digits, dots, dashes) and TIMESTAMP = digits.digits
+fn validate_header(bytes: &[u8], colon_pos: usize) -> bool {
+    if colon_pos < 8 {
+        return false;
+    }
+
+    // Find last ']' before colon
+    let before_colon = &bytes[..colon_pos];
+    let Some(bracket_pos) = memchr::memrchr(b']', before_colon) else {
+        return false;
+    };
+    let after_bracket = &bytes[bracket_pos + 1..colon_pos];
+
+    // after_bracket = " .... 12345.678901" or " dn.4  2318.331005" (double space possible)
+    // Need: space(s) + FLAGS (3-6 chars) + space(s) + TIMESTAMP (digits.digits)
+
+    // Find first non-space char
+    let Some(first_non_space) = after_bracket.iter().position(|&b| b != b' ') else {
+        return false;
+    };
+    if first_non_space == 0 {
+        return false; // No leading space
+    }
+
+    // Find last space after FLAGS (before TIMESTAMP)
+    // Scan from end to find the last space that precedes TIMESTAMP
+    let Some(last_space) = after_bracket.iter().rposition(|&b| b == b' ') else {
+        return false;
+    };
+    if last_space <= first_non_space {
+        return false;
+    }
+
+    // FLAGS = after_bracket[first_non_space..last_space]
+    let flags = &after_bracket[first_non_space..last_space];
+    // Trim trailing spaces from flags
+    let flags_end = flags
+        .iter()
+        .rposition(|&b| b != b' ')
+        .map(|p| p + 1)
+        .unwrap_or(0);
+    let flags = &flags[..flags_end];
+
+    if flags.len() < 3 || flags.len() > 6 {
+        return false;
+    }
+    if !flags
+        .iter()
+        .all(|&b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
+    {
+        return false;
+    }
+
+    // TIMESTAMP = after_bracket[last_space+1..], trim leading spaces
+    let ts_start = &after_bracket[last_space + 1..];
+    let ts_start = ts_start.trim_ascii_start();
+    if ts_start.is_empty() {
+        return false;
+    }
+
+    let mut has_dot = false;
+    let mut has_digits_before_dot = false;
+    let mut has_digits_after_dot = false;
+
+    for &b in ts_start {
+        if b.is_ascii_digit() {
+            if !has_dot {
+                has_digits_before_dot = true;
+            } else {
+                has_digits_after_dot = true;
+            }
+        } else if b == b'.' && !has_dot && has_digits_before_dot {
+            has_dot = true;
+        } else {
+            break;
+        }
+    }
+
+    has_dot && has_digits_before_dot && has_digits_after_dot
+}
+
 impl BaseTraceParts {
     /// Parse a full trace line without regex.
     ///
@@ -32,8 +136,8 @@ impl BaseTraceParts {
     pub fn parse(line: &str) -> Option<Self> {
         let bytes = line.as_bytes();
 
-        // 1. Find first ": " → separates header from "event_name: payload"
-        let colon1 = memchr::memmem::find(bytes, b": ")?;
+        // 1. Find the header boundary (before event_name) using FLAGS+TIMESTAMP validation
+        let colon1 = find_header_boundary(bytes)?;
 
         // 2. Find second ": " → separates event_name from payload
         let rest = &bytes[colon1 + 2..];
@@ -115,13 +219,12 @@ impl BaseTraceParts {
 /// This is used by `FastMatch::quick_check` for fast event name extraction.
 pub fn extract_event_name(line: &str) -> Option<&str> {
     let bytes = line.as_bytes();
-    let colon1 = memchr::memmem::find(bytes, b": ")?;
+    let colon1 = find_header_boundary(bytes)?;
     let rest = &bytes[colon1 + 2..];
     let colon2 = memchr::memmem::find(rest, b": ")?;
     std::str::from_utf8(&rest[..colon2]).ok().map(|s| s.trim())
 }
 
-#[cfg(test)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261,6 +364,33 @@ mod tests {
     #[case::parens_in_name(
         "name(inner)-123 (456) [000] .... 100.0",
         "name(inner)",
+        123,
+        Some(456),
+        0,
+        "....",
+        100.0
+    )]
+    #[case::colon_in_thread_name(
+        "thread: name-123 (456) [000] .... 100.0",
+        "thread: name",
+        123,
+        Some(456),
+        0,
+        "....",
+        100.0
+    )]
+    #[case::brackets_in_thread_name(
+        "thread[xx]: name-123 (456) [000] .... 100.0",
+        "thread[xx]: name",
+        123,
+        Some(456),
+        0,
+        "....",
+        100.0
+    )]
+    #[case::parens_and_brackets_in_thread_name(
+        "custom_thread)]: name-123 (456) [000] .... 100.0",
+        "custom_thread)]: name",
         123,
         Some(456),
         0,
