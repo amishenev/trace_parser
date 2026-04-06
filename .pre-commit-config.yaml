@@ -57,3 +57,12 @@ repos:
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
+
+  - repo: local
+    hooks:
+      - id: remove-co-authored-by
+        name: remove Co-authored-by lines
+        language: system
+        entry: bash -c 'if grep -q "Co-authored-by:" "$1"; then sed -i "" "/Co-authored-by:/d" "$1"; fi' --
+        stages: [commit-msg]
+        always_run: true
