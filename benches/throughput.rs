@@ -2,7 +2,11 @@
 //!
 //! Families:
 //! - **core**: pure Rust parsing cost
-//! - **event**: per-event-type synthetic (positive + negative)
+//! - **event/<Type>/parse_only**: parse without accessing payload fields
+//! - **event/<Type>/access_1**: parse + access 1 payload field
+//! - **event/<Type>/access_2**: parse + access 2 payload fields
+//! - **event/<Type>/access_all**: parse + access all payload fields
+//! - **event/<Type>/negative**: parse non-matching line
 
 use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use trace_parser::{
@@ -91,36 +95,171 @@ fn bench_core(c: &mut Criterion) {
 }
 
 // ---------------------------------------------------------------------------
-// Event benchmarks (positive + negative)
+// Event benchmarks (parse_only, access_1, access_2, access_all, negative)
 // ---------------------------------------------------------------------------
 
-fn bench_event_positive<T>(
+trait BenchEvent {
+    fn parse(line: &str) -> Option<Self>
+    where
+        Self: Sized;
+    fn access_1(&self);
+    fn access_2(&self);
+    fn access_all(&self);
+}
+
+impl BenchEvent for TraceSchedSwitch {
+    fn parse(line: &str) -> Option<Self> {
+        Self::parse(line)
+    }
+    fn access_1(&self) {
+        let _ = &self.prev_comm;
+    }
+    fn access_2(&self) {
+        let _ = &self.prev_comm;
+        let _ = &self.next_comm;
+    }
+    fn access_all(&self) {
+        let _ = &self.prev_comm;
+        let _ = &self.prev_pid;
+        let _ = &self.prev_prio;
+        let _ = &self.prev_state;
+        let _ = &self.next_comm;
+        let _ = &self.next_pid;
+        let _ = &self.next_prio;
+    }
+}
+
+impl BenchEvent for TraceSchedWakeup {
+    fn parse(line: &str) -> Option<Self> {
+        Self::parse(line)
+    }
+    fn access_1(&self) {
+        let _ = &self.comm;
+    }
+    fn access_2(&self) {
+        let _ = &self.comm;
+        let _ = &self.pid;
+    }
+    fn access_all(&self) {
+        let _ = &self.comm;
+        let _ = &self.pid;
+        let _ = &self.prio;
+        let _ = &self.target_cpu;
+        if let Some(s) = &self.success {
+            let _ = s;
+        }
+        if let Some(r) = &self.reason {
+            let _ = r;
+        }
+    }
+}
+
+impl BenchEvent for TraceDevFrequency {
+    fn parse(line: &str) -> Option<Self> {
+        Self::parse(line)
+    }
+    fn access_1(&self) {
+        let _ = &self.state;
+    }
+    fn access_2(&self) {
+        let _ = &self.state;
+        let _ = &self.cpu_id;
+    }
+    fn access_all(&self) {
+        let _ = &self.clk;
+        let _ = &self.state;
+        let _ = &self.cpu_id;
+    }
+}
+
+impl BenchEvent for TraceMarkBegin {
+    fn parse(line: &str) -> Option<Self> {
+        Self::parse(line)
+    }
+    fn access_1(&self) {
+        let _ = &self.message;
+    }
+    fn access_2(&self) {
+        let _ = &self.message;
+        let _ = &self.trace_mark_tgid;
+    }
+    fn access_all(&self) {
+        let _ = &self.message;
+        let _ = &self.trace_mark_tgid;
+    }
+}
+
+impl BenchEvent for TraceReceiveVsync {
+    fn parse(line: &str) -> Option<Self> {
+        Self::parse(line)
+    }
+    fn access_1(&self) {
+        let _ = &self.frame_number;
+    }
+    fn access_2(&self) {
+        let _ = &self.frame_number;
+        let _ = &self.trace_mark_tgid;
+    }
+    fn access_all(&self) {
+        let _ = &self.frame_number;
+        let _ = &self.trace_mark_tgid;
+    }
+}
+
+fn bench_event_access<T: BenchEvent>(
     group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
     name: &str,
     line: &str,
-) where
-    T: ParseLine,
-{
+) {
     let lines: Vec<String> = (0..200).map(|_| line.to_string()).collect();
     let total_bytes: u64 = lines.iter().map(|s| s.len() as u64).sum();
     group.throughput(Throughput::Bytes(total_bytes));
     group.sample_size(50);
-    group.bench_function(BenchmarkId::new(name, "positive"), |b| {
+
+    group.bench_function(BenchmarkId::new(name, "parse_only"), |b| {
         b.iter(|| {
             for line in &lines {
                 black_box(T::parse(black_box(line)));
             }
         });
     });
+
+    group.bench_function(BenchmarkId::new(name, "access_1"), |b| {
+        b.iter(|| {
+            for line in &lines {
+                if let Some(event) = T::parse(black_box(line)) {
+                    black_box(event.access_1());
+                }
+            }
+        });
+    });
+
+    group.bench_function(BenchmarkId::new(name, "access_2"), |b| {
+        b.iter(|| {
+            for line in &lines {
+                if let Some(event) = T::parse(black_box(line)) {
+                    black_box(event.access_2());
+                }
+            }
+        });
+    });
+
+    group.bench_function(BenchmarkId::new(name, "access_all"), |b| {
+        b.iter(|| {
+            for line in &lines {
+                if let Some(event) = T::parse(black_box(line)) {
+                    black_box(event.access_all());
+                }
+            }
+        });
+    });
 }
 
-fn bench_event_negative<T>(
+fn bench_event_negative<T: BenchEvent>(
     group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
     name: &str,
     line: &str,
-) where
-    T: ParseLine,
-{
+) {
     let lines: Vec<String> = (0..200).map(|_| line.to_string()).collect();
     let total_bytes: u64 = lines.iter().map(|s| s.len() as u64).sum();
     group.throughput(Throughput::Bytes(total_bytes));
@@ -134,69 +273,28 @@ fn bench_event_negative<T>(
     });
 }
 
-trait ParseLine {
-    fn parse(line: &str) -> Option<Self>
-    where
-        Self: Sized;
-}
-
-impl ParseLine for TraceSchedSwitch {
-    fn parse(line: &str) -> Option<Self> {
-        Self::parse(line)
-    }
-}
-
-impl ParseLine for TraceSchedWakeup {
-    fn parse(line: &str) -> Option<Self> {
-        Self::parse(line)
-    }
-}
-
-impl ParseLine for TraceDevFrequency {
-    fn parse(line: &str) -> Option<Self> {
-        Self::parse(line)
-    }
-}
-
-impl ParseLine for TraceMarkBegin {
-    fn parse(line: &str) -> Option<Self> {
-        Self::parse(line)
-    }
-}
-
-impl ParseLine for TraceReceiveVsync {
-    fn parse(line: &str) -> Option<Self> {
-        Self::parse(line)
-    }
-}
-
 fn bench_events(c: &mut Criterion) {
     let mut group = c.benchmark_group("event");
     group.sample_size(50);
     group.warm_up_time(std::time::Duration::from_millis(500));
 
-    // TraceSchedSwitch
-    bench_event_positive::<TraceSchedSwitch>(&mut group, "TraceSchedSwitch", SCHED_SWITCH_LINE);
+    bench_event_access::<TraceSchedSwitch>(&mut group, "TraceSchedSwitch", SCHED_SWITCH_LINE);
     bench_event_negative::<TraceSchedSwitch>(&mut group, "TraceSchedSwitch", SCHED_SWITCH_NEGATIVE);
 
-    // TraceSchedWakeup
-    bench_event_positive::<TraceSchedWakeup>(&mut group, "TraceSchedWakeup", SCHED_WAKEUP_LINE);
+    bench_event_access::<TraceSchedWakeup>(&mut group, "TraceSchedWakeup", SCHED_WAKEUP_LINE);
     bench_event_negative::<TraceSchedWakeup>(&mut group, "TraceSchedWakeup", SCHED_WAKEUP_NEGATIVE);
 
-    // TraceDevFrequency
-    bench_event_positive::<TraceDevFrequency>(&mut group, "TraceDevFrequency", DEV_FREQUENCY_LINE);
+    bench_event_access::<TraceDevFrequency>(&mut group, "TraceDevFrequency", DEV_FREQUENCY_LINE);
     bench_event_negative::<TraceDevFrequency>(
         &mut group,
         "TraceDevFrequency",
         DEV_FREQUENCY_NEGATIVE,
     );
 
-    // TraceMarkBegin
-    bench_event_positive::<TraceMarkBegin>(&mut group, "TraceMarkBegin", MARK_BEGIN_LINE);
+    bench_event_access::<TraceMarkBegin>(&mut group, "TraceMarkBegin", MARK_BEGIN_LINE);
     bench_event_negative::<TraceMarkBegin>(&mut group, "TraceMarkBegin", MARK_BEGIN_NEGATIVE);
 
-    // TraceReceiveVsync
-    bench_event_positive::<TraceReceiveVsync>(&mut group, "TraceReceiveVsync", RECEIVE_VSYNC_LINE);
+    bench_event_access::<TraceReceiveVsync>(&mut group, "TraceReceiveVsync", RECEIVE_VSYNC_LINE);
     bench_event_negative::<TraceReceiveVsync>(
         &mut group,
         "TraceReceiveVsync",

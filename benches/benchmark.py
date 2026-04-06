@@ -42,176 +42,6 @@ def run_cargo_bench(name_filter: str) -> str:
     return result.stdout
 
 
-# Known batch sizes (must match benches/throughput.rs)
-BATCH_SIZES = {
-    "core/rust_trace_parse": 5000,
-    "event/TraceSchedSwitch/positive": 200,
-    "event/TraceSchedSwitch/negative": 200,
-    "event/TraceSchedWakeup/positive": 200,
-    "event/TraceSchedWakeup/negative": 200,
-    "event/TraceDevFrequency/positive": 200,
-    "event/TraceDevFrequency/negative": 200,
-    "event/TraceMarkBegin/positive": 200,
-    "event/TraceMarkBegin/negative": 200,
-    "event/TraceReceiveVsync/positive": 200,
-    "event/TraceReceiveVsync/negative": 200,
-}
-
-
-def parse_criterion_results(text: str) -> list[dict]:
-    """Parse all benchmark results from cargo bench output."""
-    results = []
-    bench_pattern = re.compile(
-        r"^(core/\S+|event/\S+)\s+time:\s+\[\s*[\d.]+\s*(\w+)\s+[\d.]+\s*(\w+)\s+([\d.]+)\s*(\w+)\s*\]",
-        re.MULTILINE,
-    )
-
-    for m in bench_pattern.finditer(text):
-        name = m.group(1)
-        val = float(m.group(4))
-        unit = m.group(5)
-        if unit == "ns":
-            ns_total = val
-        elif unit == "µs":
-            ns_total = val * 1_000
-        elif unit == "ms":
-            ns_total = val * 1_000_000
-        elif unit == "s":
-            ns_total = val * 1_000_000_000
-        else:
-            continue
-
-        family = name.split("/")[0]
-        bench_name = "/".join(name.split("/")[1:])
-        batch = BATCH_SIZES.get(name, 1)
-        ns_per_line = ns_total / batch
-
-        results.append(
-            {
-                "family": family,
-                "name": bench_name,
-                "ns_per_line": round(ns_per_line, 1),
-                "lines_per_sec": round(1e9 / ns_per_line, 1) if ns_per_line > 0 else 0,
-            }
-        )
-
-    return results
-
-
-def run_python_benchmarks() -> list[dict]:
-    """Run Python-side benchmarks and return results."""
-    log("Running Python benchmarks...")
-    start = time.perf_counter()
-    results = []
-
-    from trace_parser import parse_trace_file
-
-    trace_dir = ROOT / "datasets" / "aosp" / "ftrace"
-    trace_files = sorted(trace_dir.glob("*.trace")) if trace_dir.is_dir() else []
-
-    for tf in trace_files:
-        log(f"  Benchmarking {tf.name}...")
-        file_start = time.perf_counter()
-        lines = tf.read_text().splitlines()
-        total_bytes = tf.stat().st_size
-        total_lines = len(lines)
-
-        events = parse_trace_file(str(tf))
-        file_elapsed = time.perf_counter() - file_start
-
-        results.append(
-            {
-                "family": "aosp",
-                "name": tf.stem,
-                "total_lines": total_lines,
-                "total_bytes": total_bytes,
-                "elapsed_sec": round(file_elapsed, 3),
-                "ns_per_line": round(file_elapsed / total_lines * 1e9, 1)
-                if total_lines
-                else 0,
-                "lines_per_sec": round(total_lines / file_elapsed, 1)
-                if file_elapsed
-                else 0,
-                "bytes_per_sec": round(total_bytes / file_elapsed, 1)
-                if file_elapsed
-                else 0,
-                "parse_rate": round(len(events) / total_lines * 100, 2)
-                if total_lines
-                else 0,
-                "p50_ns": None,
-                "p95_ns": None,
-            }
-        )
-
-    elapsed = time.perf_counter() - start
-    log(f"Python benchmarks completed in {elapsed:.1f}s")
-    return results
-
-
-def get_commit_info() -> str:
-    """Get current commit hash."""
-    try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True
-        ).strip()
-    except Exception:
-        return "unknown"
-
-
-def print_report(cargo_results: list[dict], python_results: list[dict]):
-    """Print human-readable summary."""
-    print("\n" + "=" * 70)
-    print("BENCHMARK RESULTS")
-    print("=" * 70)
-
-    if cargo_results:
-        print("\n--- Core Benchmarks ---")
-        print(f"{'Name':<30} {'µs/line':>10} {'lines/sec':>12}")
-        print("-" * 54)
-        for r in cargo_results:
-            if r["family"] == "core":
-                us = r["ns_per_line"] / 1000
-                print(f"{r['name']:<30} {us:>10,.2f} {r['lines_per_sec']:>12,.0f}")
-
-        print("\n--- Event Benchmarks (full parse) ---")
-        print(f"{'Name':<40} {'µs/line':>10} {'lines/sec':>12}")
-        print("-" * 64)
-        for r in cargo_results:
-            if r["family"] == "event" and "positive" in r["name"]:
-                us = r["ns_per_line"] / 1000
-                print(f"{r['name']:<40} {us:>10,.2f} {r['lines_per_sec']:>12,.0f}")
-
-        print("\n--- Event Benchmarks (quick-check rejection) ---")
-        print(f"{'Name':<40} {'µs/line':>10} {'lines/sec':>12}")
-        print("-" * 64)
-        for r in cargo_results:
-            if r["family"] == "event" and "negative" in r["name"]:
-                us = r["ns_per_line"] / 1000
-                print(f"{r['name']:<40} {us:>10,.2f} {r['lines_per_sec']:>12,.0f}")
-
-    if python_results:
-        print("\n--- AOSP File API ---")
-        print(f"{'File':<30} {'Lines':>8} {'lines/sec':>10} {'MiB/s':>8}")
-        print("-" * 58)
-        for r in python_results:
-            mib = r["bytes_per_sec"] / 1_048_576 if r["bytes_per_sec"] else 0
-            print(
-                f"{r['name']:<30} {r['total_lines']:>8,} {r['lines_per_sec']:>10,.0f} {mib:>8.1f}"
-            )
-
-    print("\n" + "=" * 70)
-
-
-def fmt_lines(val: float | None) -> str:
-    if val is None:
-        return "N/A"
-    if val >= 1_000_000:
-        return f"{val / 1_000_000:,.0f}M"
-    if val >= 1000:
-        return f"{val / 1000:,.0f}K"
-    return f"{val:,.0f}"
-
-
 def fmt_speed(val: float | None) -> str:
     """Format lines/sec in a human-readable way."""
     if val is None:
@@ -247,53 +77,44 @@ def compare_results(c1: str, c2: str):
         )
         print()
 
-    print(
-        f"{'Event (full parse — higher is better)':<35} {'Before':>12} {'After':>12} {'Change':>10} {'Status':>8}"
-    )
-    print("-" * 78)
-    for name in [
-        "TraceSchedSwitch/positive",
-        "TraceSchedWakeup/positive",
-        "TraceDevFrequency/positive",
-        "TraceMarkBegin/positive",
-        "TraceReceiveVsync/positive",
+    # Event partial access comparison
+    for section, suffix in [
+        ("Event parse_only", "parse_only"),
+        ("Event access_1", "access_1"),
+        ("Event access_2", "access_2"),
+        ("Event access_all", "access_all"),
     ]:
-        b1 = next((b for b in r1["benchmarks"] if b["name"] == name), None)
-        b2 = next((b for b in r2["benchmarks"] if b["name"] == name), None)
-        if b1 and b2:
-            change = (
-                (b2["lines_per_sec"] - b1["lines_per_sec"]) / b1["lines_per_sec"] * 100
+        print(
+            f"{section:<35} {'Before':>12} {'After':>12} {'Change':>10} {'Status':>8}"
+        )
+        print("-" * 78)
+        for name in [
+            "TraceSchedSwitch",
+            "TraceSchedWakeup",
+            "TraceDevFrequency",
+            "TraceMarkBegin",
+            "TraceReceiveVsync",
+        ]:
+            b1 = next(
+                (b for b in r1["benchmarks"] if b["name"] == f"{name}/{suffix}"), None
             )
-            short = name.replace("/positive", "")
-            status = "✅" if change > 5 else "❌" if change < -5 else "➖"
-            print(
-                f"{short:<35} {fmt_speed(b1['lines_per_sec']):>12} {fmt_speed(b2['lines_per_sec']):>12} {change:>+9.1f}% {status:>8}"
+            b2 = next(
+                (b for b in r2["benchmarks"] if b["name"] == f"{name}/{suffix}"), None
             )
+            if b1 and b2:
+                change = (
+                    (b2["lines_per_sec"] - b1["lines_per_sec"])
+                    / b1["lines_per_sec"]
+                    * 100
+                )
+                short = name
+                status = "✅" if change > 5 else "❌" if change < -5 else "➖"
+                print(
+                    f"{short:<35} {fmt_speed(b1['lines_per_sec']):>12} {fmt_speed(b2['lines_per_sec']):>12} {change:>+9.1f}% {status:>8}"
+                )
+        print()
 
-    print(
-        f"\n{'Quick-check rejection — higher is better':<35} {'Before':>12} {'After':>12} {'Change':>10} {'Status':>8}"
-    )
-    print("-" * 78)
-    for name in [
-        "TraceSchedSwitch/negative",
-        "TraceSchedWakeup/negative",
-        "TraceDevFrequency/negative",
-        "TraceMarkBegin/negative",
-        "TraceReceiveVsync/negative",
-    ]:
-        b1 = next((b for b in r1["benchmarks"] if b["name"] == name), None)
-        b2 = next((b for b in r2["benchmarks"] if b["name"] == name), None)
-        if b1 and b2:
-            change = (
-                (b2["lines_per_sec"] - b1["lines_per_sec"]) / b1["lines_per_sec"] * 100
-            )
-            short = name.replace("/negative", "")
-            # Negative benchmarks: lower rejection speed means slower, but we want fast
-            status = "✅" if change > 5 else "❌" if change < -5 else "➖"
-            print(
-                f"{short:<35} {fmt_speed(b1['lines_per_sec']):>12} {fmt_speed(b2['lines_per_sec']):>12} {change:>+9.1f}% {status:>8}"
-            )
-
+    # AOSP
     aosp_files = [
         "systrace_tutorial",
         "trace_30293222",
@@ -304,7 +125,7 @@ def compare_results(c1: str, c2: str):
     has_aosp2 = any(b["family"] == "aosp" for b in r2["benchmarks"])
     if has_aosp1 and has_aosp2:
         print(
-            f"\n{'AOSP File API — higher is better':<35} {'Before':>12} {'After':>12} {'Change':>10} {'Status':>8}"
+            f"{'AOSP File API — higher is better':<35} {'Before':>12} {'After':>12} {'Change':>10} {'Status':>8}"
         )
         print("-" * 78)
         for name in aosp_files:
@@ -324,6 +145,271 @@ def compare_results(c1: str, c2: str):
     print(f"\n{'=' * 78}")
     print("Legend: ✅ improved (>5%)  ❌ regressed (<-5%)  ➖ stable")
     print(f"{'=' * 78}\n")
+
+
+def run_python_benchmarks() -> list[dict]:
+    """Run Python-side benchmarks and return results."""
+    log("Running Python benchmarks...")
+    start = time.perf_counter()
+    results = []
+
+    from trace_parser import (
+        TraceDevFrequency,
+        TraceSchedSwitch,
+        TraceSchedWakeup,
+        parse_trace_file,
+    )
+
+    # AOSP File API benchmarks
+    trace_dir = ROOT / "datasets" / "aosp" / "ftrace"
+    trace_files = sorted(trace_dir.glob("*.trace")) if trace_dir.is_dir() else []
+
+    for tf in trace_files:
+        log(f"  Benchmarking {tf.name}...")
+        file_start = time.perf_counter()
+        lines_text = tf.read_text()
+        lines = lines_text.splitlines()
+        total_bytes = tf.stat().st_size
+        total_lines = len(lines)
+
+        events = parse_trace_file(str(tf))
+        file_elapsed = time.perf_counter() - file_start
+
+        results.append(
+            {
+                "family": "aosp",
+                "name": tf.stem,
+                "total_lines": total_lines,
+                "total_bytes": total_bytes,
+                "elapsed_sec": round(file_elapsed, 3),
+                "ns_per_line": round(file_elapsed / total_lines * 1e9, 1)
+                if total_lines
+                else 0,
+                "lines_per_sec": round(total_lines / file_elapsed, 1)
+                if file_elapsed
+                else 0,
+                "bytes_per_sec": round(total_bytes / file_elapsed, 1)
+                if file_elapsed
+                else 0,
+                "parse_rate": round(len(events) / total_lines * 100, 2)
+                if total_lines
+                else 0,
+                "p50_ns": None,
+                "p95_ns": None,
+            }
+        )
+
+    # Python per-event partial access benchmarks
+    log("  Python partial access benchmarks...")
+    test_cases = [
+        (
+            "TraceSchedSwitch",
+            TraceSchedSwitch,
+            "bash-1977 (12) [000] .... 12345.678901: sched_switch: "
+            "prev_comm=bash prev_pid=1977 prev_prio=120 prev_state=S ==> "
+            "next_comm=worker next_pid=123 next_prio=120",
+        ),
+        (
+            "TraceSchedWakeup",
+            TraceSchedWakeup,
+            "<idle>-0 (-----) [001] dn.4 2318.331005: sched_wakeup: "
+            "comm=ksoftirqd/1 pid=12 prio=120 success=1 target_cpu=001",
+        ),
+        (
+            "TraceDevFrequency",
+            TraceDevFrequency,
+            "swapper-0 (0) [000] .... 12345.678900: clock_set_rate: "
+            "clk=ddr_devfreq state=933000000 cpu_id=0",
+        ),
+    ]
+
+    for event_name, cls, line in test_cases:
+        n = 10000
+        line_bytes = len(line)
+
+        # access_1: parse + 1 field
+        t0 = time.perf_counter()
+        for _ in range(n):
+            e = cls.parse(line)
+            if e:
+                if hasattr(e, "prev_comm"):
+                    _ = e.prev_comm
+                elif hasattr(e, "comm"):
+                    _ = e.comm
+                elif hasattr(e, "state"):
+                    _ = e.state
+        access_1_elapsed = time.perf_counter() - t0
+
+        # access_2: parse + 2 fields
+        t0 = time.perf_counter()
+        for _ in range(n):
+            e = cls.parse(line)
+            if e:
+                if hasattr(e, "prev_comm"):
+                    _ = e.prev_comm
+                    _ = e.next_comm
+                elif hasattr(e, "comm"):
+                    _ = e.comm
+                    _ = e.pid
+                elif hasattr(e, "state"):
+                    _ = e.state
+                    _ = e.cpu_id
+        access_2_elapsed = time.perf_counter() - t0
+
+        # access_all: parse + all fields
+        payload_attrs = []
+        base_attrs = {
+            "thread_name",
+            "thread_tid",
+            "thread_tgid",
+            "cpu",
+            "flags",
+            "timestamp",
+            "event_name",
+            "payload_raw",
+            "format_id",
+            "cache",
+            "dirty",
+        }
+        skip_attrs = {
+            "parse",
+            "can_be_parsed",
+            "to_string",
+            "payload",
+            "template",
+            "timestamp_ms",
+            "timestamp_ns",
+            "has_unknown_thread",
+            "__class__",
+            "__delattr__",
+            "__dict__",
+            "__dir__",
+            "__doc__",
+            "__eq__",
+            "__format__",
+            "__ge__",
+            "__getattribute__",
+            "__gt__",
+            "__hash__",
+            "__init__",
+            "__init_subclass__",
+            "__le__",
+            "__lt__",
+            "__module__",
+            "__ne__",
+            "__new__",
+            "__reduce__",
+            "__reduce_ex__",
+            "__repr__",
+            "__setattr__",
+            "__sizeof__",
+            "__str__",
+            "__subclasshook__",
+            "__copy__",
+            "__deepcopy__",
+            "__getstate__",
+            "__setstate__",
+        }
+        for attr in dir(cls.parse(line) if cls.parse(line) else None):
+            if (
+                attr not in base_attrs
+                and not attr.startswith("_")
+                and attr not in skip_attrs
+            ):
+                if not callable(getattr(cls.parse(line), attr, None)):
+                    payload_attrs.append(attr)
+
+        t0 = time.perf_counter()
+        for _ in range(n):
+            e = cls.parse(line)
+            if e:
+                for attr in payload_attrs:
+                    _ = getattr(e, attr, None)
+        access_all_elapsed = time.perf_counter() - t0
+
+        for suffix, elapsed in [
+            ("access_1", access_1_elapsed),
+            ("access_2", access_2_elapsed),
+            ("access_all", access_all_elapsed),
+        ]:
+            results.append(
+                {
+                    "family": "python_access",
+                    "name": f"{event_name}/{suffix}",
+                    "total_lines": n,
+                    "total_bytes": n * line_bytes,
+                    "elapsed_sec": round(elapsed, 3),
+                    "ns_per_line": round(elapsed / n * 1e9, 1) if n else 0,
+                    "lines_per_sec": round(n / elapsed, 1) if elapsed else 0,
+                    "bytes_per_sec": round(n * line_bytes / elapsed, 1)
+                    if elapsed
+                    else 0,
+                    "parse_rate": None,
+                    "p50_ns": None,
+                    "p95_ns": None,
+                }
+            )
+
+    elapsed = time.perf_counter() - start
+    log(f"Python benchmarks completed in {elapsed:.1f}s")
+    return results
+
+
+def get_commit_info() -> str:
+    """Get current commit hash."""
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True
+        ).strip()
+    except Exception:
+        return "unknown"
+
+
+def print_report(cargo_results: list[dict], python_results: list[dict]):
+    """Print human-readable summary."""
+    print("\n" + "=" * 70)
+    print("BENCHMARK RESULTS")
+    print("=" * 70)
+
+    if cargo_results:
+        print("\n--- Core Benchmarks ---")
+        print(f"{'Name':<30} {'µs/line':>10} {'lines/sec':>12}")
+        print("-" * 54)
+        for r in cargo_results:
+            if r["family"] == "core":
+                us = r["ns_per_line"] / 1000
+                print(f"{r['name']:<30} {us:>10,.2f} {r['lines_per_sec']:>12,.0f}")
+
+        print("\n--- Event Benchmarks ---")
+        print(f"{'Name':<40} {'µs/line':>10} {'lines/sec':>12}")
+        print("-" * 64)
+        for r in cargo_results:
+            if r["family"] == "event":
+                us = r["ns_per_line"] / 1000
+                print(f"{r['name']:<40} {us:>10,.2f} {r['lines_per_sec']:>12,.0f}")
+
+    if python_results:
+        aosp = [r for r in python_results if r["family"] == "aosp"]
+        if aosp:
+            print("\n--- AOSP File API ---")
+            print(f"{'File':<30} {'Lines':>8} {'lines/sec':>10} {'MiB/s':>8}")
+            print("-" * 58)
+            for r in aosp:
+                mib = r["bytes_per_sec"] / 1_048_576 if r["bytes_per_sec"] else 0
+                print(
+                    f"{r['name']:<30} {r['total_lines']:>8,} {r['lines_per_sec']:>10,.0f} {mib:>8.1f}"
+                )
+
+        py_access = [r for r in python_results if r["family"] == "python_access"]
+        if py_access:
+            print("\n--- Python Partial Access ---")
+            print(f"{'Name':<40} {'µs/line':>10} {'lines/sec':>12}")
+            print("-" * 64)
+            for r in py_access:
+                us = r["ns_per_line"] / 1000
+                print(f"{r['name']:<40} {us:>10,.2f} {r['lines_per_sec']:>12,.0f}")
+
+    print("\n" + "=" * 70)
 
 
 def main():
@@ -394,6 +480,77 @@ def main():
 
     # Print summary
     print_report(cargo_results, python_results)
+
+
+def parse_criterion_results(text: str) -> list[dict]:
+    """Parse all benchmark results from cargo bench output."""
+    results = []
+    bench_pattern = re.compile(
+        r"^(core/\S+|event/\S+)\s+time:\s+\[\s*[\d.]+\s*(\w+)\s+[\d.]+\s*(\w+)\s+([\d.]+)\s*(\w+)\s*\]",
+        re.MULTILINE,
+    )
+
+    for m in bench_pattern.finditer(text):
+        name = m.group(1)
+        val = float(m.group(4))
+        unit = m.group(5)
+        if unit == "ns":
+            ns_total = val
+        elif unit == "µs":
+            ns_total = val * 1_000
+        elif unit == "ms":
+            ns_total = val * 1_000_000
+        elif unit == "s":
+            ns_total = val * 1_000_000_000
+        else:
+            continue
+
+        family = name.split("/")[0]
+        bench_name = "/".join(name.split("/")[1:])
+        batch = BATCH_SIZES.get(name, 1)
+        ns_per_line = ns_total / batch
+
+        results.append(
+            {
+                "family": family,
+                "name": bench_name,
+                "ns_per_line": round(ns_per_line, 1),
+                "lines_per_sec": round(1e9 / ns_per_line, 1) if ns_per_line > 0 else 0,
+            }
+        )
+
+    return results
+
+
+# Known batch sizes (must match benches/throughput.rs)
+BATCH_SIZES = {
+    "core/rust_trace_parse": 5000,
+    "event/TraceSchedSwitch/parse_only": 200,
+    "event/TraceSchedSwitch/access_1": 200,
+    "event/TraceSchedSwitch/access_2": 200,
+    "event/TraceSchedSwitch/access_all": 200,
+    "event/TraceSchedSwitch/negative": 200,
+    "event/TraceSchedWakeup/parse_only": 200,
+    "event/TraceSchedWakeup/access_1": 200,
+    "event/TraceSchedWakeup/access_2": 200,
+    "event/TraceSchedWakeup/access_all": 200,
+    "event/TraceSchedWakeup/negative": 200,
+    "event/TraceDevFrequency/parse_only": 200,
+    "event/TraceDevFrequency/access_1": 200,
+    "event/TraceDevFrequency/access_2": 200,
+    "event/TraceDevFrequency/access_all": 200,
+    "event/TraceDevFrequency/negative": 200,
+    "event/TraceMarkBegin/parse_only": 200,
+    "event/TraceMarkBegin/access_1": 200,
+    "event/TraceMarkBegin/access_2": 200,
+    "event/TraceMarkBegin/access_all": 200,
+    "event/TraceMarkBegin/negative": 200,
+    "event/TraceReceiveVsync/parse_only": 200,
+    "event/TraceReceiveVsync/access_1": 200,
+    "event/TraceReceiveVsync/access_2": 200,
+    "event/TraceReceiveVsync/access_all": 200,
+    "event/TraceReceiveVsync/negative": 200,
+}
 
 
 if __name__ == "__main__":
